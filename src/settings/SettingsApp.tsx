@@ -141,7 +141,23 @@ export function SettingsApp() {
                 className="h-6 gap-1.5 px-2.5 text-[11.5px]"
               >
                 <HugeiconsIcon icon={t.icon} size={12} strokeWidth={1.75} />
-                <span>{translate(t.label === "General" ? "settings.tabs.general" : t.label === "Editor" ? "settings.tabs.editor" : t.label === "Themes" ? "settings.tabs.themes" : t.label === "Shortcuts" ? "settings.tabs.shortcuts" : t.label === "Models" ? "settings.tabs.models" : t.label === "Agents" ? "settings.tabs.agents" : "settings.tabs.about")}</span>
+                <span>
+                  {translate(
+                    t.label === "General"
+                      ? "settings.tabs.general"
+                      : t.label === "Editor"
+                        ? "settings.tabs.editor"
+                        : t.label === "Themes"
+                          ? "settings.tabs.themes"
+                          : t.label === "Shortcuts"
+                            ? "settings.tabs.shortcuts"
+                            : t.label === "Models"
+                              ? "settings.tabs.models"
+                              : t.label === "Agents"
+                                ? "settings.tabs.agents"
+                                : "settings.tabs.about",
+                  )}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>

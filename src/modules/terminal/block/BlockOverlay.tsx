@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/modules/ai/store/chatStore";
+import { useLocale } from "@/modules/i18n";
 import {
   ArrowDown01Icon,
   ArrowUp01Icon,
@@ -189,6 +190,7 @@ function StickyHeader({ block, all, onSearch }: ChromeProps) {
 }
 
 function Toolbar({ block, all, onSearch }: ChromeProps) {
+  const { t } = useLocale();
   const duration = block.running
     ? null
     : fmtDuration(block.finishedAt - block.startedAt);
@@ -200,7 +202,7 @@ function Toolbar({ block, all, onSearch }: ChromeProps) {
       {!block.running && !!block.command && (
         <button
           type="button"
-          title="Run again"
+          title={t("terminal.runAgain")}
           className="bt-btn"
           disabled={!all.promptReady}
           onClick={() => all.onRunAgain(block.command)}
@@ -214,6 +216,7 @@ function Toolbar({ block, all, onSearch }: ChromeProps) {
 }
 
 function BlockMenu({ block, all, onSearch }: ChromeProps) {
+  const { t } = useLocale();
   const output = () => all.readOutput(block.id) ?? "";
   const attach = () => {
     const out = capAttachOutput(output());
@@ -223,7 +226,7 @@ function BlockMenu({ block, all, onSearch }: ChromeProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" title="Block actions" className="bt-btn">
+        <button type="button" title={t("terminal.blockActions")} className="bt-btn">
           <HugeiconsIcon
             icon={MoreHorizontalIcon}
             size={14}
@@ -241,40 +244,40 @@ function BlockMenu({ block, all, onSearch }: ChromeProps) {
       >
         <MenuItem
           icon={Refresh01Icon}
-          label="Run again"
+          label={t("terminal.runAgain")}
           disabled={block.running || !all.promptReady || !block.command}
           onClick={() => all.onRunAgain(block.command)}
         />
         <MenuItem
           icon={Copy01Icon}
-          label="Copy command"
+          label={t("terminal.copyCommand")}
           disabled={!block.command}
-          onClick={() => copy(block.command, "Command copied")}
+          onClick={() => copy(block.command, t("terminal.commandCopied"))}
         />
         <MenuItem
           icon={ComputerTerminal02Icon}
-          label="Copy output"
+          label={t("terminal.copyOutput")}
           onClick={() => {
             const o = output();
-            if (o) copy(o, "Output copied");
+            if (o) copy(o, t("terminal.outputCopied"));
           }}
         />
         <MenuItem
           icon={Copy01Icon}
-          label="Copy command and output"
+          label={t("terminal.copyCommandAndOutput")}
           onClick={() => {
             const text = `$ ${block.command}\n${output()}`;
-            copy(text, "Block copied");
+            copy(text, t("terminal.blockCopied"));
           }}
         />
         <MenuItem
           icon={SparklesIcon}
-          label="Attach to AI chat"
+          label={t("terminal.attachToAiChat")}
           onClick={attach}
         />
         <MenuItem
           icon={Search01Icon}
-          label="Find in block"
+          label={t("terminal.findInBlock")}
           onClick={() => onSearch(block.id)}
         />
       </DropdownMenuContent>
@@ -318,6 +321,7 @@ function SearchBar({
   revealMatch: (m: BlockMatch) => void;
   onClose: () => void;
 }) {
+  const { t } = useLocale();
   const [matches, setMatches] = useState<BlockMatch[]>([]);
   const [idx, setIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -345,7 +349,7 @@ function SearchBar({
       <input
         ref={inputRef}
         className="bt-search-input"
-        placeholder="Find in block"
+        placeholder={t("terminal.findInBlock")}
         onChange={(e) => run(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -361,12 +365,12 @@ function SearchBar({
         {matches.length ? `${idx + 1}/${matches.length}` : "0"}
       </span>
       <SearchBtn
-        title="Previous"
+        title={t("common.previous")}
         icon={ArrowUp01Icon}
         onClick={() => nav(-1)}
       />
-      <SearchBtn title="Next" icon={ArrowDown01Icon} onClick={() => nav(1)} />
-      <SearchBtn title="Close" icon={Cancel01Icon} onClick={onClose} />
+      <SearchBtn title={t("common.next")} icon={ArrowDown01Icon} onClick={() => nav(1)} />
+      <SearchBtn title={t("common.close")} icon={Cancel01Icon} onClick={onClose} />
     </div>
   );
 }

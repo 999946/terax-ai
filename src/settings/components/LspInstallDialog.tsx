@@ -16,6 +16,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useLocale } from "@/modules/i18n";
 import { useEffect, useState } from "react";
 
 type Props = {
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export function LspInstallDialog({ server, onClose }: Props) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   const [checking, setChecking] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -81,7 +83,7 @@ export function LspInstallDialog({ server, onClose }: Props) {
               type="button"
               className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
               onClick={() => void copyInstallCommand()}
-              title="Copy install command"
+              title={t("settings.lsp.copyInstallCommand")}
             >
               <HugeiconsIcon
                 icon={copied ? Tick02Icon : Copy01Icon}

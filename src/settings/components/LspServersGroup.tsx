@@ -25,12 +25,14 @@ import {
 } from "@/modules/settings/store";
 import { Delete02Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useLocale } from "@/modules/i18n";
 import { useEffect, useId, useState } from "react";
 import { LspInstallDialog } from "./LspInstallDialog";
 import { resolveLspSwitchState } from "./lspSwitchState";
 import { SettingRow } from "./SettingRow";
 
 export function LspServersGroup() {
+  const { t } = useLocale();
   const activation = usePreferencesStore((s) => s.lspActivation);
   const customServers = usePreferencesStore((s) => s.lspCustomServers);
   const [installTarget, setInstallTarget] = useState<LspPreset | null>(null);
@@ -39,7 +41,7 @@ export function LspServersGroup() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label>Language servers</Label>
+        <Label>{t("settings.lsp.languageServers")}</Label>
         <AddCustomServerDialog customServers={customServers} />
       </div>
       {servers.map((server) => (
@@ -74,6 +76,7 @@ function ServerRow({
   customServers: LspCustomServer[];
   onInstall: () => void;
 }) {
+  const { t } = useLocale();
   const detected = useLspRuntimeStore((s) => s.detected[server.command]);
 
   useEffect(() => {
@@ -106,7 +109,7 @@ function ServerRow({
           type="button"
           className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={() => void redetectBinary(server.command)}
-          title="Detect again"
+          title={t("settings.lsp.detectAgain")}
         >
           <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={1.75} />
         </button>
@@ -120,7 +123,7 @@ function ServerRow({
                 customServers.filter((c) => c.id !== server.id),
               );
             }}
-            title="Remove server"
+            title={t("settings.lsp.removeServer")}
           >
             <HugeiconsIcon icon={Delete02Icon} size={12} strokeWidth={1.75} />
           </button>
@@ -151,6 +154,7 @@ function AddCustomServerDialog({
 }: {
   customServers: LspCustomServer[];
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
@@ -227,7 +231,9 @@ function AddCustomServerDialog({
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-sm">Custom language server</DialogTitle>
+          <DialogTitle className="text-sm">
+            {t("settings.lsp.customServer")}
+          </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2.5">
           {field("Name", name, setName, "Zig")}

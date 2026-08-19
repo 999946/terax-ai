@@ -4,6 +4,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useChatStore } from "@/modules/ai";
+import { useLocale } from "@/modules/i18n";
 import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
 import {
   AiOpenButton,
@@ -42,6 +43,7 @@ export function StatusBar({
   hasComposer,
   privateActive,
 }: Props) {
+  const { t } = useLocale();
   const panelOpen = useChatStore((s) => s.panelOpen);
 
   return (
@@ -56,15 +58,14 @@ export function StatusBar({
             <TooltipTrigger asChild>
               <span className="flex shrink-0 cursor-default items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-400">
                 <HugeiconsIcon icon={IncognitoIcon} size={11} strokeWidth={2} />
-                <span>Private: hidden from AI</span>
+                <span>{t("statusbar.privateHiddenFromAi")}</span>
               </span>
             </TooltipTrigger>
             <TooltipContent
               side="top"
               className="max-w-64 text-[11px] leading-relaxed"
             >
-              AI can't see this terminal's output. Use it for secrets, SSH, or
-              anything you don't want sent to the model.
+              {t("statusbar.privateTooltip")}
             </TooltipContent>
           </Tooltip>
         ) : null}

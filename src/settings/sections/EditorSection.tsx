@@ -35,6 +35,7 @@ import {
 } from "@/modules/settings/store";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useLocale } from "@/modules/i18n";
 import { useEffect, useState } from "react";
 import { LspServersGroup } from "../components/LspServersGroup";
 import { SectionHeader } from "../components/SectionHeader";
@@ -43,6 +44,7 @@ import { SettingRow } from "../components/SettingRow";
 const AUTO_SAVE_STEP = 100;
 
 export function EditorSection() {
+  const { t } = useLocale();
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
@@ -63,13 +65,16 @@ export function EditorSection() {
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
-        title="Editor"
-        description="Editing behavior, saving, and language servers."
+        title={t("settings.editor.title")}
+        description={t("settings.editor.description")}
       />
 
       <div className="flex flex-col gap-2">
-        <Label>Appearance</Label>
-        <SettingRow title="Font size" description="Code editor text size.">
+        <Label>{t("settings.general.appearance")}</Label>
+        <SettingRow
+          title={t("settings.editor.fontSize")}
+          description={t("settings.editor.fontSizeDescription")}
+        >
           <Select
             value={String(editorFontSize)}
             onValueChange={(v) => void setEditorFontSize(Number(v))}
@@ -95,8 +100,8 @@ export function EditorSection() {
       <div className="flex flex-col gap-2">
         <Label>Editing</Label>
         <SettingRow
-          title="Vim mode"
-          description="Enable Vim keybindings in the code editor."
+          title={t("settings.editor.vimMode")}
+          description={t("settings.editor.vimModeDescription")}
         >
           <Switch
             checked={vimMode}
@@ -104,8 +109,8 @@ export function EditorSection() {
           />
         </SettingRow>
         <SettingRow
-          title="Word wrap"
-          description="Wrap long lines instead of scrolling horizontally."
+          title={t("settings.editor.wordWrap")}
+          description={t("settings.editor.wordWrapDescription")}
         >
           <Switch
             checked={editorWordWrap}
@@ -121,10 +126,10 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Saving</Label>
+        <Label>{t("settings.editor.saving")}</Label>
         <SettingRow
-          title="Auto save"
-          description="Automatically save files after a delay when changes are detected."
+          title={t("settings.editor.autoSave")}
+          description={t("settings.editor.autoSaveDescription")}
         >
           <Switch
             checked={editorAutoSave}
@@ -138,7 +143,7 @@ export function EditorSection() {
           />
         )}
         <SettingRow
-          title="Format on save"
+          title={t("settings.editor.formatOnSave")}
           description="Format the file on explicit save (Cmd+S / :w) with the formatter below."
         >
           <Switch
@@ -149,7 +154,7 @@ export function EditorSection() {
         {editorFormatOnSave && (
           <>
             <SettingRow
-              title="Formatter"
+              title={t("settings.editor.formatter")}
               description="Language server formats the buffer before writing; external tools run on the saved file from your PATH."
             >
               <FormatterSelect
@@ -198,6 +203,7 @@ function FormatterSelect({
 }
 
 function CustomFormatCommandInput() {
+  const { t } = useLocale();
   const stored = usePreferencesStore((s) => s.editorCustomFormatCommand);
   const [draft, setDraft] = useState(stored);
 
@@ -207,7 +213,7 @@ function CustomFormatCommandInput() {
 
   return (
     <SettingRow
-      title="Custom command"
+      title={t("settings.editor.customCommand")}
       description="Runs on the saved file; {file} is replaced with the quoted path (appended when omitted)."
     >
       <Input
@@ -227,6 +233,7 @@ function CustomFormatCommandInput() {
 }
 
 function FormatterOverrides() {
+  const { t } = useLocale();
   const byLang = usePreferencesStore((s) => s.editorFormatterByLang);
   const entries = Object.entries(byLang);
   const unused = EXPOSED_LANGUAGES.filter((l) => !(l.ext in byLang));
@@ -237,7 +244,7 @@ function FormatterOverrides() {
   return (
     <>
       <SettingRow
-        title="Language overrides"
+        title={t("settings.editor.languageOverrides")}
         description="Use a different formatter for specific languages (e.g. Ruff for Python)."
       >
         <button
@@ -287,7 +294,7 @@ function FormatterOverrides() {
           <button
             type="button"
             className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title="Remove override"
+            title={t("settings.editor.removeOverride")}
             onClick={() => {
               const next = { ...byLang };
               delete next[lang];
@@ -317,6 +324,7 @@ function AutoSaveDelayInput({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const { t } = useLocale();
   const [draft, setDraft] = useState(String(value));
 
   useEffect(() => {
@@ -336,8 +344,8 @@ function AutoSaveDelayInput({
 
   return (
     <SettingRow
-      title="Auto save delay"
-      description="Delay before unsaved changes are saved automatically."
+      title={t("settings.editor.autoSaveDelay")}
+      description={t("settings.editor.autoSaveDelayDescription")}
     >
       <div className="flex items-center gap-2">
         <Input
@@ -368,6 +376,7 @@ function WordWrapColumnInput({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const { t } = useLocale();
   const [draft, setDraft] = useState(String(value));
 
   useEffect(() => {
@@ -387,7 +396,7 @@ function WordWrapColumnInput({
 
   return (
     <SettingRow
-      title="Wrap column"
+      title={t("settings.editor.wrapColumn")}
       description="Soft-wrap at this column, or earlier when the editor is narrower."
     >
       <div className="flex items-center gap-2">

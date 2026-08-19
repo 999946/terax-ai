@@ -94,7 +94,11 @@ type NotificationTestState =
 
 export function GeneralSection() {
   const { mode, setMode } = useTheme();
-  const { t, preference: locale, setPreference: setLocalePreference } = useLocale();
+  const {
+    t,
+    preference: locale,
+    setPreference: setLocalePreference,
+  } = useLocale();
 
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
@@ -190,15 +194,21 @@ export function GeneralSection() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="system" className="text-[12px]">{t("settings.general.systemDefault")}</SelectItem>
-            <SelectItem value="en" className="text-[12px]">{t("settings.general.english")}</SelectItem>
-            <SelectItem value="zh-CN" className="text-[12px]">{t("settings.general.simplifiedChinese")}</SelectItem>
+            <SelectItem value="system" className="text-[12px]">
+              {t("settings.general.systemDefault")}
+            </SelectItem>
+            <SelectItem value="en" className="text-[12px]">
+              {t("settings.general.english")}
+            </SelectItem>
+            <SelectItem value="zh-CN" className="text-[12px]">
+              {t("settings.general.simplifiedChinese")}
+            </SelectItem>
           </SelectContent>
         </Select>
       </SettingRow>
 
       <div className="flex flex-col gap-2">
-        <Label>Appearance</Label>
+        <Label>{t("settings.general.appearance")}</Label>
         <div className="grid grid-cols-3 gap-2">
           {APPEARANCE.map((o) => (
             <button
@@ -219,7 +229,10 @@ export function GeneralSection() {
         </div>
         <p className="text-[11px] text-muted-foreground">
           For theme, background and customization, see the{" "}
-          <strong className="font-medium text-foreground">Themes</strong> tab.
+          <strong className="font-medium text-foreground">
+            {t("settings.themes.title")}
+          </strong>{" "}
+          tab.
         </p>
       </div>
 
@@ -464,7 +477,10 @@ export function GeneralSection() {
             </SelectContent>
           </Select>
         </SettingRow>
-        <SettingRow title="Font size" description="Terminal text size.">
+        <SettingRow
+          title={t("settings.editor.fontSize")}
+          description="Terminal text size."
+        >
           <Select
             value={String(terminalFontSize)}
             onValueChange={(v) => void setTerminalFontSize(Number(v))}
@@ -521,7 +537,7 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Agents</Label>
+        <Label>{t("settings.agents.title")}</Label>
         <SettingRow
           title="Coding agent notifications"
           description="Alert when a coding agent needs your input or finishes. Native notification when Terax is unfocused, in-app otherwise."

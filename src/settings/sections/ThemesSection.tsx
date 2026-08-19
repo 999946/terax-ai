@@ -38,10 +38,12 @@ import { validateTheme } from "@/modules/theme/validateTheme";
 import { Edit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useLocale } from "@/modules/i18n";
 import { useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 export function ThemesSection() {
+  const { t } = useLocale();
   const { themeId, setThemeId, resolvedMode, customThemes } = useTheme();
   const builtinThemes = listBuiltinThemes();
   const themes = useMemo(
@@ -137,8 +139,8 @@ export function ThemesSection() {
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
-        title="Themes"
-        description="Theme, background image, and customization."
+        title={t("settings.themes.title")}
+        description={t("settings.themes.description")}
       />
 
       <div
@@ -154,7 +156,7 @@ export function ThemesSection() {
         }}
       >
         <div className="flex items-center justify-between">
-          <Label>Theme</Label>
+          <Label>{t("settings.themes.theme")}</Label>
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
@@ -279,7 +281,7 @@ export function ThemesSection() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <Label>Editor theme</Label>
+            <Label>{t("settings.themes.editorTheme")}</Label>
             <span className="text-[11px] text-muted-foreground">
               Syntax colors for the code editor. Auto follows the app theme.
             </span>
@@ -330,7 +332,7 @@ export function ThemesSection() {
         }}
       >
         <div className="flex items-center justify-between">
-          <Label>Background</Label>
+          <Label>{t("settings.themes.background")}</Label>
           <div className="flex items-center gap-2">
             {backgroundKind === "image" && backgroundImageId ? (
               <Button
@@ -385,7 +387,9 @@ export function ThemesSection() {
               onValueChange={(v) => void setBackgroundOpacity(v[0] ?? 0)}
             />
             <div className="flex items-center justify-between gap-3 pt-1">
-              <span className="text-[11.5px] text-muted-foreground">Blur</span>
+              <span className="text-[11.5px] text-muted-foreground">
+                {t("settings.themes.blur")}
+              </span>
               <span className="tabular-nums text-[11px] text-muted-foreground">
                 {backgroundBlur}px
               </span>

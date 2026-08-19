@@ -17,10 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import {
-  getBindingTokens,
-  SHORTCUTS,
-} from "@/modules/shortcuts/shortcuts";
+import { getBindingTokens, SHORTCUTS } from "@/modules/shortcuts/shortcuts";
 import {
   type CustomEndpoint,
   compatModelIdForEndpoint,
@@ -88,6 +85,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useLocale } from "@/modules/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { ProviderKeyCard } from "../components/ProviderKeyCard";
@@ -149,6 +147,7 @@ const LOCAL_META: Partial<Record<ProviderId, LocalMeta>> = {
 };
 
 export function ModelsSection() {
+  const { t } = useLocale();
   const [keys, setKeys] = useState<KeysMap | null>(null);
   const [epKeys, setEpKeys] = useState<CustomEndpointKeys>({});
   const [adding, setAdding] = useState<Set<ProviderId>>(new Set());
@@ -356,8 +355,8 @@ export function ModelsSection() {
   return (
     <div className="flex flex-col gap-7">
       <SectionHeader
-        title="Models"
-        description="Connect the providers you use. Keys live in your OS keychain and are used only by Terax."
+        title={t("settings.models.title")}
+        description={t("settings.models.description")}
       />
 
       <DefaultsBlock
@@ -371,7 +370,7 @@ export function ModelsSection() {
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <Label>Providers</Label>
+          <Label>{t("settings.models.providers")}</Label>
           <AddProviderMenu
             providers={addableProviders}
             onAdd={addProvider}
@@ -537,9 +536,10 @@ function DefaultsBlock({
   keys: KeysMap;
   customEndpoints: readonly CustomEndpoint[];
 }) {
+  const { t } = useLocale();
   return (
     <div className="flex flex-col gap-3">
-      <Label>Defaults</Label>
+      <Label>{t("settings.models.defaults")}</Label>
       <div className="flex flex-col gap-2.5 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
         <FieldRow label="Chat model">
           <DefaultModelPicker
@@ -640,6 +640,7 @@ function AutocompleteRow({
   configuredIds: Set<ProviderId>;
   customEndpoints: readonly CustomEndpoint[];
 }) {
+  const { t } = useLocale();
   const enabled = usePreferencesStore((s) => s.autocompleteEnabled);
   const trigger = usePreferencesStore((s) => s.autocompleteTrigger);
   const provider = usePreferencesStore((s) => s.autocompleteProvider);
@@ -800,7 +801,9 @@ function AutocompleteRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">Automatic (as you type)</SelectItem>
+              <SelectItem value="auto">
+                {t("settings.models.automatic")}
+              </SelectItem>
               <SelectItem value="manual">
                 Manual ({aiCompleteShortcut || "shortcut"})
               </SelectItem>
@@ -836,6 +839,7 @@ function LocalProviderCard({
   onClearKey: () => Promise<void>;
   onRemove: () => void;
 }) {
+  const { t } = useLocale();
   const {
     baseURL,
     modelId,
@@ -904,7 +908,7 @@ function LocalProviderCard({
           size="icon"
           variant="ghost"
           onClick={onRemove}
-          title="Remove provider"
+          title={t("settings.models.removeProvider")}
           className="size-7 text-muted-foreground hover:text-destructive"
         >
           <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={1.75} />
@@ -990,7 +994,7 @@ function LocalProviderCard({
                   size="icon"
                   variant="ghost"
                   onClick={() => void onClearKey()}
-                  title="Remove key"
+                  title={t("settings.models.removeKey")}
                   className="size-7 text-muted-foreground hover:text-destructive"
                 >
                   <HugeiconsIcon
@@ -1055,6 +1059,7 @@ function CustomEndpointCard({
   onUpdate: (patch: Partial<CustomEndpoint>) => Promise<void>;
   onRemove: () => void;
 }) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState(!endpoint.baseURL.trim());
   const [nameDraft, setNameDraft] = useState(endpoint.name);
   const [urlDraft, setUrlDraft] = useState(endpoint.baseURL);
@@ -1225,7 +1230,7 @@ function CustomEndpointCard({
                   size="icon"
                   variant="ghost"
                   onClick={() => void onClearKey()}
-                  title="Remove key"
+                  title={t("settings.models.removeKey")}
                   className="size-7 text-muted-foreground hover:text-destructive"
                 >
                   <HugeiconsIcon
@@ -1291,10 +1296,13 @@ function StatusLine({
 }: {
   status: "idle" | "testing" | "ok" | "fail";
 }) {
+  const { t } = useLocale();
   if (status === "idle") return null;
   if (status === "testing") {
     return (
-      <span className="text-[10.5px] text-muted-foreground">Testing…</span>
+      <span className="text-[10.5px] text-muted-foreground">
+        {t("settings.models.testing")}
+      </span>
     );
   }
   if (status === "ok") {
@@ -1313,6 +1321,7 @@ function StatusLine({
 }
 
 function VoiceBlock() {
+  const { t } = useLocale();
   const sttProvider = usePreferencesStore((s) => s.sttProvider);
   const groqSttModel = usePreferencesStore((s) => s.groqSttModel);
   const whispercppBaseURL = usePreferencesStore((s) => s.whispercppBaseURL);
@@ -1326,7 +1335,9 @@ function VoiceBlock() {
     <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
       <div className="flex items-center gap-2">
         <HugeiconsIcon icon={Mic01Icon} size={15} strokeWidth={1.5} />
-        <span className="text-[12.5px] font-medium">Voice input</span>
+        <span className="text-[12.5px] font-medium">
+          {t("settings.models.voiceInput")}
+        </span>
       </div>
 
       <FieldRow label="Provider">
