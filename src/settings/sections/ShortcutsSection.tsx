@@ -45,10 +45,14 @@ export function ShortcutsSection() {
     const lower = search.toLowerCase();
     return base.filter(
       (s) =>
-        s.label.toLowerCase().includes(lower) ||
-        s.group.toLowerCase().includes(lower),
+        `${t(`settings.shortcuts.items.${s.id}`)} ${s.label}`
+          .toLowerCase()
+          .includes(lower) ||
+        `${t(`settings.shortcuts.groups.${s.group}`)} ${s.group}`
+          .toLowerCase()
+          .includes(lower),
     );
-  }, [search]);
+  }, [search, t]);
 
   const onRecord = (id: ShortcutId, binding: KeyBinding) => {
     const next = { ...userShortcuts, [id]: [binding] };
@@ -117,13 +121,14 @@ export function ShortcutsSection() {
           return (
             <div key={group} className="flex flex-col gap-3">
               <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                {group}
+                {t(`settings.shortcuts.groups.${group}`)}
               </h3>
               <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
                 {items.map((s) => (
                   <ShortcutRow
                     key={s.id}
                     shortcut={s}
+                    label={t(`settings.shortcuts.items.${s.id}`)}
                     isRecording={recordingId === s.id}
                     onStartRecording={() => setRecordingId(s.id)}
                     onStopRecording={() => setRecordingId(null)}
@@ -166,6 +171,7 @@ export function ShortcutsSection() {
 
 function ShortcutRow({
   shortcut,
+  label,
   isRecording,
   onStartRecording,
   onStopRecording,
@@ -175,6 +181,7 @@ function ShortcutRow({
   userBindings,
 }: {
   shortcut: Shortcut;
+  label: string;
   isRecording: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
@@ -192,7 +199,7 @@ function ShortcutRow({
   return (
     <div className="group flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-muted/30">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[12.5px] font-medium">{shortcut.label}</span>
+        <span className="text-[12.5px] font-medium">{label}</span>
       </div>
 
       <div className="flex items-center gap-2">

@@ -186,6 +186,7 @@ function FormatterSelect({
   value: EditorFormatter;
   onChange: (v: EditorFormatter) => void;
 }) {
+  const { t } = useLocale();
   return (
     <Select value={value} onValueChange={(v) => onChange(v as EditorFormatter)}>
       <SelectTrigger className="h-8 w-40 text-[12px]">
@@ -194,7 +195,7 @@ function FormatterSelect({
       <SelectContent>
         {FORMATTER_OPTIONS.map((id) => (
           <SelectItem key={id} value={id}>
-            {FORMATTER_LABELS[id]}
+            {id === "lsp" ? t("settings.editor.languageServer") : id === "custom" ? t("settings.editor.customCommand") : FORMATTER_LABELS[id]}
           </SelectItem>
         ))}
       </SelectContent>

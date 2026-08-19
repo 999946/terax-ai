@@ -435,7 +435,7 @@ export function GeneralSection() {
                     value={`wsl:${d.name}`}
                     className="text-[12px]"
                   >
-                    WSL: {d.name}
+                    {t("settings.general.wslPrefix", { distro: d.name })}
                   </SelectItem>
                 ))}
                 {defaultWorkspaceEnv.startsWith("wsl:") &&

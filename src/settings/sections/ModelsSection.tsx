@@ -98,6 +98,8 @@ const isLocalProvider = (id: ProviderId): boolean => !providerNeedsKey(id);
 type LocalMeta = {
   urlPlaceholder: string;
   modelPlaceholder: string;
+  descriptionKey?: string;
+  modelHintKey?: string;
   description: string;
   modelHint: React.ReactNode;
 };
@@ -106,43 +108,39 @@ const LOCAL_META: Partial<Record<ProviderId, LocalMeta>> = {
   lmstudio: {
     urlPlaceholder: "http://localhost:1234/v1",
     modelPlaceholder: "qwen2.5-coder-7b-instruct",
-    description:
-      "Run GGUF models via LM Studio's HTTP server (Developer tab → enable).",
-    modelHint: (
-      <>
-        The model id loaded in LM Studio — see the server's{" "}
-        <span className="font-mono">/v1/models</span> page.
-      </>
-    ),
+    descriptionKey: "settings.models.local.lmstudio.description",
+    modelHintKey: "settings.models.local.lmstudio.hint",
+    description: "",
+    modelHint: null,
   },
   mlx: {
     urlPlaceholder: "http://127.0.0.1:8080/v1",
     modelPlaceholder: "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
-    description:
-      "Apple-silicon inference via mlx_lm.server (pip install mlx-lm).",
-    modelHint: <>The Hugging Face repo path you launched mlx_lm.server with.</>,
+    descriptionKey: "settings.models.local.mlx.description",
+    description: "",
+    modelHint: null, modelHintKey: "settings.models.local.mlx.hint",
   },
   ollama: {
     urlPlaceholder: "http://localhost:11434/v1",
     modelPlaceholder: "qwen2.5-coder:7b",
-    description: "Local models via Ollama's built-in OpenAI-compatible API.",
-    modelHint: <>The model name from `ollama list` / `ollama pull`.</>,
+    descriptionKey: "settings.models.local.ollama.description",
+    description: "",
+    modelHint: null, modelHintKey: "settings.models.local.ollama.hint",
   },
   "openai-compatible": {
     urlPlaceholder: "https://api.example.com/v1",
     modelPlaceholder: "gpt-4o, qwen3-max, glm-4.6, …",
-    description: "Any OpenAI-compatible endpoint — vLLM, Z.AI, Fireworks, etc.",
+    descriptionKey: "settings.models.local.compatible.description",
+    description: "",
     modelHint: null,
   },
   openrouter: {
     urlPlaceholder: "",
     modelPlaceholder: "anthropic/claude-sonnet-5, openai/gpt-5.6, …",
-    description: "Any model on OpenRouter — type its full provider/model id.",
-    modelHint: (
-      <>
-        Browse ids at <span className="font-mono">openrouter.ai/models</span>.
-      </>
-    ),
+    descriptionKey: "settings.models.local.openrouter.description",
+    description: "",
+    modelHint: null,
+    modelHintKey: "settings.models.local.openrouter.hint",
   },
 };
 
@@ -890,7 +888,7 @@ function LocalProviderCard({
               size={9}
               strokeWidth={2}
             />
-            Connected
+            {t("settings.common.connected")}
           </Badge>
         ) : null}
         <button
@@ -898,7 +896,7 @@ function LocalProviderCard({
           onClick={() => void openUrl(provider.consoleUrl)}
           className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] text-muted-foreground transition-colors hover:text-foreground"
         >
-          Docs
+          {t("settings.models.docs")}
           <HugeiconsIcon
             icon={ArrowUpRight01Icon}
             size={11}
@@ -942,7 +940,7 @@ function LocalProviderCard({
                 disabled={!urlDraft.trim()}
                 className="h-8 px-3 text-[11px]"
               >
-                Test
+                {t("settings.models.test")}
               </Button>
             </div>
           </FieldRow>
@@ -978,7 +976,7 @@ function LocalProviderCard({
                 className="h-8 w-28 font-mono text-[11.5px]"
               />
               <span className="text-[10.5px] text-muted-foreground">
-                tokens
+                {t("settings.models.tokens")}
               </span>
             </div>
           </FieldRow>
@@ -1026,7 +1024,7 @@ function LocalProviderCard({
                   disabled={!keyDraft.trim()}
                   className="h-8 px-3 text-[11px]"
                 >
-                  Save
+                  {t("settings.models.save")}
                 </Button>
               </div>
             )}
@@ -1037,7 +1035,7 @@ function LocalProviderCard({
 
         {!modelId.trim() && meta.modelHint ? (
           <p className="text-[10.5px] leading-relaxed text-muted-foreground">
-            {meta.modelHint}
+            {meta.modelHintKey ? t(meta.modelHintKey) : meta.modelHint}
           </p>
         ) : null}
       </div>
@@ -1128,7 +1126,7 @@ function CustomEndpointCard({
               size={9}
               strokeWidth={2}
             />
-            Connected
+            {t("settings.common.connected")}
           </Badge>
         ) : null}
         <Button
@@ -1181,7 +1179,7 @@ function CustomEndpointCard({
                 disabled={!urlDraft.trim()}
                 className="h-8 px-3 text-[11px]"
               >
-                Test
+                {t("settings.models.test")}
               </Button>
             </div>
           </FieldRow>
@@ -1216,7 +1214,7 @@ function CustomEndpointCard({
                 className="h-8 w-28 font-mono text-[11.5px]"
               />
               <span className="text-[10.5px] text-muted-foreground">
-                tokens
+                {t("settings.models.tokens")}
               </span>
             </div>
           </FieldRow>
@@ -1262,7 +1260,7 @@ function CustomEndpointCard({
                   disabled={!keyDraft.trim()}
                   className="h-8 px-3 text-[11px]"
                 >
-                  Save
+                  {t("settings.models.save")}
                 </Button>
               </div>
             )}
