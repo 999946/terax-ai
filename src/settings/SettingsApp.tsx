@@ -2,6 +2,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
+import { useLocale } from "@/modules/i18n";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   AiScanIcon,
@@ -90,6 +91,7 @@ function readInitialTab(): SettingsTab {
 
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsTab>(readInitialTab);
+  const { t: translate } = useLocale();
   const init = usePreferencesStore((s) => s.init);
   const ActiveSection = TABS.find((t) => t.id === active)?.component;
 
@@ -139,7 +141,7 @@ export function SettingsApp() {
                 className="h-6 gap-1.5 px-2.5 text-[11.5px]"
               >
                 <HugeiconsIcon icon={t.icon} size={12} strokeWidth={1.75} />
-                <span>{t.label}</span>
+                <span>{translate(t.label === "General" ? "settings.tabs.general" : t.label === "Editor" ? "settings.tabs.editor" : t.label === "Themes" ? "settings.tabs.themes" : t.label === "Shortcuts" ? "settings.tabs.shortcuts" : t.label === "Models" ? "settings.tabs.models" : t.label === "Agents" ? "settings.tabs.agents" : "settings.tabs.about")}</span>
               </TabsTrigger>
             ))}
           </TabsList>

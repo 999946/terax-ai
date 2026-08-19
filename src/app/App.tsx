@@ -29,6 +29,7 @@ import {
 } from "@/modules/ai";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { native } from "@/modules/ai/lib/native";
+import { useLocale } from "@/modules/i18n";
 import { open } from "@tauri-apps/plugin-dialog";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import { useControlBridge } from "@/modules/control";
@@ -229,6 +230,7 @@ export default function App() {
   });
 
   const activeSpaceId = useSpaces((s) => s.activeId);
+  const { t } = useLocale();
   const spacesHydrated = useSpaces((s) => s.hydrated);
   const activeSpaceIdRef = useRef(activeSpaceId);
   useLayoutEffect(() => {
@@ -1138,7 +1140,7 @@ export default function App() {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "选择 Space 的根目录",
+      title: t("spaces.chooseRoot"),
     });
     const root = selected ?? activeCwd ?? home ?? null;
     const meta = create({
@@ -1150,7 +1152,7 @@ export default function App() {
     newTab(root ?? undefined);
     setActive(meta.id);
     return meta.id;
-  }, [activeCwd, home, workspaceEnv, newTab, setActiveSpaceForNewTabs]);
+  }, [activeCwd, home, workspaceEnv, newTab, setActiveSpaceForNewTabs, t]);
 
   const handleDeleteSpace = useCallback(
     (id: string) => {

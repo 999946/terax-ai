@@ -15,12 +15,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/modules/i18n";
 import {
   type OsNotificationResult,
   testAgentOsNotification,
 } from "@/modules/agents/lib/notify";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { ThemePref } from "@/modules/settings/store";
+import type { LocalePref, ThemePref } from "@/modules/settings/store";
 import {
   setAgentNotifications,
   setAutostart,
@@ -93,6 +94,7 @@ type NotificationTestState =
 
 export function GeneralSection() {
   const { mode, setMode } = useTheme();
+  const { t, preference: locale, setPreference: setLocalePreference } = useLocale();
 
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
@@ -172,9 +174,28 @@ export function GeneralSection() {
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
-        title="General"
-        description="Mode, terminal, and startup."
+        title={t("settings.general.title")}
+        description={t("settings.general.description")}
       />
+
+      <SettingRow
+        title={t("settings.general.language")}
+        description={t("settings.general.languageDescription")}
+      >
+        <Select
+          value={locale}
+          onValueChange={(value) => setLocalePreference(value as LocalePref)}
+        >
+          <SelectTrigger className="h-7 w-32 text-[11px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="system" className="text-[12px]">{t("settings.general.systemDefault")}</SelectItem>
+            <SelectItem value="en" className="text-[12px]">{t("settings.general.english")}</SelectItem>
+            <SelectItem value="zh-CN" className="text-[12px]">{t("settings.general.simplifiedChinese")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingRow>
 
       <div className="flex flex-col gap-2">
         <Label>Appearance</Label>

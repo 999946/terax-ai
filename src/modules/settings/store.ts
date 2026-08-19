@@ -24,6 +24,7 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 
 export type ThemePref = "system" | "light" | "dark";
+export type LocalePref = "system" | "en" | "zh-CN";
 
 export const DEFAULT_THEME_ID = "terax-default";
 
@@ -119,6 +120,7 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
 };
 
 export type Preferences = {
+  locale: LocalePref;
   theme: ThemePref;
   themeId: string;
   backgroundKind: BackgroundKind;
@@ -209,6 +211,7 @@ export type LspCustomServer = {
 };
 
 const STORE_PATH = "terax-settings.json";
+const KEY_LOCALE = "locale";
 const KEY_THEME = "theme";
 const KEY_THEME_ID = "themeId";
 const KEY_BG_KIND = "backgroundKind";
@@ -301,6 +304,7 @@ export const TERMINAL_SCROLLBACK_PRESETS = [
 ] as const;
 
 export const DEFAULT_PREFERENCES: Preferences = {
+  locale: "system",
   theme: "system",
   themeId: DEFAULT_THEME_ID,
   backgroundKind: "none",
@@ -385,6 +389,7 @@ export async function loadPreferences(): Promise<Preferences> {
   const map = new Map<string, unknown>(entries);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   return {
+    locale: get<LocalePref>(KEY_LOCALE) ?? DEFAULT_PREFERENCES.locale,
     theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
     themeId: get<string>(KEY_THEME_ID) ?? DEFAULT_PREFERENCES.themeId,
     backgroundKind:
@@ -582,6 +587,10 @@ export async function setLspCustomServers(
   value: LspCustomServer[],
 ): Promise<void> {
   await writePref(KEY_LSP_CUSTOM_SERVERS, value);
+}
+
+export async function setLocale(value: LocalePref): Promise<void> {
+  await writePref(KEY_LOCALE, value);
 }
 
 export async function setTheme(value: ThemePref): Promise<void> {
