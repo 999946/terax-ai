@@ -52,11 +52,16 @@ export function ProviderKeyCard({
   const submit = async () => {
     const trimmed = value.trim();
     if (!trimmed) {
-      setError("Enter your API key.");
+      setError(t("settings.models.enterApiKey"));
       return;
     }
     if (provider.keyPrefix && !trimmed.startsWith(provider.keyPrefix)) {
-      setError(`${provider.label} keys start with "${provider.keyPrefix}".`);
+      setError(
+        t("settings.models.keyPrefixError", {
+          provider: provider.label,
+          prefix: provider.keyPrefix,
+        }),
+      );
       return;
     }
     setSaving(true);
@@ -66,7 +71,7 @@ export function ProviderKeyCard({
       setValue("");
       setReveal(false);
     } catch (e) {
-      setError(`Failed to save: ${String(e)}`);
+      setError(t("settings.models.saveKeyFailed", { error: String(e) }));
     } finally {
       setSaving(false);
     }

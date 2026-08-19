@@ -34,22 +34,22 @@ export function AboutSection() {
   const ready = status.kind === "ready";
   const checkLabel =
     status.kind === "uptodate"
-      ? "You're up to date"
+      ? t("update.upToDate")
       : status.kind === "error"
-        ? "Check failed — retry"
+        ? t("update.checkFailed")
         : checking
-          ? "Checking…"
+          ? t("update.checking")
           : downloading
-            ? "Downloading…"
+            ? t("update.downloading")
             : ready
-              ? "Restart to install"
+              ? t("update.restartToInstall")
               : available
                 ? t("update.installVersion", { version: status.update.version })
                 : manualAvailable
                   ? t("settings.about.updateToVersion", {
                       version: status.info.version,
                     })
-                  : "Check for updates";
+                  : t("settings.about.checkForUpdates");
   const onUpdateClick = () => {
     if (available) void install();
     else void check({ manual: true });
@@ -79,7 +79,7 @@ export function AboutSection() {
             {name}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Open-source AI-native terminal emulator
+            {t("settings.about.tagline")}
           </span>
           <span className="mt-1 font-mono text-[11px] text-muted-foreground">
             v{version || "—"}
@@ -143,14 +143,14 @@ export function AboutSection() {
             className="gap-1.5"
           >
             <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={1.75} />
-            View on GitHub
+            {t("settings.about.viewOnGitHub")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => void openUrl(`${REPO_URL}/issues/new`)}
           >
-            Report an issue
+            {t("settings.about.reportIssue")}
           </Button>
         </div>
         {status.kind === "error" && (

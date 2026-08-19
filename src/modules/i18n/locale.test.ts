@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { en } from "./messages/en";
+import { zhCN } from "./messages/zh-CN";
 import { interpolate, isLocalePreference, resolveLocale } from "./locale";
+
+const placeholders = (message: string) =>
+  [...message.matchAll(/{([^{}]+)}/g)].map((match) => match[1]).sort();
 
 describe("locale", () => {
   it("resolves Chinese system locales", () => {
@@ -22,5 +27,15 @@ describe("locale", () => {
     expect(interpolate("Install v{version}", { version: "1.2.3" })).toBe(
       "Install v1.2.3",
     );
+  });
+
+  it("keeps English and Chinese message keys in parity", () => {
+    expect(Object.keys(zhCN).sort()).toEqual(Object.keys(en).sort());
+  });
+
+  it("keeps interpolation placeholders in parity between locales", () => {
+    for (const key of Object.keys(en) as Array<keyof typeof en>) {
+      expect(placeholders(zhCN[key]), key).toEqual(placeholders(en[key]));
+    }
   });
 });

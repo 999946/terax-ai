@@ -65,12 +65,11 @@ export function LspInstallDialog({ server, onClose }: Props) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Install {server.name} language server</DialogTitle>
+          <DialogTitle>
+            {t("settings.lsp.installTitle", { name: server.name })}
+          </DialogTitle>
           <DialogDescription>
-            Terax could not find{" "}
-            <code className="font-mono text-foreground">{server.command}</code>{" "}
-            on your PATH. Install it, then check again to enable this language
-            server.
+            {t("settings.lsp.installDescription", { command: server.command })}
           </DialogDescription>
         </DialogHeader>
 
@@ -94,15 +93,13 @@ export function LspInstallDialog({ server, onClose }: Props) {
           </div>
         ) : (
           <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            Install this custom server manually and make sure its command is
-            available on PATH.
+            {t("settings.lsp.manualInstallDescription")}
           </p>
         )}
 
         {notFound ? (
           <p className="text-xs text-destructive">
-            Still not found. Finish the installation and make sure the command
-            is available on PATH.
+            {t("settings.lsp.notFoundDescription")}
           </p>
         ) : null}
 
@@ -116,7 +113,7 @@ export function LspInstallDialog({ server, onClose }: Props) {
                 void openUrl(server.install?.docsUrl ?? "").catch(console.error)
               }
             >
-              Documentation
+              {t("settings.lsp.documentation")}
             </Button>
           ) : (
             <span />
@@ -132,7 +129,9 @@ export function LspInstallDialog({ server, onClose }: Props) {
               strokeWidth={1.9}
               className={checking ? "animate-spin" : undefined}
             />
-            {checking ? "Checking..." : "Check again"}
+            {checking
+              ? t("settings.lsp.checking")
+              : t("settings.lsp.checkAgain")}
           </Button>
         </DialogFooter>
       </DialogContent>

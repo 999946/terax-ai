@@ -86,10 +86,10 @@ function ServerRow({
   const langs = Object.keys(server.languages).join(", ");
   const status =
     detected === undefined
-      ? "checking..."
+      ? t("settings.lsp.checking")
       : detected
         ? detected
-        : "not found on PATH";
+        : t("settings.lsp.notFoundOnPath");
   const switchState = resolveLspSwitchState(enabled, detected);
 
   return (
@@ -102,7 +102,11 @@ function ServerRow({
           ) : null}
         </span>
       }
-      description={`${server.command} (${langs}) - ${status}`}
+      description={t("settings.lsp.serverDescription", {
+        command: server.command,
+        languages: langs,
+        status,
+      })}
     >
       <div className="flex items-center gap-1.5">
         <button
@@ -131,7 +135,12 @@ function ServerRow({
         <Switch
           checked={switchState.checked}
           disabled={switchState.checking}
-          aria-label={`${switchState.checked ? "Disable" : "Enable"} ${server.name} language server`}
+          aria-label={t(
+            switchState.checked
+              ? "settings.lsp.disableServer"
+              : "settings.lsp.enableServer",
+            { name: server.name },
+          )}
           onCheckedChange={(checked) => {
             if (!checked) {
               void setLspActivation(server.id, "dismissed");
@@ -226,7 +235,7 @@ function AddCustomServerDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]">
-          Add custom server
+          {t("settings.lsp.addCustomServer")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm">
@@ -236,16 +245,46 @@ function AddCustomServerDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2.5">
-          {field("Name", name, setName, "Zig")}
-          {field("Command", command, setCommand, "zls")}
-          {field("Arguments", args, setArgs, "--stdio")}
-          {field("File extensions", extensions, setExtensions, "zig, zon")}
-          {field("LSP language id", languageId, setLanguageId, "zig")}
-          {field("Root markers", rootMarkers, setRootMarkers, "build.zig")}
+          {field(
+            t("settings.lsp.nameLabel"),
+            name,
+            setName,
+            t("settings.lsp.namePlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.commandLabel"),
+            command,
+            setCommand,
+            t("settings.lsp.commandPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.argumentsLabel"),
+            args,
+            setArgs,
+            t("settings.lsp.argumentsPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.extensionsLabel"),
+            extensions,
+            setExtensions,
+            t("settings.lsp.extensionsPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.languageIdLabel"),
+            languageId,
+            setLanguageId,
+            t("settings.lsp.languageIdPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.rootMarkersLabel"),
+            rootMarkers,
+            setRootMarkers,
+            t("settings.lsp.rootMarkersPlaceholder"),
+          )}
         </div>
         <DialogFooter>
           <Button size="sm" disabled={!valid} onClick={save}>
-            Add server
+            {t("settings.lsp.addServer")}
           </Button>
         </DialogFooter>
       </DialogContent>

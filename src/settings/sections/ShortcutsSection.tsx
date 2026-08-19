@@ -90,7 +90,7 @@ export function ShortcutsSection() {
             size={12}
             strokeWidth={2}
           />
-          Reset All
+          {t("settings.shortcuts.resetAll")}
         </Button>
       </div>
 
@@ -146,17 +146,16 @@ export function ShortcutsSection() {
               {t("settings.shortcuts.resetAllQuestion")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will revert all your custom keyboard shortcuts to their
-              factory defaults. This action cannot be undone.
+              {t("settings.shortcuts.resetAllDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={onResetAll}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Reset All
+              {t("settings.shortcuts.resetAll")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -218,7 +217,7 @@ function ShortcutRow({
                 </KbdGroup>
               ) : (
                 <span className="text-[11px] text-muted-foreground italic">
-                  Unassigned
+                  {t("settings.shortcuts.unassigned")}
                 </span>
               )}
             </div>

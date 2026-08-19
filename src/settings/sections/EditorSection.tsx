@@ -98,7 +98,7 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Editing</Label>
+        <Label>{t("settings.editor.editing")}</Label>
         <SettingRow
           title={t("settings.editor.vimMode")}
           description={t("settings.editor.vimModeDescription")}
@@ -144,7 +144,7 @@ export function EditorSection() {
         )}
         <SettingRow
           title={t("settings.editor.formatOnSave")}
-          description="Format the file on explicit save (Cmd+S / :w) with the formatter below."
+          description={t("settings.editor.formatOnSaveDescription")}
         >
           <Switch
             checked={editorFormatOnSave}
@@ -155,7 +155,7 @@ export function EditorSection() {
           <>
             <SettingRow
               title={t("settings.editor.formatter")}
-              description="Language server formats the buffer before writing; external tools run on the saved file from your PATH."
+              description={t("settings.editor.formatterDescription")}
             >
               <FormatterSelect
                 value={editorFormatter}
@@ -214,11 +214,11 @@ function CustomFormatCommandInput() {
   return (
     <SettingRow
       title={t("settings.editor.customCommand")}
-      description="Runs on the saved file; {file} is replaced with the quoted path (appended when omitted)."
+      description={t("settings.editor.customCommandDescription")}
     >
       <Input
         value={draft}
-        placeholder="mytool --fix {file}"
+        placeholder={t("settings.editor.customCommandPlaceholder")}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           if (draft !== stored) void setEditorCustomFormatCommand(draft);
@@ -245,7 +245,7 @@ function FormatterOverrides() {
     <>
       <SettingRow
         title={t("settings.editor.languageOverrides")}
-        description="Use a different formatter for specific languages (e.g. Ruff for Python)."
+        description={t("settings.editor.languageOverridesDescription")}
       >
         <button
           type="button"
@@ -256,7 +256,7 @@ function FormatterOverrides() {
             if (first) update({ ...byLang, [first.ext]: "lsp" });
           }}
         >
-          Add override
+          {t("settings.editor.addOverride")}
         </button>
       </SettingRow>
       {entries.map(([lang, formatter]) => (
@@ -397,7 +397,7 @@ function WordWrapColumnInput({
   return (
     <SettingRow
       title={t("settings.editor.wrapColumn")}
-      description="Soft-wrap at this column, or earlier when the editor is narrower."
+      description={t("settings.editor.wrapColumnDescription")}
     >
       <div className="flex items-center gap-2">
         <Input
@@ -413,7 +413,7 @@ function WordWrapColumnInput({
           }}
           className="h-8 w-20 rounded-md border border-border bg-background px-2.5 text-right text-[12px] md:text-[12px] tabular-nums outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="text-[11px] text-muted-foreground">columns</span>
+        <span className="text-[11px] text-muted-foreground">{t("settings.editor.columns")}</span>
       </div>
     </SettingRow>
   );
