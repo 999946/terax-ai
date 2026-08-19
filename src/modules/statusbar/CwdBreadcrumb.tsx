@@ -261,6 +261,7 @@ function CollapsedSegments({
   segments: { fullPath: string; label: string; isHome: boolean }[];
   onCd: (p: string) => void;
 }) {
+  const { t } = useLocale();
   return (
     <span className="contents md:hidden">
       <BreadcrumbItem>
