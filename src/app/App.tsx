@@ -29,6 +29,7 @@ import {
 } from "@/modules/ai";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { native } from "@/modules/ai/lib/native";
+import { open } from "@tauri-apps/plugin-dialog";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import { useControlBridge } from "@/modules/control";
 import {
@@ -345,9 +346,16 @@ export default function App() {
   useEditorFileSync({ tabs, tabsRef, editorRefs });
   useThemeFileEditing({ tabsRef, openFileTab });
 
-  const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(
+  // 文件树根目录来自当前 Space 的 root，不依赖终端 cwd
+  const spaces = useSpaces((s) => s.spaces);
+  const activeSpace = useMemo(
+    () => spaces.find((s) => s.id === activeSpaceId),
+    [spaces, activeSpaceId],
+  );
+  const explorerRoot = activeSpace?.root ?? null;
+
+  const { inheritedCwdForNewTab } = useWorkspaceCwd(
     activeTab,
-    tabs,
     launchCwd ?? home,
   );
 
@@ -1125,15 +1133,21 @@ export default function App() {
 
   const activeCwd = activeTerminalLeafCwd;
 
-  const handleNewSpace = useCallback(() => {
+  const handleNewSpace = useCallback(async () => {
     const { spaces, create, setActive } = useSpaces.getState();
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: "选择 Space 的根目录",
+    });
+    const root = selected ?? activeCwd ?? home ?? null;
     const meta = create({
       name: `Space ${spaces.length + 1}`,
-      root: activeCwd ?? home ?? null,
+      root,
       env: workspaceEnv,
     });
     setActiveSpaceForNewTabs(meta.id);
-    newTab(activeCwd ?? undefined);
+    newTab(root ?? undefined);
     setActive(meta.id);
     return meta.id;
   }, [activeCwd, home, workspaceEnv, newTab, setActiveSpaceForNewTabs]);
