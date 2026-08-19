@@ -159,7 +159,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
               >
                 <span className="flex-1">{p.label}</span>
                 <span className="text-xs text-muted-foreground">
-                  {checkingPort === p.port ? "{t("preview.checking")}" : `:${p.port}`}
+                  {checkingPort === p.port ? t("preview.checking") : `:${p.port}`}
                 </span>
               </DropdownMenuItem>
             ))}
