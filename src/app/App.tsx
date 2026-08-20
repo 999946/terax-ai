@@ -68,7 +68,7 @@ import {
   useSourceControlContext,
 } from "@/modules/source-control";
 import {
-  SpaceSwitcher,
+  SpacesPanel,
   useSpacePersistence,
   useSpaces,
   useSpacesBoot,
@@ -293,8 +293,6 @@ export default function App() {
     setActiveId,
     adoptWorkspaceEnv,
   ]);
-
-  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const spaceTabs = useMemo(
     () => tabs.filter((t) => t.spaceId === (activeSpaceId ?? DEFAULT_SPACE_ID)),
@@ -874,7 +872,7 @@ export default function App() {
         ),
       "space.next": () => cycleSpace(1),
       "space.prev": () => cycleSpace(-1),
-      "space.overview": () => setSwitcherOpen(true),
+      "space.overview": () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
       "pane.splitRight": () => splitActivePaneInActiveTab("row"),
       "pane.splitDown": () => splitActivePaneInActiveTab("col"),
       "pane.focusNext": () => focusNextPaneInTab(activeId, 1),
@@ -1201,15 +1199,12 @@ export default function App() {
       if (!t) return;
       setActiveId(tabId);
       useSpaces.getState().setActive(t.spaceId);
-      setSwitcherOpen(false);
     },
     [setActiveId],
   );
 
-  const spaceSwitcher = (
-    <SpaceSwitcher
-      open={switcherOpen}
-      onOpenChange={setSwitcherOpen}
+  const spacesPanel = (
+    <SpacesPanel
       tabs={tabs}
       onNewSpace={() => void handleNewSpace()}
       onDeleteSpace={handleDeleteSpace}
@@ -1250,7 +1245,7 @@ export default function App() {
             openKeyboardShortcuts: () => void openSettingsWindow("shortcuts"),
             spaces: useSpaces.getState().spaces,
             activeSpaceId,
-            openSpacesOverview: () => setSwitcherOpen(true),
+            openSpacesOverview: () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
             newSpace: () => void handleNewSpace(),
             switchSpace: (id) => useSpaces.getState().setActive(id),
           })
@@ -1387,14 +1382,14 @@ export default function App() {
               onActivateAgent={onActivateAgent}
               onActivateLocalAgent={onActivateLocalAgent}
               onOpenSettings={() => void openSettingsWindow()}
-              spaceSwitcher={spaceSwitcher}
               searchTarget={searchTarget}
               searchRef={searchInlineRef}
               onOverrideLanguage={setOverrideLanguage}
             />
           )}
 
-          <main className="zoom-content flex min-h-0 flex-1 flex-col">
+          <main className="zoom-content flex min-h-0 flex-1 flex-row">
+            {spacesPanel}
             <ResizablePanelGroup
               orientation="horizontal"
               className="min-h-0 flex-1"
