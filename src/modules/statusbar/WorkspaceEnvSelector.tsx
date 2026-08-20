@@ -20,9 +20,9 @@ type Props = {
 };
 
 export function WorkspaceEnvSelector({ onSelect }: Props) {
-  if (!IS_WINDOWS) return null;
-
   const { t } = useTranslation();
+
+  if (!IS_WINDOWS) return null;
   const env = useWorkspaceEnvStore((s) => s.env);
   const distros = useWorkspaceEnvStore((s) => s.distros);
   const loading = useWorkspaceEnvStore((s) => s.loading);

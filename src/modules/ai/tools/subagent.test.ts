@@ -38,7 +38,7 @@ function makeContext(): ToolContext {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: tool results are heterogeneous.
-type Result = Record<string, any>;
+type Result = Record<string, unknown>;
 
 async function run(input: Record<string, unknown>): Promise<Result> {
   const execute = buildSubagentTools(makeContext()).run_subagent.execute;

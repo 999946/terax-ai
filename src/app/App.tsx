@@ -1006,7 +1006,7 @@ export default function App() {
       }
       return false;
     },
-    [activeTab],
+    [activeTab, captureActiveSelection],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -1077,7 +1077,7 @@ export default function App() {
   }, [openPanel, focusInput]);
 
   const handleLeafExit = useCallback(
-    (leafId: number, _code: number) => {
+    (leafId: number) => {
       const all = tabsRef.current;
       const tab = all.find(
         (t) => t.kind === "terminal" && hasLeaf(t.paneTree, leafId),

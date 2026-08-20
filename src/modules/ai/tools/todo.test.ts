@@ -31,7 +31,7 @@ function makeContext(sessionId: string | null = "session"): ToolContext {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: tool results are heterogeneous.
-type Result = Record<string, any>;
+type Result = Record<string, unknown>;
 
 async function run(
   ctx: ToolContext,
