@@ -35,7 +35,7 @@ import {
   SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
@@ -49,7 +49,7 @@ const ICON_OPTIONS: AgentIconId[] = [
 ];
 
 export function AgentsSection() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const customInstructions = usePreferencesStore((s) => s.customInstructions);
   const customAgents = useAgentsStore((s) => s.customAgents);
   const activeAgentId = useAgentsStore((s) => s.activeId);
@@ -239,7 +239,7 @@ function AgentCard({
   onEdit: (() => void) | null;
   onDelete: (() => void) | null;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const Icon = AGENT_ICONS[agent.icon] ?? SparklesIcon;
   return (
     <div
@@ -328,7 +328,7 @@ function AgentEditorDialog({
   onClose: () => void;
   onSave: (a: Agent) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<Agent | null>(agent);
   useEffect(() => setDraft(agent), [agent]);
   if (!draft) return null;
@@ -432,7 +432,7 @@ function SnippetEditorDialog({
   onClose: () => void;
   onSave: (s: Snippet) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<Snippet | null>(snippet);
   useEffect(() => setDraft(snippet), [snippet]);
   if (!draft) return null;
@@ -530,7 +530,7 @@ function SnippetEditorDialog({
 }
 
 function CustomInstructionsBlock({ value }: { value: string }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
   const hadFirstSync = useRef(false);
 

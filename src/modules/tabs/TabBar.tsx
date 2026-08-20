@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
 import {
@@ -102,7 +102,7 @@ export function TabBar({
   onOverrideLanguage,
   compact,
 }: Props) {
-  const { t: tr } = useLocale();
+  const { t: tr } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -740,7 +740,7 @@ function TabRenameInput({
   onCommit: (value: string) => void;
   onCancel: () => void;
 }) {
-  const { t: tr } = useLocale();
+  const { t: tr } = useTranslation();
   const ref = useRef<HTMLInputElement>(null);
   // Guards against a trailing blur re-resolving an edit that Enter/Escape
   // already finished (Escape must never commit).

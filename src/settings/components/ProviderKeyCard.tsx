@@ -14,7 +14,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { ProviderIcon } from "./ProviderIcon";
 
@@ -38,7 +38,7 @@ export function ProviderKeyCard({
   onClear,
   onRemove,
 }: Props) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(!currentKey);
   const [value, setValue] = useState("");
   const [reveal, setReveal] = useState(false);

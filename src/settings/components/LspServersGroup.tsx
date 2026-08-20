@@ -25,14 +25,14 @@ import {
 } from "@/modules/settings/store";
 import { Delete02Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useId, useState } from "react";
 import { LspInstallDialog } from "./LspInstallDialog";
 import { resolveLspSwitchState } from "./lspSwitchState";
 import { SettingRow } from "./SettingRow";
 
 export function LspServersGroup() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const activation = usePreferencesStore((s) => s.lspActivation);
   const customServers = usePreferencesStore((s) => s.lspCustomServers);
   const [installTarget, setInstallTarget] = useState<LspPreset | null>(null);
@@ -76,7 +76,7 @@ function ServerRow({
   customServers: LspCustomServer[];
   onInstall: () => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const detected = useLspRuntimeStore((s) => s.detected[server.command]);
 
   useEffect(() => {
@@ -163,7 +163,7 @@ function AddCustomServerDialog({
 }: {
   customServers: LspCustomServer[];
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");

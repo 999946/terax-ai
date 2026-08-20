@@ -16,7 +16,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 
 type Props = {
@@ -25,7 +25,7 @@ type Props = {
 };
 
 export function LspInstallDialog({ server, onClose }: Props) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [checking, setChecking] = useState(false);
   const [notFound, setNotFound] = useState(false);

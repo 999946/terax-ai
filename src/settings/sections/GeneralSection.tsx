@@ -15,7 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import {
   type OsNotificationResult,
   testAgentOsNotification,
@@ -28,6 +28,7 @@ import {
   setConfirmCloseRunningTerminal,
   setDefaultWorkspaceEnv,
   setExplorerGitDecorations,
+  setLocale,
   setRestoreWindowState,
   setShowHidden,
   setTerminalCursorBlink,
@@ -94,11 +95,8 @@ type NotificationTestState =
 
 export function GeneralSection() {
   const { mode, setMode } = useTheme();
-  const {
-    t,
-    preference: locale,
-    setPreference: setLocalePreference,
-  } = useLocale();
+  const { t } = useTranslation();
+  const locale = usePreferencesStore((s) => s.locale);
 
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
@@ -188,7 +186,7 @@ export function GeneralSection() {
       >
         <Select
           value={locale}
-          onValueChange={(value) => setLocalePreference(value as LocalePref)}
+          onValueChange={(value) => void setLocale(value as LocalePref)}
         >
           <SelectTrigger className="h-7 w-32 text-[11px]">
             <SelectValue />
@@ -635,7 +633,7 @@ function FontFamilyInput({
   value: string;
   onCommit: (v: string) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
 
   useEffect(() => {

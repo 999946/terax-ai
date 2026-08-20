@@ -35,7 +35,7 @@ import {
 } from "@/modules/settings/store";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { LspServersGroup } from "../components/LspServersGroup";
 import { SectionHeader } from "../components/SectionHeader";
@@ -44,7 +44,7 @@ import { SettingRow } from "../components/SettingRow";
 const AUTO_SAVE_STEP = 100;
 
 export function EditorSection() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
@@ -186,7 +186,7 @@ function FormatterSelect({
   value: EditorFormatter;
   onChange: (v: EditorFormatter) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={(v) => onChange(v as EditorFormatter)}>
       <SelectTrigger className="h-8 w-40 text-[12px]">
@@ -204,7 +204,7 @@ function FormatterSelect({
 }
 
 function CustomFormatCommandInput() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const stored = usePreferencesStore((s) => s.editorCustomFormatCommand);
   const [draft, setDraft] = useState(stored);
 
@@ -234,7 +234,7 @@ function CustomFormatCommandInput() {
 }
 
 function FormatterOverrides() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const byLang = usePreferencesStore((s) => s.editorFormatterByLang);
   const entries = Object.entries(byLang);
   const unused = EXPOSED_LANGUAGES.filter((l) => !(l.ext in byLang));
@@ -325,7 +325,7 @@ function AutoSaveDelayInput({
   value: number;
   onChange: (v: number) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(String(value));
 
   useEffect(() => {
@@ -377,7 +377,7 @@ function WordWrapColumnInput({
   value: number;
   onChange: (v: number) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(String(value));
 
   useEffect(() => {

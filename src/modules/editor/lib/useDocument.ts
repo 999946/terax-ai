@@ -1,4 +1,4 @@
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { notifyDocumentSaved } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
@@ -30,7 +30,7 @@ type Options = {
 };
 
 export function useDocument({ path, onDirtyChange }: Options) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
 

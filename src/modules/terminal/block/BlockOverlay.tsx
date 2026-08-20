@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/modules/ai/store/chatStore";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import {
   ArrowDown01Icon,
   ArrowUp01Icon,
@@ -190,7 +190,7 @@ function StickyHeader({ block, all, onSearch }: ChromeProps) {
 }
 
 function Toolbar({ block, all, onSearch }: ChromeProps) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const duration = block.running
     ? null
     : fmtDuration(block.finishedAt - block.startedAt);
@@ -216,7 +216,7 @@ function Toolbar({ block, all, onSearch }: ChromeProps) {
 }
 
 function BlockMenu({ block, all, onSearch }: ChromeProps) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const output = () => all.readOutput(block.id) ?? "";
   const attach = () => {
     const out = capAttachOutput(output());
@@ -321,7 +321,7 @@ function SearchBar({
   revealMatch: (m: BlockMatch) => void;
   onClose: () => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [matches, setMatches] = useState<BlockMatch[]>([]);
   const [idx, setIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

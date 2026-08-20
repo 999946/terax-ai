@@ -38,12 +38,12 @@ import { validateTheme } from "@/modules/theme/validateTheme";
 import { Edit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 export function ThemesSection() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const { themeId, setThemeId, resolvedMode, customThemes } = useTheme();
   const builtinThemes = listBuiltinThemes();
   const themes = useMemo(

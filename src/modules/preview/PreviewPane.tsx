@@ -1,4 +1,4 @@
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { Alert02Icon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -31,7 +31,7 @@ const SUSPEND_AFTER_MS = 30_000;
 
 export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
   function PreviewPane({ url, visible, onUrlChange }, ref) {
-    const { t } = useLocale();
+    const { t } = useTranslation();
     // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
     // which is the only reliable cross-origin reload (calling
     // contentWindow.location.reload() throws on cross-origin frames).
@@ -132,7 +132,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
 );
 
 function SuspendedState({ onReload }: { onReload: () => void }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
       <div className="flex size-10 items-center justify-center rounded-2xl border border-border/60 bg-card text-muted-foreground">
@@ -158,7 +158,7 @@ function SuspendedState({ onReload }: { onReload: () => void }) {
 }
 
 function EmptyState() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-4 px-6 text-center">
       <div className="flex size-12 items-center justify-center rounded-2xl border border-border/60 bg-card text-muted-foreground">

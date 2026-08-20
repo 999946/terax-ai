@@ -27,12 +27,12 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 export function ShortcutsSection() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
   const [search, setSearch] = useState("");
   const [recordingId, setRecordingId] = useState<ShortcutId | null>(null);
@@ -190,7 +190,7 @@ function ShortcutRow({
   onReset: () => void;
   userBindings?: KeyBinding[];
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const bindings =
     userBindings !== undefined ? userBindings : shortcut.defaultBindings;
   const isModified = userBindings !== undefined;
@@ -265,8 +265,8 @@ function Recorder({
   onRecord: (b: KeyBinding) => void;
   onCancel: () => void;
 }) {
-  const { t } = useLocale();
-  const [_mods, setMods] = useState({
+  const { t } = useTranslation();
+  const [, setMods] = useState({
     ctrl: false,
     shift: false,
     alt: false,

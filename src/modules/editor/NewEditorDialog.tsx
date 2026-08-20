@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { currentWorkspaceEnv } from "@/modules/workspace";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { File02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -33,7 +33,7 @@ export function NewEditorDialog({
   rootPath,
   onCreated,
 }: Props) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [name, setName] = useState("untitled.txt");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);

@@ -5,7 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
@@ -22,7 +22,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 };
 
 export function AboutSection() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [version, setVersion] = useState("");
   const [name, setName] = useState("Terax");
   const [build, setBuild] = useState("");

@@ -1,6 +1,7 @@
 import "../styles/globals.css";
 
 import { USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import "@/modules/i18n/config";
 import { LocaleProvider } from "@/modules/i18n";
 import { ThemeProvider } from "@/modules/theme";
 import { getCurrentWindow } from "@tauri-apps/api/window";

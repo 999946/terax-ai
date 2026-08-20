@@ -29,7 +29,7 @@ import {
 } from "@/modules/ai";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { native } from "@/modules/ai/lib/native";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import { useControlBridge } from "@/modules/control";
@@ -230,7 +230,7 @@ export default function App() {
   });
 
   const activeSpaceId = useSpaces((s) => s.activeId);
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const spacesHydrated = useSpaces((s) => s.hydrated);
   const activeSpaceIdRef = useRef(activeSpaceId);
   useLayoutEffect(() => {

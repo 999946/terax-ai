@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
 import {
@@ -46,7 +46,7 @@ function basename(path: string): string {
 }
 
 export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -139,7 +139,7 @@ function BreadcrumbSegment({
   isHome: boolean;
   onClick: () => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   return (
     <>
       <BreadcrumbItem>
@@ -175,7 +175,7 @@ function CurrentSegmentDropdown({
   path: string;
   onCd: (p: string) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<string[] | null>(null);
@@ -261,7 +261,7 @@ function CollapsedSegments({
   segments: { fullPath: string; label: string; isHome: boolean }[];
   onCd: (p: string) => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   return (
     <span className="contents md:hidden">
       <BreadcrumbItem>

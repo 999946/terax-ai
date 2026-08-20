@@ -4,7 +4,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useChatStore } from "@/modules/ai";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
 import {
   AiOpenButton,
@@ -43,7 +43,7 @@ export function StatusBar({
   hasComposer,
   privateActive,
 }: Props) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const panelOpen = useChatStore((s) => s.panelOpen);
 
   return (

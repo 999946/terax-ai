@@ -85,7 +85,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useState } from "react";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { ProviderKeyCard } from "../components/ProviderKeyCard";
@@ -145,7 +145,7 @@ const LOCAL_META: Partial<Record<ProviderId, LocalMeta>> = {
 };
 
 export function ModelsSection() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [keys, setKeys] = useState<KeysMap | null>(null);
   const [epKeys, setEpKeys] = useState<CustomEndpointKeys>({});
   const [adding, setAdding] = useState<Set<ProviderId>>(new Set());
@@ -459,7 +459,7 @@ function AddProviderMenu({
   onAdd: (id: ProviderId) => void;
   onAddCompat: () => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const cloud = providers.filter((p) => !isLocalProvider(p.id));
   const local = providers.filter(
     (p) => isLocalProvider(p.id) && p.id !== "openai-compatible",
@@ -535,7 +535,7 @@ function DefaultsBlock({
   keys: KeysMap;
   customEndpoints: readonly CustomEndpoint[];
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-3">
       <Label>{t("settings.models.defaults")}</Label>
@@ -639,7 +639,7 @@ function AutocompleteRow({
   configuredIds: Set<ProviderId>;
   customEndpoints: readonly CustomEndpoint[];
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const enabled = usePreferencesStore((s) => s.autocompleteEnabled);
   const trigger = usePreferencesStore((s) => s.autocompleteTrigger);
   const provider = usePreferencesStore((s) => s.autocompleteProvider);
@@ -838,7 +838,7 @@ function LocalProviderCard({
   onClearKey: () => Promise<void>;
   onRemove: () => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const {
     baseURL,
     modelId,
@@ -1058,7 +1058,7 @@ function CustomEndpointCard({
   onUpdate: (patch: Partial<CustomEndpoint>) => Promise<void>;
   onRemove: () => void;
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(!endpoint.baseURL.trim());
   const [nameDraft, setNameDraft] = useState(endpoint.name);
   const [urlDraft, setUrlDraft] = useState(endpoint.baseURL);
@@ -1295,7 +1295,7 @@ function StatusLine({
 }: {
   status: "idle" | "testing" | "ok" | "fail";
 }) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   if (status === "idle") return null;
   if (status === "testing") {
     return (
@@ -1320,7 +1320,7 @@ function StatusLine({
 }
 
 function VoiceBlock() {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const sttProvider = usePreferencesStore((s) => s.sttProvider);
   const groqSttModel = usePreferencesStore((s) => s.groqSttModel);
   const whispercppBaseURL = usePreferencesStore((s) => s.whispercppBaseURL);

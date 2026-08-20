@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +60,7 @@ type Props = {
 
 export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
   function PreviewAddressBar({ url, onSubmit, onReload }, ref) {
-    const { t } = useLocale();
+    const { t } = useTranslation();
     const [draft, setDraft] = useState(url);
     const inputRef = useRef<HTMLInputElement>(null);
 

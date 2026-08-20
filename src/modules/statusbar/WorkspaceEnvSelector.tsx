@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IS_WINDOWS } from "@/lib/platform";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import {
   LOCAL_WORKSPACE,
   useWorkspaceEnvStore,
@@ -22,7 +22,7 @@ type Props = {
 export function WorkspaceEnvSelector({ onSelect }: Props) {
   if (!IS_WINDOWS) return null;
 
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const env = useWorkspaceEnvStore((s) => s.env);
   const distros = useWorkspaceEnvStore((s) => s.distros);
   const loading = useWorkspaceEnvStore((s) => s.loading);

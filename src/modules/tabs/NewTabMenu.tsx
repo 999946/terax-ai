@@ -11,7 +11,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { fmtShortcut, MOD_KEY, SHIFT_KEY } from "@/lib/platform";
-import { useLocale } from "@/modules/i18n";
+import { useTranslation } from "react-i18next";
 import { AgentLauncherPanel } from "@/modules/agents/components/AgentLauncherPanel";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
 import {
@@ -46,7 +46,7 @@ export function NewTabMenu({
   onNewGitGraph,
   onLaunchAgents,
 }: Props) {
-  const { t } = useLocale();
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const openLauncherAfterMenuClose = useRef(false);
