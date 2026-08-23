@@ -15,6 +15,7 @@ type Props = {
   tabs: Tab[];
   onNewSpace: () => void;
   onDeleteSpace: (id: string) => void;
+  onRenameSpace: (id: string, name: string) => void;
   onNewTabInSpace: (spaceId: string) => void;
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
@@ -60,6 +61,7 @@ export function SpaceSwitcherContent({
   tabs,
   onNewSpace,
   onDeleteSpace,
+  onRenameSpace,
   onNewTabInSpace,
   onJumpTab,
   onCloseTab,
@@ -71,7 +73,6 @@ export function SpaceSwitcherContent({
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
   const setActive = useSpaces((s) => s.setActive);
-  const rename = useSpaces((s) => s.rename);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() =>
     activeId ? new Set([activeId]) : new Set(),
@@ -239,7 +240,7 @@ export function SpaceSwitcherContent({
             onStartRename={() => setEditingId(sp.id)}
             onCommitRename={(name) => {
               const v = name.trim();
-              if (v) rename(sp.id, v);
+              if (v) onRenameSpace(sp.id, v);
               setEditingId(null);
             }}
             onCancelRename={() => setEditingId(null)}

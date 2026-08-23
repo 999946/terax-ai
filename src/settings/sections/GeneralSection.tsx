@@ -27,6 +27,7 @@ import {
   setAutostart,
   setConfirmCloseRunningTerminal,
   setDefaultWorkspaceEnv,
+  setSpacesRoot,
   setExplorerGitDecorations,
   setLocale,
   setRestoreWindowState,
@@ -52,6 +53,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
@@ -115,6 +117,7 @@ export function GeneralSection() {
   const [shells, setShells] = useState<ShellInfo[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string }[]>([]);
   const defaultWorkspaceEnv = usePreferencesStore((s) => s.defaultWorkspaceEnv);
+  const spacesRoot = usePreferencesStore((s) => s.spacesRoot);
   const terminalLetterSpacing = usePreferencesStore(
     (s) => s.terminalLetterSpacing,
   );
@@ -253,6 +256,45 @@ export function GeneralSection() {
             onValueChange={(v) => void setZoomLevel(v[0] ?? 1)}
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>{t("settings.general.workspaceEnvironment")}</Label>
+        <SettingRow
+          title={t("settings.general.spacesRoot")}
+          description={t("settings.general.spacesRootDescription")}
+        >
+          <div className="flex max-w-80 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={spacesRoot ?? undefined}>
+              {spacesRoot ?? t("settings.general.spacesRootNotSet")}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={async () => {
+                const selected = await open({
+                  directory: true,
+                  multiple: false,
+                  title: t("settings.general.spacesRoot"),
+                });
+                if (typeof selected === "string") await setSpacesRoot(selected);
+              }}
+            >
+              {t("settings.general.chooseSpacesRoot")}
+            </Button>
+            {spacesRoot ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => void setSpacesRoot(null)}
+              >
+                {t("settings.general.clearSpacesRoot")}
+              </Button>
+            ) : null}
+          </div>
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

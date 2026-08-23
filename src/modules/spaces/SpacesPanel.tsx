@@ -9,6 +9,7 @@ type Props = {
   tabs: Tab[];
   onNewSpace: () => void;
   onDeleteSpace: (id: string) => void;
+  onRenameSpace: (id: string, name: string) => void;
   onNewTabInSpace: (spaceId: string) => void;
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
@@ -21,6 +22,7 @@ export function SpacesPanel({
   tabs,
   onNewSpace,
   onDeleteSpace,
+  onRenameSpace,
   onNewTabInSpace,
   onJumpTab,
   onCloseTab,
@@ -91,6 +93,7 @@ export function SpacesPanel({
               tabs={tabs}
               onNewSpace={onNewSpace}
               onDeleteSpace={onDeleteSpace}
+              onRenameSpace={onRenameSpace}
               onNewTabInSpace={onNewTabInSpace}
               onJumpTab={onJumpTab}
               onCloseTab={onCloseTab}

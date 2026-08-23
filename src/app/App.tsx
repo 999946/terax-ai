@@ -30,7 +30,6 @@ import {
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { native } from "@/modules/ai/lib/native";
 import { useTranslation } from "react-i18next";
-import { open } from "@tauri-apps/plugin-dialog";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import { useControlBridge } from "@/modules/control";
 import {
@@ -72,6 +71,7 @@ import {
   useSpacePersistence,
   useSpaces,
   useSpacesBoot,
+  useSpacesDirectorySync,
 } from "@/modules/spaces";
 import { StatusBar } from "@/modules/statusbar";
 import {
@@ -249,6 +249,8 @@ export default function App() {
     },
     [switchWorkspace, activeSpaceId],
   );
+
+  useSpacesDirectorySync();
 
   useSpacesBoot({
     ready: launchCwdResolved,
@@ -1134,23 +1136,24 @@ export default function App() {
   const activeCwd = activeTerminalLeafCwd;
 
   const handleNewSpace = useCallback(async () => {
-    const { spaces, create, setActive } = useSpaces.getState();
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: t("spaces.chooseRoot"),
-    });
-    const root = selected ?? activeCwd ?? home ?? null;
-    const meta = create({
-      name: `Space ${spaces.length + 1}`,
-      root,
-      env: workspaceEnv,
-    });
-    setActiveSpaceForNewTabs(meta.id);
-    newTab(root ?? undefined);
-    setActive(meta.id);
-    return meta.id;
-  }, [activeCwd, home, workspaceEnv, newTab, setActiveSpaceForNewTabs, t]);
+    const spacesRoot = usePreferencesStore.getState().spacesRoot;
+    if (!spacesRoot) return null;
+    const name = window.prompt(t("spaces.folderName"), `Space ${useSpaces.getState().spaces.length + 1}`);
+    if (name === null) return null;
+    try {
+      const { createSpaceFolder } = await import("@/modules/spaces/lib/filesystem");
+      const root = await createSpaceFolder(spacesRoot, name);
+      const { create, setActive } = useSpaces.getState();
+      const meta = create({ name: name.trim(), root, env: workspaceEnv });
+      setActiveSpaceForNewTabs(meta.id);
+      newTab(root);
+      setActive(meta.id);
+      return meta.id;
+    } catch (error) {
+      console.error("create space failed", error);
+      return null;
+    }
+  }, [workspaceEnv, newTab, setActiveSpaceForNewTabs, t]);
 
   const handleDeleteSpace = useCallback(
     (id: string) => {
@@ -1208,6 +1211,16 @@ export default function App() {
       tabs={tabs}
       onNewSpace={() => void handleNewSpace()}
       onDeleteSpace={handleDeleteSpace}
+      onRenameSpace={(id, name) => {
+        const space = useSpaces.getState().spaces.find((s) => s.id === id);
+        if (!space?.root) return;
+        void import("@/modules/spaces/lib/filesystem").then(({ renameSpaceFolder }) => {
+          const oldName = space.root!.split(/[\\\\/]/).filter(Boolean).slice(-1)[0] ?? space.name;
+          return renameSpaceFolder(usePreferencesStore.getState().spacesRoot ?? "", oldName, name);
+        }).then((root) => {
+          useSpaces.getState().rename(id, name.trim(), root);
+        }).catch((error) => console.error("rename space failed", error));
+      }}
       onNewTabInSpace={handleNewTabInSpace}
       onJumpTab={jumpToTab}
       onCloseTab={handleClose}

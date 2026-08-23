@@ -31,8 +31,9 @@ type State = {
     activeId: string | null,
     initialActiveIndex?: Record<string, number>,
   ) => void;
+  reconcile: (roots: string[], defaultEnv?: WorkspaceEnv) => SpaceMeta[];
   create: (input: CreateInput) => SpaceMeta;
-  rename: (id: string, name: string) => void;
+  rename: (id: string, name: string, root?: string) => void;
   setEnv: (id: string, env: WorkspaceEnv) => void;
   setColor: (id: string, color: number | undefined) => void;
   reorder: (orderedIds: string[]) => void;
@@ -48,6 +49,29 @@ export const useSpaces = create<State>((set, get) => ({
 
   hydrate: (spaces, activeId, initialActiveIndex = {}) => {
     set({ spaces, activeId, initialActiveIndex, hydrated: true });
+  },
+
+  reconcile: (roots, defaultEnv) => {
+    const prev = get();
+    const byRoot = new Map(prev.spaces.filter((s) => s.root).map((s) => [s.root!, s]));
+    const spaces = roots.map((root) => {
+      const existing = byRoot.get(root);
+      if (existing) return existing;
+      const now = Date.now();
+      return {
+        id: newSpaceId(),
+        name: root.split(/[\\\\/]/).filter(Boolean).slice(-1)[0] ?? root,
+        root,
+        env: defaultEnv ?? parseWorkspaceScopeKey(usePreferencesStore.getState().defaultWorkspaceEnv),
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+    const activeId = spaces.some((s) => s.id === prev.activeId) ? prev.activeId : spaces[0]?.id ?? null;
+    set({ spaces, activeId });
+    void saveSpacesList(spaces);
+    if (activeId !== prev.activeId) void saveActiveId(activeId);
+    return spaces;
   },
 
   create: (input) => {
@@ -70,9 +94,9 @@ export const useSpaces = create<State>((set, get) => ({
     return meta;
   },
 
-  rename: (id, name) => {
+  rename: (id, name, root) => {
     const spaces = get().spaces.map((s) =>
-      s.id === id ? { ...s, name, updatedAt: Date.now() } : s,
+      s.id === id ? { ...s, name, ...(root ? { root } : {}), updatedAt: Date.now() } : s,
     );
     set({ spaces });
     void saveSpacesList(spaces);
