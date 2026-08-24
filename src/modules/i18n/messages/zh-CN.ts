@@ -456,6 +456,8 @@ export const zhCN: Record<string, string> = {
   "settings.general.workspaceEnvironment": "工作区环境",
   "settings.general.spacesRoot": "工作空间根目录",
   "settings.general.spacesRootDescription": "根目录下的每个一级文件夹都会成为一个工作空间。",
+  "settings.general.showSpaceTabs": "显示工作空间中的标签页",
+  "settings.general.showSpaceTabsDescription": "在工作空间面板和切换器中显示每个工作空间下的标签页列表。",
   "settings.general.chooseSpacesRoot": "选择文件夹",
   "settings.general.clearSpacesRoot": "清除文件夹",
   "settings.general.spacesRootNotSet": "请先选择根目录，再创建工作空间。",

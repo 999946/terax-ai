@@ -9,6 +9,7 @@ import { InlineRename } from "./components/InlineRename";
 import { accentFor } from "./lib/spaceColor";
 import type { SpaceMeta } from "./lib/store";
 import { useSpaces } from "./lib/useSpaces";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SpaceAvatar } from "./SpaceAvatar";
 
 type Props = {
@@ -72,6 +73,7 @@ export function SpaceSwitcherContent({
   const { t } = useTranslation();
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
+  const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
   const setActive = useSpaces((s) => s.setActive);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() =>
@@ -226,6 +228,7 @@ export function SpaceSwitcherContent({
             isActive={sp.id === activeId}
             canDelete={spaces.length > 1}
             expanded={expanded.has(sp.id)}
+            showTabs={showSpaceTabs}
             editing={editingId === sp.id}
             dragging={dragging}
             drop={drop}
@@ -289,6 +292,7 @@ type SpaceRowProps = {
   isActive: boolean;
   canDelete: boolean;
   expanded: boolean;
+  showTabs: boolean;
   editing: boolean;
   dragging: { kind: "space" | "tab"; id: string | number } | null;
   drop: DropTarget | null;
@@ -317,6 +321,7 @@ function SpaceRow({
   isActive,
   canDelete,
   expanded,
+  showTabs,
   editing,
   dragging,
   drop,
@@ -429,7 +434,7 @@ function SpaceRow({
         )}
       </div>
 
-      {expanded && (
+      {showTabs && expanded && (
         <div className="flex flex-col gap-px py-0.5 pl-10 pr-0.5">
           {tabs.map((t) => (
             <TabRow

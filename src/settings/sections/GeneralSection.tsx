@@ -32,6 +32,7 @@ import {
   setLocale,
   setRestoreWindowState,
   setShowHidden,
+  setShowSpaceTabs,
   setTerminalCursorBlink,
   setTerminalCursorStyle,
   setTerminalFontFamily,
@@ -118,6 +119,7 @@ export function GeneralSection() {
   const [wslDistros, setWslDistros] = useState<{ name: string }[]>([]);
   const defaultWorkspaceEnv = usePreferencesStore((s) => s.defaultWorkspaceEnv);
   const spacesRoot = usePreferencesStore((s) => s.spacesRoot);
+  const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
   const terminalLetterSpacing = usePreferencesStore(
     (s) => s.terminalLetterSpacing,
   );
@@ -294,6 +296,15 @@ export function GeneralSection() {
               </Button>
             ) : null}
           </div>
+        </SettingRow>
+        <SettingRow
+          title={t("settings.general.showSpaceTabs")}
+          description={t("settings.general.showSpaceTabsDescription")}
+        >
+          <Switch
+            checked={showSpaceTabs}
+            onCheckedChange={(v) => void setShowSpaceTabs(v)}
+          />
         </SettingRow>
       </div>
 

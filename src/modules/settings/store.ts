@@ -174,6 +174,7 @@ export type Preferences = {
   agentLaunchCommands: AgentLaunchCommands;
   defaultWorkspaceEnv: string;
   spacesRoot: string | null;
+  showSpaceTabs: boolean;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number;
@@ -269,6 +270,7 @@ const KEY_AGENT_NOTIFICATIONS = "agentNotifications";
 const KEY_AGENT_LAUNCH_COMMANDS = "agentLaunchCommands";
 const KEY_DEFAULT_WORKSPACE_ENV = "defaultWorkspaceEnv";
 const KEY_SPACES_ROOT = "spacesRoot";
+const KEY_SHOW_SPACE_TABS = "showSpaceTabs";
 const KEY_SHORTCUTS = "shortcuts";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
@@ -360,6 +362,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   agentLaunchCommands: DEFAULT_AGENT_LAUNCH_COMMANDS,
   defaultWorkspaceEnv: "local",
   spacesRoot: null,
+  showSpaceTabs: false,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 1000,
@@ -547,6 +550,8 @@ export async function loadPreferences(): Promise<Preferences> {
       const value = get<string | null>(KEY_SPACES_ROOT);
       return value?.trim() || null;
     })(),
+    showSpaceTabs:
+      get<boolean>(KEY_SHOW_SPACE_TABS) ?? DEFAULT_PREFERENCES.showSpaceTabs,
     shortcuts:
       get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
       DEFAULT_PREFERENCES.shortcuts,
@@ -936,6 +941,10 @@ export async function setSpacesRoot(value: string | null): Promise<void> {
   await writePref(KEY_SPACES_ROOT, value?.trim() || null);
 }
 
+export async function setShowSpaceTabs(value: boolean): Promise<void> {
+  await writePref(KEY_SHOW_SPACE_TABS, value);
+}
+
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
@@ -1006,6 +1015,7 @@ export async function onPreferencesChange(
     [KEY_AGENT_LAUNCH_COMMANDS]: "agentLaunchCommands",
     [KEY_DEFAULT_WORKSPACE_ENV]: "defaultWorkspaceEnv",
     [KEY_SPACES_ROOT]: "spacesRoot",
+    [KEY_SHOW_SPACE_TABS]: "showSpaceTabs",
     [KEY_SHORTCUTS]: "shortcuts",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
     [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",

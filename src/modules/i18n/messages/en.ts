@@ -456,6 +456,8 @@ export const en: Record<string, string> = {
   "settings.general.workspaceEnvironment": "Workspace environment",
   "settings.general.spacesRoot": "Spaces root folder",
   "settings.general.spacesRootDescription": "Each first-level folder becomes a Space.",
+  "settings.general.showSpaceTabs": "Show tabs in Spaces",
+  "settings.general.showSpaceTabsDescription": "Display the tab list under each Space in the Spaces panel and switcher.",
   "settings.general.chooseSpacesRoot": "Choose folder",
   "settings.general.clearSpacesRoot": "Clear folder",
   "settings.general.spacesRootNotSet": "Choose a root folder before creating a Space.",
