@@ -27,5 +27,5 @@ const showWindow = () => {
     .show()
     .catch((e) => console.error("settings show failed:", e));
 };
-setTimeout(showWindow, 50);
-setTimeout(showWindow, 500);
+// Show once after the first React paint; avoid duplicate delayed IPC calls.
+requestAnimationFrame(showWindow);
