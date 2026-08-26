@@ -8,8 +8,6 @@ function toSpaceInfo(space) {
 }
 
 export default {
-  "app.started": async () => ({ type: "handled" }),
-
   "spaces.loaded": async ({ spaces }) => ({
     type: "spaces.info.updated",
     spaces: Object.fromEntries(
@@ -19,15 +17,8 @@ export default {
     ),
   }),
 
-  "spaces.changed": async () => ({ type: "handled" }),
-
   "space.activated": async ({ space }) => ({
     type: "space.info.updated",
     spaceId: space.id,
     info: toSpaceInfo(space),
-  }),
-
-  "space.deactivated": async () => ({ type: "handled" }),
-
-  "file.saved": async () => ({ type: "handled" }),
-};
+  }),};
