@@ -17,6 +17,7 @@ import { Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import {
   forwardRef,
@@ -107,6 +108,7 @@ function formatBytes(n: number): string {
 export const EditorPane = memo(
   forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
     const { path, overrideLanguage, onDirtyChange, onSaved, onClose } = props;
+    const { t } = useTranslation();
 
     const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
       useDocument({
@@ -551,7 +553,7 @@ export const EditorPane = memo(
     if (doc.status === "loading") {
       return (
         <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-          Loading…
+          {t("common.loading")}
         </div>
       );
     }
@@ -628,11 +630,15 @@ export const EditorPane = memo(
       return (
         <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
           <div className="text-sm text-foreground">
-            {doc.status === "binary" ? "Binary file" : "File too large"}
+            {doc.status === "binary"
+              ? t("editor.binaryFile")
+              : t("editor.fileTooLarge")}
           </div>
           <div className="text-xs text-muted-foreground">
             {formatBytes(doc.size)} ·{" "}
-            {canForce ? "syntax features disabled" : "preview not supported"}
+            {canForce
+              ? t("editor.syntaxFeaturesDisabled")
+              : t("editor.previewNotSupported")}
           </div>
           {canForce && (
             <button
@@ -640,7 +646,7 @@ export const EditorPane = memo(
               onClick={openAnyway}
               className="mt-2 rounded-md border border-border bg-muted/60 px-3 py-1 text-xs text-foreground hover:bg-accent"
             >
-              Open anyway
+              {t("editor.openAnyway")}
             </button>
           )}
         </div>
@@ -656,7 +662,7 @@ export const EditorPane = memo(
           theme={themeExt}
           extensions={extensions}
           height="100%"
-          className="flex-1 min-h-0 overflow-hidden"
+          className="terax-code-editor flex-1 min-h-0 overflow-hidden"
           basicSetup={{
             lineNumbers: true,
             highlightActiveLineGutter: true,

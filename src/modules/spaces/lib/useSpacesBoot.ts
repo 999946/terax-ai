@@ -52,7 +52,28 @@ export function useSpacesBoot({
 
     void (async () => {
       try {
-        const { spaces, activeId, states } = await loadAll();
+        const { spaces: savedSpaces, activeId, states } = await loadAll();
+        await usePreferencesStore.getState().init().catch(() => {});
+        const spacesRoot = usePreferencesStore.getState().spacesRoot;
+        let spaces = savedSpaces;
+        if (spacesRoot) {
+          try {
+            const { listSpaceFolders } = await import("./filesystem");
+            const roots = await listSpaceFolders(spacesRoot);
+            const byRoot = new Map(savedSpaces.filter((s) => s.root).map((s) => [s.root!, s]));
+            spaces = roots.map((root) => byRoot.get(root) ?? {
+              id: `sp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+              name: root.split(/[\\\\/]/).filter(Boolean).slice(-1)[0] ?? root,
+              root,
+              env: parseWorkspaceScopeKey(usePreferencesStore.getState().defaultWorkspaceEnv),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            });
+            await saveSpacesList(spaces);
+          } catch (error) {
+            console.warn("spaces root scan failed", error);
+          }
+        }
 
         if (spaces.length === 0) {
           const root = launchCwd ?? home ?? null;

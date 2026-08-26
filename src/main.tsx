@@ -5,6 +5,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
+import "./modules/i18n/config";
+import { LocaleProvider } from "./modules/i18n";
 import { initLaunchDir } from "./lib/launchDir";
 import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 
@@ -26,7 +28,9 @@ await invoke("pty_close_all").catch(() => {});
 await initLaunchDir();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <App />,
+  <LocaleProvider>
+    <App />
+  </LocaleProvider>,
 );
 
 // Window starts hidden (per tauri.conf.json) so users never see a transparent

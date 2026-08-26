@@ -39,6 +39,9 @@
     "externalBin": [
       "binaries/terax-cli"
     ],
+    "resources": [
+      "../scripts/plugin/index.mjs"
+    ],
     "targets": "all",
     "createUpdaterArtifacts": true,
     "copyright": "Copyright 2026 Crynta",

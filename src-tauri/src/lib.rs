@@ -1,8 +1,6 @@
 pub mod modules;
 
-use modules::{
-    agent, control, fs, git, history, lsp, net, pty, secrets, shell, vibrancy, workspace,
-};
+use modules::{agent, control, plugin, fs, git, history, lsp, net, pty, secrets, shell, workspace};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -100,8 +98,8 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
     let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
         .title("Settings")
-        .inner_size(900.0, 700.0)
-        .min_inner_size(820.0, 620.0)
+        .inner_size(1100.0, 820.0)
+        .min_inner_size(960.0, 700.0)
         .resizable(true)
         .visible(false)
         // Keep settings above the main app window so it doesn't get hidden
@@ -203,6 +201,7 @@ pub fn run() {
                 .level(tauri_plugin_log::log::LevelFilter::Info)
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(move |_app| {
             if let Err(error) = control::start(_app.handle().clone(), control_for_setup.clone()) {
@@ -228,6 +227,7 @@ pub fn run() {
         })
         .manage(pty::PtyState::default())
         .manage(control_state)
+        .manage(plugin::PluginState::default())
         .manage(shell::ShellState::default())
         .manage(secrets::SecretsState::default())
         .manage(fs::watch::FsWatchState::default())
@@ -312,6 +312,14 @@ pub fn run() {
             workspace::workspace_current_dir,
             control::control_frontend_ready,
             control::control_respond,
+            plugin::plugin_list_plugins,
+            plugin::plugin_register_plugin,
+            plugin::plugin_delete_plugin,
+            plugin::plugin_set_plugin_enabled,
+            plugin::plugin_snapshot,
+            plugin::plugin_dispatch_event,
+            plugin::plugin_entry_read,
+            plugin::plugin_entry_write,
             get_launch_dir,
             get_launch_files,
             open_settings_window,
@@ -328,8 +336,6 @@ pub fn run() {
             history::history_commands,
             history::history_record,
             history::history_list,
-            vibrancy::window_backdrop_kind,
-            vibrancy::window_set_backdrop,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -399,8 +405,9 @@ mod launch_target_tests {
 
     #[test]
     fn file_arg_opens_file_and_uses_parent_as_workspace() {
-        let out =
-            resolve_launch_target(vec![LaunchEntry::File(PathBuf::from("/home/u/proj/main.rs"))]);
+        let out = resolve_launch_target(vec![LaunchEntry::File(PathBuf::from(
+            "/home/u/proj/main.rs",
+        ))]);
         assert_eq!(out.dir.as_deref(), Some("/home/u/proj"));
         assert_eq!(out.files, vec!["/home/u/proj/main.rs".to_string()]);
     }

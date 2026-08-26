@@ -29,6 +29,7 @@ import {
 } from "@/modules/ai";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { native } from "@/modules/ai/lib/native";
+import { useTranslation } from "react-i18next";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
 import { useControlBridge } from "@/modules/control";
 import {
@@ -48,7 +49,6 @@ import { setLspNavigator } from "@/modules/lsp";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setShowHidden } from "@/modules/settings/store";
 import {
   shouldDisablePaneSwapShortcut,
   type ShortcutHandlers,
@@ -67,10 +67,11 @@ import {
   useSourceControlContext,
 } from "@/modules/source-control";
 import {
-  SpaceSwitcher,
+  SpacesPanel,
   useSpacePersistence,
   useSpaces,
   useSpacesBoot,
+  useSpacesDirectorySync,
 } from "@/modules/spaces";
 import { StatusBar } from "@/modules/statusbar";
 import {
@@ -97,11 +98,7 @@ import {
   whenSessionReady,
   writeToSession,
 } from "@/modules/terminal";
-import {
-  ThemeProvider,
-  useThemeFileEditing,
-  WindowVibrancyBridge,
-} from "@/modules/theme";
+import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import {
   useWorkspaceEnvStore,
@@ -233,6 +230,7 @@ export default function App() {
   });
 
   const activeSpaceId = useSpaces((s) => s.activeId);
+  const { t } = useTranslation();
   const spacesHydrated = useSpaces((s) => s.hydrated);
   const activeSpaceIdRef = useRef(activeSpaceId);
   useLayoutEffect(() => {
@@ -251,6 +249,8 @@ export default function App() {
     },
     [switchWorkspace, activeSpaceId],
   );
+
+  useSpacesDirectorySync();
 
   useSpacesBoot({
     ready: launchCwdResolved,
@@ -295,8 +295,6 @@ export default function App() {
     setActiveId,
     adoptWorkspaceEnv,
   ]);
-
-  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const spaceTabs = useMemo(
     () => tabs.filter((t) => t.spaceId === (activeSpaceId ?? DEFAULT_SPACE_ID)),
@@ -350,9 +348,16 @@ export default function App() {
   useEditorFileSync({ tabs, tabsRef, editorRefs });
   useThemeFileEditing({ tabsRef, openFileTab });
 
-  const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(
+  // 文件树根目录来自当前 Space 的 root，不依赖终端 cwd
+  const spaces = useSpaces((s) => s.spaces);
+  const activeSpace = useMemo(
+    () => spaces.find((s) => s.id === activeSpaceId),
+    [spaces, activeSpaceId],
+  );
+  const explorerRoot = activeSpace?.root ?? null;
+
+  const { inheritedCwdForNewTab } = useWorkspaceCwd(
     activeTab,
-    tabs,
     launchCwd ?? home,
   );
 
@@ -752,10 +757,6 @@ export default function App() {
   const openSourceControl = useCallback(() => {
     openSidebarView("source-control");
   }, [openSidebarView]);
-  const toggleHiddenFiles = useCallback(() => {
-    openSidebarView("explorer");
-    void setShowHidden(!usePreferencesStore.getState().showHidden);
-  }, [openSidebarView]);
   const {
     repositoryTarget: sourceControlRepositoryTarget,
     openInSourceControl: handleOpenRepositoryInSourceControl,
@@ -873,7 +874,7 @@ export default function App() {
         ),
       "space.next": () => cycleSpace(1),
       "space.prev": () => cycleSpace(-1),
-      "space.overview": () => setSwitcherOpen(true),
+      "space.overview": () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
       "pane.splitRight": () => splitActivePaneInActiveTab("row"),
       "pane.splitDown": () => splitActivePaneInActiveTab("col"),
       "pane.focusNext": () => focusNextPaneInTab(activeId, 1),
@@ -911,7 +912,6 @@ export default function App() {
       "settings.open": () => void openSettingsWindow(),
       "sidebar.toggle": toggleSidebar,
       "explorer.focus": toggleExplorerFocus,
-      "explorer.toggleHidden": toggleHiddenFiles,
       "view.zoomIn": zoomIn,
       "view.zoomOut": zoomOut,
       "view.zoomReset": zoomReset,
@@ -945,7 +945,6 @@ export default function App() {
       onAskFromSelection,
       toggleSidebar,
       toggleExplorerFocus,
-      toggleHiddenFiles,
       zoomIn,
       zoomOut,
       zoomReset,
@@ -1007,7 +1006,7 @@ export default function App() {
       }
       return false;
     },
-    [activeTab],
+    [activeTab, captureActiveSelection],
   );
 
   useGlobalShortcuts(shortcutHandlers, { isDisabled: shortcutsDisabled });
@@ -1078,7 +1077,7 @@ export default function App() {
   }, [openPanel, focusInput]);
 
   const handleLeafExit = useCallback(
-    (leafId: number, _code: number) => {
+    (leafId: number) => {
       const all = tabsRef.current;
       const tab = all.find(
         (t) => t.kind === "terminal" && hasLeaf(t.paneTree, leafId),
@@ -1136,18 +1135,25 @@ export default function App() {
 
   const activeCwd = activeTerminalLeafCwd;
 
-  const handleNewSpace = useCallback(() => {
-    const { spaces, create, setActive } = useSpaces.getState();
-    const meta = create({
-      name: `Space ${spaces.length + 1}`,
-      root: activeCwd ?? home ?? null,
-      env: workspaceEnv,
-    });
-    setActiveSpaceForNewTabs(meta.id);
-    newTab(activeCwd ?? undefined);
-    setActive(meta.id);
-    return meta.id;
-  }, [activeCwd, home, workspaceEnv, newTab, setActiveSpaceForNewTabs]);
+  const handleNewSpace = useCallback(async () => {
+    const spacesRoot = usePreferencesStore.getState().spacesRoot;
+    if (!spacesRoot) return null;
+    const name = window.prompt(t("spaces.folderName"), `Space ${useSpaces.getState().spaces.length + 1}`);
+    if (name === null) return null;
+    try {
+      const { createSpaceFolder } = await import("@/modules/spaces/lib/filesystem");
+      const root = await createSpaceFolder(spacesRoot, name);
+      const { create, setActive } = useSpaces.getState();
+      const meta = create({ name: name.trim(), root, env: workspaceEnv });
+      setActiveSpaceForNewTabs(meta.id);
+      newTab(root);
+      setActive(meta.id);
+      return meta.id;
+    } catch (error) {
+      console.error("create space failed", error);
+      return null;
+    }
+  }, [workspaceEnv, newTab, setActiveSpaceForNewTabs, t]);
 
   const handleDeleteSpace = useCallback(
     (id: string) => {
@@ -1196,18 +1202,25 @@ export default function App() {
       if (!t) return;
       setActiveId(tabId);
       useSpaces.getState().setActive(t.spaceId);
-      setSwitcherOpen(false);
     },
     [setActiveId],
   );
 
-  const spaceSwitcher = (
-    <SpaceSwitcher
-      open={switcherOpen}
-      onOpenChange={setSwitcherOpen}
+  const spacesPanel = (
+    <SpacesPanel
       tabs={tabs}
       onNewSpace={() => void handleNewSpace()}
       onDeleteSpace={handleDeleteSpace}
+      onRenameSpace={(id, name) => {
+        const space = useSpaces.getState().spaces.find((s) => s.id === id);
+        if (!space?.root) return;
+        void import("@/modules/spaces/lib/filesystem").then(({ renameSpaceFolder }) => {
+          const oldName = space.root!.split(/[\\\\/]/).filter(Boolean).slice(-1)[0] ?? space.name;
+          return renameSpaceFolder(usePreferencesStore.getState().spacesRoot ?? "", oldName, name);
+        }).then((root) => {
+          useSpaces.getState().rename(id, name.trim(), root);
+        }).catch((error) => console.error("rename space failed", error));
+      }}
       onNewTabInSpace={handleNewTabInSpace}
       onJumpTab={jumpToTab}
       onCloseTab={handleClose}
@@ -1239,14 +1252,19 @@ export default function App() {
             focusSearch: () => searchInlineRef.current?.focus(),
             focusExplorerSearch: () => explorerRef.current?.focusSearch(),
             toggleSidebar,
-            toggleHiddenFiles,
+            toggleHiddenFiles: () => {
+              const preferences = usePreferencesStore.getState();
+              void import("@/modules/settings/store").then(({ setShowHidden }) =>
+                setShowHidden(!preferences.showHidden),
+              );
+            },
             toggleAi: togglePanelAndFocus,
             askAiSelection: askFromSelection,
             openSettings: () => void openSettingsWindow(),
             openKeyboardShortcuts: () => void openSettingsWindow("shortcuts"),
             spaces: useSpaces.getState().spaces,
             activeSpaceId,
-            openSpacesOverview: () => setSwitcherOpen(true),
+            openSpacesOverview: () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
             newSpace: () => void handleNewSpace(),
             switchSpace: (id) => useSpaces.getState().setActive(id),
           })
@@ -1267,7 +1285,6 @@ export default function App() {
       handleCloseTabOrPane,
       splitActivePaneInActiveTab,
       toggleSidebar,
-      toggleHiddenFiles,
       togglePanelAndFocus,
       askFromSelection,
       activeSpaceId,
@@ -1360,7 +1377,7 @@ export default function App() {
   const shell = (
     <ThemeProvider>
       <TooltipProvider>
-        <div className="relative flex h-screen flex-col overflow-hidden bg-frame text-foreground">
+        <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
           {!zenMode && (
             <Header
               tabs={spaceTabs}
@@ -1384,14 +1401,14 @@ export default function App() {
               onActivateAgent={onActivateAgent}
               onActivateLocalAgent={onActivateLocalAgent}
               onOpenSettings={() => void openSettingsWindow()}
-              spaceSwitcher={spaceSwitcher}
               searchTarget={searchTarget}
               searchRef={searchInlineRef}
               onOverrideLanguage={setOverrideLanguage}
             />
           )}
 
-          <main className="zoom-content flex min-h-0 flex-1 flex-col">
+          <main className="zoom-content flex min-h-0 flex-1 flex-row">
+            {spacesPanel}
             <ResizablePanelGroup
               orientation="horizontal"
               className="min-h-0 flex-1"
@@ -1416,93 +1433,89 @@ export default function App() {
                   persistSidebarCollapsed(size.inPixels <= 0);
                 }}
               >
-                <div className="h-full min-h-0 pl-2 pr-0.5">
-                  <div className="terax-pane flex h-full min-h-0 flex-col">
-                    <div
-                      key={sidebarView}
-                      className="min-h-0 flex-1 terax-panel-in"
-                    >
-                      {sidebarView === "explorer" ? (
-                        <FileExplorer
-                          ref={explorerRef}
-                          rootPath={explorerRoot}
-                          gitStatus={
-                            explorerGitDecorations ? sourceControl.status : null
-                          }
-                          activeFilePath={explorerActiveFilePath}
-                          onOpenFile={handleOpenFile}
-                          onPathRenamed={handlePathRenamed}
-                          onPathDeleted={handlePathDeleted}
-                          onRevealInTerminal={cdInNewTab}
-                          onOpenInSourceControl={
-                            handleOpenRepositoryInSourceControl
-                          }
-                          onOpenGitHistory={handleOpenGitHistoryForPath}
-                          onAttachToAgent={handleAttachFileToAgent}
-                          pathDropTarget={terminalPathDropTarget}
-                        />
-                      ) : (
-                        <SourceControlPanel
-                          open
-                          sourceControl={sourceControl}
-                          onOpenDiff={openGitDiffTab}
-                          onOpenGitGraph={openGitGraphFromContext}
-                          onOpenFile={handleOpenFile}
-                          onNavigateToPath={cdInNewTab}
-                          repositoryTarget={sourceControlRepositoryTarget}
-                          onFollowRepositoryContext={
-                            handleFollowRepositoryContext
-                          }
-                        />
-                      )}
-                    </div>
-                    <SidebarRail
-                      activeView={sidebarView}
-                      onSelectView={persistSidebarView}
-                      changedCount={sourceControl.changedCount}
-                    />
+                <div className="flex h-full min-h-0 flex-col border-r border-border/60 bg-card">
+                  <SidebarRail
+                    activeView={sidebarView}
+                    onSelectView={persistSidebarView}
+                    changedCount={sourceControl.changedCount}
+                  />
+                  <div
+                    key={sidebarView}
+                    className="min-h-0 flex-1 terax-panel-in"
+                  >
+                    {sidebarView === "explorer" ? (
+                      <FileExplorer
+                        ref={explorerRef}
+                        rootPath={explorerRoot}
+                        gitStatus={
+                          explorerGitDecorations ? sourceControl.status : null
+                        }
+                        activeFilePath={explorerActiveFilePath}
+                        onOpenFile={handleOpenFile}
+                        onPathRenamed={handlePathRenamed}
+                        onPathDeleted={handlePathDeleted}
+                        onRevealInTerminal={cdInNewTab}
+                        onOpenInSourceControl={
+                          handleOpenRepositoryInSourceControl
+                        }
+                        onOpenGitHistory={handleOpenGitHistoryForPath}
+                        onAttachToAgent={handleAttachFileToAgent}
+                        pathDropTarget={terminalPathDropTarget}
+                      />
+                    ) : (
+                      <SourceControlPanel
+                        open
+                        sourceControl={sourceControl}
+                        onOpenDiff={openGitDiffTab}
+                        onOpenGitGraph={openGitGraphFromContext}
+                        onOpenFile={handleOpenFile}
+                        onNavigateToPath={cdInNewTab}
+                        repositoryTarget={sourceControlRepositoryTarget}
+                        onFollowRepositoryContext={
+                          handleFollowRepositoryContext
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               </ResizablePanel>
-              <ResizableHandle className="w-1 rounded-full bg-transparent transition-colors duration-[var(--dur-fast)] after:w-4 hover:bg-border" />
+              <ResizableHandle withHandle />
               <ResizablePanel id="workspace" defaultSize="78%" minSize="30%">
-                <div className="h-full min-h-0 pl-0.5 pr-2">
-                  <div className="terax-pane flex h-full min-h-0 flex-col">
-                    <div className="relative min-h-0 flex-1">
-                      <WorkspaceSurface
-                        tabs={tabs}
-                        activeId={activeId}
-                        activeTab={activeTab}
-                        registerTerminalHandle={registerTerminalHandle}
-                        onSearchReady={handleSearchReady}
-                        onCwd={handleTerminalCwd}
-                        onExit={handleLeafExit}
-                        onFocusLeaf={handleFocusLeaf}
-                        registerEditorHandle={registerEditorHandle}
-                        onEditorDirtyChange={handleEditorDirty}
-                        onEditorCloseTab={disposeTab}
-                        registerPreviewHandle={registerPreviewHandle}
-                        onPreviewUrlChange={handlePreviewUrl}
-                        onAiDiffAccept={(id) => respondToApproval(id, true)}
-                        onAiDiffReject={(id) => respondToApproval(id, false)}
-                        onOpenCommitFile={openCommitFileDiffTab}
-                        onGitHistorySearchHandle={setGitHistoryHandle}
-                        onSetMarkdownView={setMarkdownView}
-                      />
-                    </div>
-
-                    <WorkspaceInputBar
-                      isBlockTab={isBlockTab}
-                      isTerminalTab={isTerminalTab}
-                      activeLeafId={activeLeafId}
-                      cwd={activeCwd}
-                      home={home}
-                      hasComposer={hasComposer}
-                      panelOpen={panelOpen}
-                      keysLoaded={keysLoaded}
-                      onConnect={() => void openSettingsWindow("models")}
+                <div className="flex h-full min-h-0 flex-col">
+                  <div className="relative min-h-0 flex-1">
+                    <WorkspaceSurface
+                      tabs={tabs}
+                      activeId={activeId}
+                      activeTab={activeTab}
+                      registerTerminalHandle={registerTerminalHandle}
+                      onSearchReady={handleSearchReady}
+                      onCwd={handleTerminalCwd}
+                      onExit={handleLeafExit}
+                      onFocusLeaf={handleFocusLeaf}
+                      registerEditorHandle={registerEditorHandle}
+                      onEditorDirtyChange={handleEditorDirty}
+                      onEditorCloseTab={disposeTab}
+                      registerPreviewHandle={registerPreviewHandle}
+                      onPreviewUrlChange={handlePreviewUrl}
+                      onAiDiffAccept={(id) => respondToApproval(id, true)}
+                      onAiDiffReject={(id) => respondToApproval(id, false)}
+                      onOpenCommitFile={openCommitFileDiffTab}
+                      onGitHistorySearchHandle={setGitHistoryHandle}
+                      onSetMarkdownView={setMarkdownView}
                     />
                   </div>
+
+                  <WorkspaceInputBar
+                    isBlockTab={isBlockTab}
+                    isTerminalTab={isTerminalTab}
+                    activeLeafId={activeLeafId}
+                    cwd={activeCwd}
+                    home={home}
+                    hasComposer={hasComposer}
+                    panelOpen={panelOpen}
+                    keysLoaded={keysLoaded}
+                    onConnect={() => void openSettingsWindow("models")}
+                  />
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -1523,8 +1536,6 @@ export default function App() {
               }
             />
           )}
-
-          <WindowVibrancyBridge />
 
           <AgentNotificationsBridge
             tabs={tabs}

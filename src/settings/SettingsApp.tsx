@@ -2,6 +2,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
+import { useTranslation } from "react-i18next";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   AiScanIcon,
@@ -19,50 +20,62 @@ import { AboutSection } from "./sections/AboutSection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
+import { PluginSettings } from "./sections/PluginSettings";
 import { ModelsSection } from "./sections/ModelsSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { ThemesSection } from "./sections/ThemesSection";
 
 const TABS: {
   id: SettingsTab;
-  label: string;
+  labelKey: string;
   icon: typeof Settings01Icon;
   component: () => JSX.Element;
 }[] = [
   {
     id: "general",
-    label: "General",
+    labelKey: "settings.tabs.general",
     icon: Settings01Icon,
     component: GeneralSection,
   },
   {
     id: "editor",
-    label: "Editor",
+    labelKey: "settings.tabs.editor",
     icon: SourceCodeIcon,
     component: EditorSection,
   },
   {
     id: "themes",
-    label: "Themes",
+    labelKey: "settings.tabs.themes",
     icon: PaintBoardIcon,
     component: ThemesSection,
   },
   {
     id: "shortcuts",
-    label: "Shortcuts",
+    labelKey: "settings.tabs.shortcuts",
     icon: KeyboardIcon,
     component: ShortcutsSection,
   },
-  { id: "models", label: "Models", icon: AiScanIcon, component: ModelsSection },
+  {
+    id: "models",
+    labelKey: "settings.tabs.models",
+    icon: AiScanIcon,
+    component: ModelsSection,
+  },
   {
     id: "agents",
-    label: "Agents",
+    labelKey: "settings.tabs.agents",
     icon: UserMultiple02Icon,
     component: AgentsSection,
   },
   {
+    id: "plugin",
+    labelKey: "settings.tabs.plugin",
+    icon: SourceCodeIcon,
+    component: PluginSettings,
+  },
+  {
     id: "about",
-    label: "About",
+    labelKey: "settings.tabs.about",
     icon: InformationCircleIcon,
     component: AboutSection,
   },
@@ -75,6 +88,7 @@ const VALID_TABS: SettingsTab[] = [
   "shortcuts",
   "models",
   "agents",
+  "plugin",
   "about",
 ];
 
@@ -90,6 +104,7 @@ function readInitialTab(): SettingsTab {
 
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsTab>(readInitialTab);
+  const { t: translate } = useTranslation();
   const init = usePreferencesStore((s) => s.init);
   const ActiveSection = TABS.find((t) => t.id === active)?.component;
 
@@ -139,7 +154,7 @@ export function SettingsApp() {
                 className="h-6 gap-1.5 px-2.5 text-[11.5px]"
               >
                 <HugeiconsIcon icon={t.icon} size={12} strokeWidth={1.75} />
-                <span>{t.label}</span>
+                <span>{translate(t.labelKey)}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -148,7 +163,7 @@ export function SettingsApp() {
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-7 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="mx-auto w-full max-w-160">
+        <div className="mx-auto w-full max-w-240">
           {ActiveSection && <ActiveSection />}
         </div>
       </main>

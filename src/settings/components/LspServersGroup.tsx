@@ -25,12 +25,14 @@ import {
 } from "@/modules/settings/store";
 import { Delete02Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useTranslation } from "react-i18next";
 import { useEffect, useId, useState } from "react";
 import { LspInstallDialog } from "./LspInstallDialog";
 import { resolveLspSwitchState } from "./lspSwitchState";
 import { SettingRow } from "./SettingRow";
 
 export function LspServersGroup() {
+  const { t } = useTranslation();
   const activation = usePreferencesStore((s) => s.lspActivation);
   const customServers = usePreferencesStore((s) => s.lspCustomServers);
   const [installTarget, setInstallTarget] = useState<LspPreset | null>(null);
@@ -39,7 +41,7 @@ export function LspServersGroup() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label>Language servers</Label>
+        <Label>{t("settings.lsp.languageServers")}</Label>
         <AddCustomServerDialog customServers={customServers} />
       </div>
       {servers.map((server) => (
@@ -74,6 +76,7 @@ function ServerRow({
   customServers: LspCustomServer[];
   onInstall: () => void;
 }) {
+  const { t } = useTranslation();
   const detected = useLspRuntimeStore((s) => s.detected[server.command]);
 
   useEffect(() => {
@@ -83,10 +86,10 @@ function ServerRow({
   const langs = Object.keys(server.languages).join(", ");
   const status =
     detected === undefined
-      ? "checking..."
+      ? t("settings.lsp.checking")
       : detected
         ? detected
-        : "not found on PATH";
+        : t("settings.lsp.notFoundOnPath");
   const switchState = resolveLspSwitchState(enabled, detected);
 
   return (
@@ -99,14 +102,18 @@ function ServerRow({
           ) : null}
         </span>
       }
-      description={`${server.command} (${langs}) - ${status}`}
+      description={t("settings.lsp.serverDescription", {
+        command: server.command,
+        languages: langs,
+        status,
+      })}
     >
       <div className="flex items-center gap-1.5">
         <button
           type="button"
           className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
           onClick={() => void redetectBinary(server.command)}
-          title="Detect again"
+          title={t("settings.lsp.detectAgain")}
         >
           <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={1.75} />
         </button>
@@ -120,7 +127,7 @@ function ServerRow({
                 customServers.filter((c) => c.id !== server.id),
               );
             }}
-            title="Remove server"
+            title={t("settings.lsp.removeServer")}
           >
             <HugeiconsIcon icon={Delete02Icon} size={12} strokeWidth={1.75} />
           </button>
@@ -128,7 +135,12 @@ function ServerRow({
         <Switch
           checked={switchState.checked}
           disabled={switchState.checking}
-          aria-label={`${switchState.checked ? "Disable" : "Enable"} ${server.name} language server`}
+          aria-label={t(
+            switchState.checked
+              ? "settings.lsp.disableServer"
+              : "settings.lsp.enableServer",
+            { name: server.name },
+          )}
           onCheckedChange={(checked) => {
             if (!checked) {
               void setLspActivation(server.id, "dismissed");
@@ -151,6 +163,7 @@ function AddCustomServerDialog({
 }: {
   customServers: LspCustomServer[];
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
@@ -222,24 +235,56 @@ function AddCustomServerDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]">
-          Add custom server
+          {t("settings.lsp.addCustomServer")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-sm">Custom language server</DialogTitle>
+          <DialogTitle className="text-sm">
+            {t("settings.lsp.customServer")}
+          </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2.5">
-          {field("Name", name, setName, "Zig")}
-          {field("Command", command, setCommand, "zls")}
-          {field("Arguments", args, setArgs, "--stdio")}
-          {field("File extensions", extensions, setExtensions, "zig, zon")}
-          {field("LSP language id", languageId, setLanguageId, "zig")}
-          {field("Root markers", rootMarkers, setRootMarkers, "build.zig")}
+          {field(
+            t("settings.lsp.nameLabel"),
+            name,
+            setName,
+            t("settings.lsp.namePlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.commandLabel"),
+            command,
+            setCommand,
+            t("settings.lsp.commandPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.argumentsLabel"),
+            args,
+            setArgs,
+            t("settings.lsp.argumentsPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.extensionsLabel"),
+            extensions,
+            setExtensions,
+            t("settings.lsp.extensionsPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.languageIdLabel"),
+            languageId,
+            setLanguageId,
+            t("settings.lsp.languageIdPlaceholder"),
+          )}
+          {field(
+            t("settings.lsp.rootMarkersLabel"),
+            rootMarkers,
+            setRootMarkers,
+            t("settings.lsp.rootMarkersPlaceholder"),
+          )}
         </div>
         <DialogFooter>
           <Button size="sm" disabled={!valid} onClick={save}>
-            Add server
+            {t("settings.lsp.addServer")}
           </Button>
         </DialogFooter>
       </DialogContent>

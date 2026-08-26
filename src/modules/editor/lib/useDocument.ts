@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { notifyDocumentSaved } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { currentWorkspaceEnv } from "@/modules/workspace";
@@ -29,6 +30,7 @@ type Options = {
 };
 
 export function useDocument({ path, onDirtyChange }: Options) {
+  const { t } = useTranslation();
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
 
@@ -84,17 +86,17 @@ export function useDocument({ path, onDirtyChange }: Options) {
       }).catch(() => null);
       if (stat && stat.mtime !== known) {
         const name = path.split(/[\\/]/).pop() ?? path;
-        toast.warning("File changed on disk", {
+        toast.warning(t("editor.fileChangedOnDisk"), {
           id: `save-conflict:${path}`,
-          description: `${name} was modified by another program while you had unsaved changes. Overwrite to keep your version.`,
-          action: { label: "Overwrite", onClick: () => void writeToDisk() },
+          description: t("editor.fileChangedOnDiskDescription", { name }),
+          action: { label: t("editor.overwrite"), onClick: () => void writeToDisk() },
         });
         return false;
       }
     }
     await writeToDisk();
     return true;
-  }, [path, writeToDisk]);
+  }, [path, t, writeToDisk]);
 
   // Notify parent of dirty transitions.
   const onDirtyChangeRef = useRef(onDirtyChange);

@@ -1,6 +1,8 @@
 import "../styles/globals.css";
 
 import { USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import "@/modules/i18n/config";
+import { LocaleProvider } from "@/modules/i18n";
 import { ThemeProvider } from "@/modules/theme";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
@@ -13,9 +15,11 @@ if (USE_CUSTOM_WINDOW_CONTROLS) {
 ReactDOM.createRoot(
   document.getElementById("settings-root") as HTMLElement,
 ).render(
-  <ThemeProvider>
-    <SettingsApp />
-  </ThemeProvider>,
+  <LocaleProvider>
+    <ThemeProvider>
+      <SettingsApp />
+    </ThemeProvider>
+  </LocaleProvider>,
 );
 
 const showWindow = () => {
@@ -23,5 +27,5 @@ const showWindow = () => {
     .show()
     .catch((e) => console.error("settings show failed:", e));
 };
-setTimeout(showWindow, 50);
-setTimeout(showWindow, 500);
+// Show once after the first React paint; avoid duplicate delayed IPC calls.
+requestAnimationFrame(showWindow);
