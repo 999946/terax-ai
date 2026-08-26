@@ -1,6 +1,6 @@
 pub mod modules;
 
-use modules::{agent, control, dcp, fs, git, history, lsp, net, pty, secrets, shell, workspace};
+use modules::{agent, control, plugin, fs, git, history, lsp, net, pty, secrets, shell, workspace};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -227,7 +227,7 @@ pub fn run() {
         })
         .manage(pty::PtyState::default())
         .manage(control_state)
-        .manage(dcp::DcpState::default())
+        .manage(plugin::PluginState::default())
         .manage(shell::ShellState::default())
         .manage(secrets::SecretsState::default())
         .manage(fs::watch::FsWatchState::default())
@@ -312,14 +312,14 @@ pub fn run() {
             workspace::workspace_current_dir,
             control::control_frontend_ready,
             control::control_respond,
-            dcp::dcp_list_plugins,
-            dcp::dcp_register_plugin,
-            dcp::dcp_delete_plugin,
-            dcp::dcp_set_plugin_enabled,
-            dcp::dcp_snapshot,
-            dcp::dcp_refresh,
-            dcp::dcp_entry_read,
-            dcp::dcp_entry_write,
+            plugin::plugin_list_plugins,
+            plugin::plugin_register_plugin,
+            plugin::plugin_delete_plugin,
+            plugin::plugin_set_plugin_enabled,
+            plugin::plugin_snapshot,
+            plugin::plugin_dispatch_event,
+            plugin::plugin_entry_read,
+            plugin::plugin_entry_write,
             get_launch_dir,
             get_launch_files,
             open_settings_window,

@@ -3,17 +3,17 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDcpStore } from "@/modules/dcp";
-import type { DcpPlugin } from "@/modules/dcp/types";
+import { usePluginStore } from "@/modules/plugin";
+import type { Plugin } from "@/modules/plugin/types";
 import { SectionHeader } from "../components/SectionHeader";
 
-type Pending = { action: "edit"; plugin: DcpPlugin } | { action: "add" };
+type Pending = { action: "edit"; plugin: Plugin } | { action: "add" };
 
-export function DcpSettings() {
+export function PluginSettings() {
   const { t } = useTranslation();
-  const { snapshot: s, load, register, setEnabled, delete: remove } = useDcpStore();
-  const [edit, setEdit] = useState<DcpPlugin | null>(null);
-  const [original, setOriginal] = useState<DcpPlugin | null>(null);
+  const { snapshot: s, load, register, setEnabled, delete: remove } = usePluginStore();
+  const [edit, setEdit] = useState<Plugin | null>(null);
+  const [original, setOriginal] = useState<Plugin | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
 
   useEffect(() => {
@@ -29,11 +29,11 @@ export function DcpSettings() {
     if (dirty) {
       setPending(next);
     } else if (next.action === "add") {
-      const p: DcpPlugin = {
+      const p: Plugin = {
         id: crypto.randomUUID(),
         name: "",
         content: "",
-        schemaVersion: 3,
+        schemaVersion: 1,
         enabled: true,
       };
       setEdit(p);
@@ -63,15 +63,15 @@ export function DcpSettings() {
   return (
     <div className="flex flex-col gap-5">
       <SectionHeader
-        title={t("settings.dcp.title")}
-        description={t("settings.dcp.description")}
+        title={t("settings.plugin.title")}
+        description={t("settings.plugin.description")}
       />
       <div className="rounded-lg border p-3">
         <Button size="xs" onClick={() => begin({ action: "add" })}>
-          {t("settings.dcp.addPlugin")}
+          {t("settings.plugin.addPlugin")}
         </Button>
 
-        {s?.plugins?.map((p: DcpPlugin) => (
+        {s?.plugins?.map((p: Plugin) => (
           <div key={p.id} className="border-t py-2">
             <div className="flex gap-2">
               <span className="flex-1">{p.name}</span>
@@ -80,14 +80,14 @@ export function DcpSettings() {
                 variant="ghost"
                 onClick={() => begin({ action: "edit", plugin: p })}
               >
-                {t("settings.dcp.editPlugin")}
+                {t("settings.plugin.editPlugin")}
               </Button>
               <Button
                 size="xs"
                 variant="ghost"
                 onClick={() => void remove(p.id)}
               >
-                {t("settings.dcp.removePlugin")}
+                {t("settings.plugin.removePlugin")}
               </Button>
               <Switch
                 checked={p.enabled}
@@ -98,7 +98,7 @@ export function DcpSettings() {
             {edit?.id === p.id && (
               <div className="mt-3 grid gap-2">
                 <Input
-                  placeholder={t("settings.dcp.pluginName")}
+                  placeholder={t("settings.plugin.pluginName")}
                   value={edit.name}
                   onChange={(e) =>
                     setEdit({ ...edit, name: e.target.value })
@@ -106,7 +106,7 @@ export function DcpSettings() {
                 />
                 <textarea
                   className="min-h-96 w-full resize-y rounded border p-3 font-mono text-xs leading-relaxed"
-                  placeholder={t("settings.dcp.pluginScript")}
+                  placeholder={t("settings.plugin.pluginScript")}
                   value={edit.content}
                   onChange={(e) =>
                     setEdit({ ...edit, content: e.target.value })
@@ -114,7 +114,7 @@ export function DcpSettings() {
                 />
                 <div className="flex gap-2">
                   <Button size="xs" onClick={() => void save()}>
-                    {t("settings.dcp.save")}
+                    {t("settings.plugin.save")}
                   </Button>
                   <Button
                     size="xs"
@@ -124,7 +124,7 @@ export function DcpSettings() {
                       setOriginal(null);
                     }}
                   >
-                    {t("settings.dcp.cancel")}
+                    {t("settings.plugin.cancel")}
                   </Button>
                 </div>
               </div>
@@ -135,19 +135,19 @@ export function DcpSettings() {
         {edit && edit.id && !s?.plugins?.some((p) => p.id === edit.id) && (
           <div className="mt-3 grid gap-2">
             <Input
-              placeholder={t("settings.dcp.pluginName")}
+              placeholder={t("settings.plugin.pluginName")}
               value={edit.name}
               onChange={(e) => setEdit({ ...edit, name: e.target.value })}
             />
             <textarea
               className="min-h-96 w-full resize-y rounded border p-3 font-mono text-xs leading-relaxed"
-              placeholder={t("settings.dcp.pluginScript")}
+              placeholder={t("settings.plugin.pluginScript")}
               value={edit.content}
               onChange={(e) => setEdit({ ...edit, content: e.target.value })}
             />
             <div className="flex gap-2">
               <Button size="xs" onClick={() => void save()}>
-                {t("settings.dcp.save")}
+                {t("settings.plugin.save")}
               </Button>
               <Button
                 size="xs"
@@ -157,7 +157,7 @@ export function DcpSettings() {
                   setOriginal(null);
                 }}
               >
-                {t("settings.dcp.cancel")}
+                {t("settings.plugin.cancel")}
               </Button>
             </div>
           </div>
@@ -169,7 +169,7 @@ export function DcpSettings() {
             className="mt-4 rounded border bg-background p-4 shadow"
           >
             <p className="mb-3 text-sm">
-              {t("settings.dcp.saveBeforeSwitching")}
+              {t("settings.plugin.saveBeforeSwitching")}
             </p>
             <div className="flex gap-2">
               <Button
@@ -180,17 +180,17 @@ export function DcpSettings() {
                   void save(next);
                 }}
               >
-                {t("settings.dcp.saveAndSwitch")}
+                {t("settings.plugin.saveAndSwitch")}
               </Button>
               <Button size="xs" variant="outline" onClick={discard}>
-                {t("settings.dcp.discardChanges")}
+                {t("settings.plugin.discardChanges")}
               </Button>
               <Button
                 size="xs"
                 variant="ghost"
                 onClick={() => setPending(null)}
               >
-                {t("settings.dcp.cancel")}
+                {t("settings.plugin.cancel")}
               </Button>
             </div>
           </div>

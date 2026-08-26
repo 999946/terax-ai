@@ -38,7 +38,7 @@
       "binaries/terax-cli"
     ],
     "resources": [
-      "../scripts/dcp-plugin/index.mjs"
+      "../scripts/plugin/index.mjs"
     ],
     "targets": "all",
     "createUpdaterArtifacts": true,

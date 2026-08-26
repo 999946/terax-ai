@@ -1,16 +1,18 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct DcpEntry {
-    pub entry: String,
-    pub value: Option<serde_json::Value>,
+pub struct PluginEvent {
+    pub event_type: String,
+    pub version: u32,
+    pub payload: Value,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DcpEvent {
+pub struct PluginDispatchResult {
     pub plugin_id: String,
-    pub ok: bool,
+    pub result: Option<Value>,
     pub error: Option<String>,
 }
-pub type DcpResponse = serde_json::Value;

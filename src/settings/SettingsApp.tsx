@@ -20,7 +20,7 @@ import { AboutSection } from "./sections/AboutSection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
-import { DcpSettings } from "./sections/DcpSettings";
+import { PluginSettings } from "./sections/PluginSettings";
 import { ModelsSection } from "./sections/ModelsSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { ThemesSection } from "./sections/ThemesSection";
@@ -68,10 +68,10 @@ const TABS: {
     component: AgentsSection,
   },
   {
-    id: "dcp",
-    labelKey: "settings.tabs.dcp",
+    id: "plugin",
+    labelKey: "settings.tabs.plugin",
     icon: SourceCodeIcon,
-    component: DcpSettings,
+    component: PluginSettings,
   },
   {
     id: "about",
@@ -88,7 +88,7 @@ const VALID_TABS: SettingsTab[] = [
   "shortcuts",
   "models",
   "agents",
-  "dcp",
+  "plugin",
   "about",
 ];
 

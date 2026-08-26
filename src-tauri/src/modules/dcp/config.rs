@@ -1,6 +1,0 @@
-use super::DcpPlugin;
-use std::{fs,path::PathBuf};
-fn path()->PathBuf{dirs::data_local_dir().unwrap_or_else(||PathBuf::from(".")).join("terax").join("dcp.json")}
-fn defaults()->Vec<DcpPlugin>{vec![DcpPlugin{id:"terax-builtin".into(),name:"space-info".into(),content:super::process::minimal_script().into(),schema_version:3,enabled:true}]}
-pub fn load()->Result<Vec<DcpPlugin>,String>{let p=path();let mut changed=!p.exists();let mut v=if !p.exists(){defaults()}else{let raw=fs::read(&p).map_err(|e|e.to_string())?;serde_json::from_slice::<Vec<DcpPlugin>>(&raw).or_else(|_|{changed=true;serde_json::from_slice::<Vec<super::LegacyPlugin>>(&raw).map(|x|x.into_iter().map(Into::into).collect())}).map_err(|e|e.to_string())?};let b=defaults().remove(0);if let Some(existing)=v.iter_mut().find(|x|x.id==b.id){if existing.name.trim().is_empty()||existing.name=="Terax built-in DCP"{existing.name=b.name.clone();changed=true;}if existing.content.trim().is_empty(){existing.content=b.content.clone();changed=true;}}else{v.insert(0,b);changed=true}if changed{save(&v)?;}Ok(v)}
-pub fn save(v:&[DcpPlugin])->Result<(),String>{let p=path();fs::create_dir_all(p.parent().unwrap()).map_err(|e|e.to_string())?;fs::write(p,serde_json::to_vec_pretty(v).map_err(|e|e.to_string())?).map_err(|e|e.to_string())}

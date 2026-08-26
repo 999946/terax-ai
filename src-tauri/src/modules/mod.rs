@@ -1,6 +1,6 @@
 pub mod agent;
 pub mod control;
-pub mod dcp;
+pub mod plugin;
 pub mod fs;
 pub mod git;
 pub mod history;
