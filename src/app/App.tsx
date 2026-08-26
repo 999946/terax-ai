@@ -1252,6 +1252,12 @@ export default function App() {
             focusSearch: () => searchInlineRef.current?.focus(),
             focusExplorerSearch: () => explorerRef.current?.focusSearch(),
             toggleSidebar,
+            toggleHiddenFiles: () => {
+              const preferences = usePreferencesStore.getState();
+              void import("@/modules/settings/store").then(({ setShowHidden }) =>
+                setShowHidden(!preferences.showHidden),
+              );
+            },
             toggleAi: togglePanelAndFocus,
             askAiSelection: askFromSelection,
             openSettings: () => void openSettingsWindow(),
