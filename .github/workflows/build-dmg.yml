@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -46,15 +46,55 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Read application version
+        id: version
+        shell: bash
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
       - name: Build DMG
         env:
           TERAX_CLI_TARGET: ${{ matrix.target }}
         run: pnpm tauri build --bundles dmg --target ${{ matrix.target }}
 
-      - name: Upload DMG
+      - name: Rename DMG
+        shell: bash
+        run: |
+          dmg=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
+          test -n "$dmg"
+          mv "$dmg" "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
+
+      - name: Upload DMG to workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: terax-dmg-${{ matrix.arch }}-${{ github.sha }}
-          path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          name: Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: Publish DMG release
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read application version
+        id: version
+        run: echo "version=$(gh api repos/${{ github.repository }}/contents/package.json?ref=${{ github.sha }} --jq '.content' | base64 -d | jq -r .version)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download DMG artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Terax-v${{ steps.version.outputs.version }}-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Terax v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: release-assets/*.dmg
+          fail_on_unmatched_files: true
