@@ -47,6 +47,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build DMG
+        env:
+          TERAX_CLI_TARGET: ${{ matrix.target }}
         run: pnpm tauri build --bundles dmg --target ${{ matrix.target }}
 
       - name: Upload DMG
