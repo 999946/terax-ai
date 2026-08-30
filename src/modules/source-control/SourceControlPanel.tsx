@@ -42,7 +42,7 @@ import {
   copyToClipboard,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
-import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   COMPACT_CONTENT,
   COMPACT_ITEM,
@@ -80,6 +80,11 @@ import {
   repositoryTargetIsPending,
   type SourceControlRepositoryTarget,
 } from "./repositoryTarget";
+import {
+  buildChangeTree,
+  directoryPaths,
+  flattenChangeTree,
+} from "./changeTree";
 import type { SourceControlSummary } from "./useSourceControl";
 import {
   useSourceControlPanel,
@@ -116,7 +121,8 @@ const ROW_HEIGHTS = {
 type RowDescriptor =
   | { kind: "banner-diverged"; key: string }
   | { kind: "list-header"; key: string; count: number }
-  | { kind: "entry"; key: string; entry: SourceControlFileEntry };
+  | Extract<import("./changeTree").ChangeRow, { kind: "dir" }>
+  | Extract<import("./changeTree").ChangeRow, { kind: "file" }>;
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -403,6 +409,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     return () => {
@@ -521,23 +528,38 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     void sourceControl.runRemoteAction("pull");
   }, [sourceControl]);
 
+  const changeTree = useMemo(
+    () => buildChangeTree(scm.fileEntries),
+    [scm.fileEntries],
+  );
+
+  useEffect(() => {
+    const paths = directoryPaths(changeTree);
+    setExpandedDirs((prev) => {
+      const next = new Set(prev);
+      for (const path of paths) next.add(path);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [changeTree]);
+
+  const toggleDir = useCallback((path: string) => {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
   const rows = useMemo<RowDescriptor[]>(() => {
     const result: RowDescriptor[] = [];
-    if (isDiverged) {
-      result.push({ kind: "banner-diverged", key: "banner-diverged" });
-    }
+    if (isDiverged) result.push({ kind: "banner-diverged", key: "banner-diverged" });
     if (changedCount > 0) {
-      result.push({
-        kind: "list-header",
-        key: "list-header",
-        count: changedCount,
-      });
-      for (const entry of scm.fileEntries) {
-        result.push({ kind: "entry", key: entry.key, entry });
-      }
+      result.push({ kind: "list-header", key: "list-header", count: changedCount });
+      result.push(...flattenChangeTree(changeTree, expandedDirs));
     }
     return result;
-  }, [changedCount, isDiverged, scm.fileEntries]);
+  }, [changedCount, changeTree, expandedDirs, isDiverged]);
 
   const rowKeyToIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -555,7 +577,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const focusableIndices = useMemo(() => {
     const out: number[] = [];
     rows.forEach((row, index) => {
-      if (row.kind === "entry") out.push(index);
+      if ((row.kind === "file" || row.kind === "dir")) out.push(index);
     });
     return out;
   }, [rows]);
@@ -569,7 +591,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           return ROW_HEIGHTS.banner;
         case "list-header":
           return ROW_HEIGHTS.header;
-        case "entry":
+        case "dir":
+        case "file":
           return ROW_HEIGHTS.entry;
       }
     },
@@ -609,7 +632,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     const index = rowKeyToIndex.get(focusedRowKey);
     if (index === undefined) return null;
     const row = rows[index];
-    return row && row.kind === "entry" ? row.entry : null;
+    return row?.kind === "file" ? row.entry : null;
   }, [focusedRowKey, rowKeyToIndex, rows]);
 
   const handlePanelKeyDown = useCallback(
@@ -639,11 +662,28 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           moveFocus(-1);
           break;
         case "Enter": {
-          const entry = focusedEntry();
-          if (entry) {
+          const index = focusedRowKey ? rowKeyToIndex.get(focusedRowKey) : undefined;
+          const row = index === undefined ? undefined : rows[index];
+          if (row?.kind === "dir") {
             event.preventDefault();
-            void scm.selectFile(entry);
+            toggleDir(row.path);
+          } else {
+            const entry = focusedEntry();
+            if (entry) {
+              event.preventDefault();
+              void scm.selectFile(entry);
+            }
           }
+          break;
+        }
+        case "ArrowRight":
+        case "ArrowLeft": {
+          const index = focusedRowKey ? rowKeyToIndex.get(focusedRowKey) : undefined;
+          const row = index === undefined ? undefined : rows[index];
+          if (row?.kind !== "dir") break;
+          event.preventDefault();
+          if (event.key === "ArrowRight" && !row.isExpanded) toggleDir(row.path);
+          else if (event.key === "ArrowLeft" && row.isExpanded) toggleDir(row.path);
           break;
         }
         case " ":
@@ -669,7 +709,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         }
       }
     },
-    [focusedEntry, handleRefresh, moveFocus, scm],
+    [focusedEntry, focusedRowKey, handleRefresh, moveFocus, rowKeyToIndex, rows, scm, toggleDir],
   );
 
   if (!open) return null;
@@ -1029,6 +1069,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             onToggleStageFile={scm.toggleStageFile}
                             onDiscardFile={scm.requestDiscardFile}
                             onOpenFile={onOpenFile}
+                            onToggleDir={toggleDir}
                           />
                         </div>
                       );
@@ -1127,6 +1168,7 @@ type RowRendererProps = {
   onToggleStageFile: (entry: SourceControlFileEntry) => Promise<void>;
   onDiscardFile: (entry: SourceControlFileEntry) => void;
   onOpenFile?: (absolutePath: string) => void;
+  onToggleDir: (path: string) => void;
 };
 
 const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
@@ -1136,7 +1178,9 @@ const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
       return <DivergedBanner />;
     case "list-header":
       return <ListHeader {...props} row={row} />;
-    case "entry":
+    case "dir":
+      return <DirRow {...props} row={row} onToggleDir={props.onToggleDir} />;
+    case "file":
       return <EntryRow {...props} row={row} />;
   }
 });
@@ -1190,6 +1234,44 @@ function ListHeader({
   );
 }
 
+function DirRow({
+  row,
+  focused,
+  onFocusRow,
+  onToggleDir,
+}: RowRendererProps & { row: Extract<RowDescriptor, { kind: "dir" }> }) {
+  const iconUrl = folderIconUrl(row.name, row.isExpanded);
+  return (
+    <button
+      id={`scm-row-${row.key}`}
+      type="button"
+      role="option"
+      aria-selected={false}
+      data-focused={focused || undefined}
+      onMouseDown={() => onFocusRow(row.key)}
+      onClick={() => onToggleDir(row.path)}
+      className={cn(
+        "flex h-[30px] w-full items-center gap-2 rounded-md pr-2 text-left transition-colors",
+        focused ? "bg-accent/60" : "hover:bg-accent/30",
+      )}
+      style={{ paddingLeft: 6 + row.depth * 12 }}
+    >
+      <span className="flex size-3.5 shrink-0 items-center justify-center">
+        <HugeiconsIcon
+          icon={ArrowRight01Icon}
+          size={12}
+          strokeWidth={2.25}
+          className={cn("transition-transform", row.isExpanded && "rotate-90")}
+        />
+      </span>
+      {iconUrl ? <img src={iconUrl} alt="" className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />}
+      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/95">
+        {row.name}
+      </span>
+    </button>
+  );
+}
+
 const EntryRow = memo(function EntryRow({
   row,
   focused,
@@ -1202,7 +1284,7 @@ const EntryRow = memo(function EntryRow({
   onDiscardFile,
   onOpenFile,
 }: RowRendererProps & {
-  row: Extract<RowDescriptor, { kind: "entry" }>;
+  row: Extract<RowDescriptor, { kind: "file" }>;
 }) {
   const entry = row.entry;
   const isSelected = selectedPath === entry.path;
@@ -1233,7 +1315,8 @@ const EntryRow = memo(function EntryRow({
           aria-selected={isSelected}
           onMouseDown={() => onFocusRow(row.key)}
           className={cn(
-            "group relative flex h-[30px] items-center gap-2 rounded-md pl-2 pr-2 transition-all duration-100",
+            "group relative flex h-[30px] items-center gap-2 rounded-md pr-2 transition-all duration-100",
+            { paddingLeft: 6 + row.depth * 12 },
             focused
               ? "bg-accent/60"
               : isSelected
@@ -1259,6 +1342,7 @@ const EntryRow = memo(function EntryRow({
             }}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
           >
+            <span className="size-3.5 shrink-0" aria-hidden />
             {iconUrl ? (
               <img src={iconUrl} alt="" className="size-4 shrink-0" />
             ) : (
