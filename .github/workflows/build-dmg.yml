@@ -86,9 +86,17 @@ jobs:
       - name: Download DMG artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: Terax-v${{ steps.version.outputs.version }}-*
+          # Download both architecture artifacts without relying on the
+          # package version lookup matching the upload job exactly.
+          pattern: Terax-*
           path: release-assets
           merge-multiple: true
+
+      - name: Verify DMG artifacts
+        shell: bash
+        run: |
+          find release-assets -type f -name '*.dmg' -print
+          test -n "$(find release-assets -type f -name '*.dmg' -print -quit)"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
