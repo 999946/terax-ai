@@ -1196,6 +1196,25 @@ export default function App() {
     [newTabInSpace],
   );
 
+  // Activate a space and sync the active tab to it. Mirrors the active-space
+  // effect that runs when activeSpaceId changes, but works even when the space
+  // is already active (so clicking the current space resyncs the visible tab).
+  const activateSpace = useCallback(
+    (spaceId: string) => {
+      useSpaces.getState().setActive(spaceId);
+      if (activeSpaceIdRef.current === spaceId) {
+        const inSpace = tabsRef.current.filter((t) => t.spaceId === spaceId);
+        if (
+          inSpace.length > 0 &&
+          !inSpace.some((t) => t.id === activeIdRef.current)
+        ) {
+          setActiveId(inSpace[inSpace.length - 1].id);
+        }
+      }
+    },
+    [setActiveId],
+  );
+
   const jumpToTab = useCallback(
     (tabId: number) => {
       const t = tabsRef.current.find((x) => x.id === tabId);
@@ -1222,6 +1241,7 @@ export default function App() {
         }).catch((error) => console.error("rename space failed", error));
       }}
       onNewTabInSpace={handleNewTabInSpace}
+      onActivateSpace={activateSpace}
       onJumpTab={jumpToTab}
       onCloseTab={handleClose}
       onMoveTabToSpace={handleMoveTab}

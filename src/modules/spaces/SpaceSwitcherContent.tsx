@@ -18,6 +18,7 @@ type Props = {
   onDeleteSpace: (id: string) => void;
   onRenameSpace: (id: string, name: string) => void;
   onNewTabInSpace: (spaceId: string) => void;
+  onActivateSpace: (spaceId: string) => void;
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
   onMoveTabToSpace: (tabId: number, spaceId: string) => void;
@@ -64,6 +65,7 @@ export function SpaceSwitcherContent({
   onDeleteSpace,
   onRenameSpace,
   onNewTabInSpace,
+  onActivateSpace,
   onJumpTab,
   onCloseTab,
   onMoveTabToSpace,
@@ -74,7 +76,6 @@ export function SpaceSwitcherContent({
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
   const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
-  const setActive = useSpaces((s) => s.setActive);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() =>
     activeId ? new Set([activeId]) : new Set(),
@@ -122,6 +123,10 @@ export function SpaceSwitcherContent({
       else next.add(id);
       return next;
     });
+
+  useEffect(() => {
+    if (!showSpaceTabs) setExpanded(new Set());
+  }, [showSpaceTabs]);
 
   const endDrag = (el: Element) => {
     const st = drag.current;
@@ -239,7 +244,7 @@ export function SpaceSwitcherContent({
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onToggle={() => toggleExpand(sp.id)}
-            onSwitch={() => setActive(sp.id)}
+            onSwitch={() => onActivateSpace(sp.id)}
             onStartRename={() => setEditingId(sp.id)}
             onCommitRename={(name) => {
               const v = name.trim();
@@ -373,22 +378,24 @@ function SpaceRow({
               : "hover:bg-accent/50",
         )}
       >
-        <button
-          type="button"
-          data-no-drag
-          aria-label={expanded ? "Collapse" : "Expand"}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground"
-        >
-          <HugeiconsIcon
-            icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
-            size={13}
-            strokeWidth={2}
-          />
-        </button>
+        {showTabs && (
+          <button
+            type="button"
+            data-no-drag
+            aria-label={expanded ? "Collapse" : "Expand"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground"
+          >
+            <HugeiconsIcon
+              icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
+              size={13}
+              strokeWidth={2}
+            />
+          </button>
+        )}
         <SpaceAvatar space={space} size="sm" active={isActive} />
         {editing ? (
           <InlineRename
