@@ -15,6 +15,7 @@
     "dev:inspect": "INSPECT=true vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "version:bump": "node scripts/bump-version.mjs",
     "tauri": "tauri",
     "test": "vitest run",
     "test:watch": "vitest",
