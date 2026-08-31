@@ -17,6 +17,51 @@ use crate::modules::git::utils::{
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
+pub fn list_repos(
+    registry: &WorkspaceRegistry,
+    cwd: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<GitRepoInfo>> {
+    let root = canonical_dir(registry, cwd, workspace)?;
+    if !registry.is_authorized(&root.local_path) {
+        return Err(GitError::PathOutsideWorkspace(root.local_path));
+    }
+    ensure_git_available(&root.workspace)?;
+
+    let mut repos = std::collections::BTreeMap::new();
+    let mut stack = vec![root.local_path.clone()];
+    while let Some(dir) = stack.pop() {
+        if dir.join(".git").exists() {
+            let dir_string = crate::modules::fs::to_canon(&dir);
+            if let Some(repo) = resolve_repo_in_authorized(
+                registry,
+                &canonical_dir(registry, &dir_string, workspace)?,
+            )? {
+                repos.entry(repo.repo_root.clone()).or_insert(repo);
+            }
+        }
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if matches!(name, ".git" | "node_modules" | "target" | "dist" | "build") {
+                continue;
+            }
+            if registry.is_authorized(&path) {
+                stack.push(path);
+            }
+        }
+    }
+    Ok(repos.into_values().collect())
+}
+
 pub fn resolve_repo(
     registry: &WorkspaceRegistry,
     cwd: &str,

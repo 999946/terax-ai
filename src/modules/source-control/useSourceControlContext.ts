@@ -9,6 +9,7 @@ import {
   type SourceControlRepositoryTarget,
 } from "./repositoryTarget";
 import { useSourceControl } from "./useSourceControl";
+import { useMultiSourceControl } from "./useMultiSourceControl";
 
 type Params = {
   activeTab: Tab | undefined;
@@ -81,6 +82,15 @@ export function useSourceControlContext({
     target: repositoryTarget,
   });
   const sourceControl = useSourceControl(sourceControlPath, true);
+  const multiSourceControl = useMultiSourceControl(sourceControlContextPath, true);
+  const focusedRepository = useMemo(
+    () =>
+      multiSourceControl.repositories.find(
+        (repository) => repository.repo.repoRoot === multiSourceControl.focusedRoot,
+      ) ?? multiSourceControl.repositories[0],
+    [multiSourceControl.focusedRoot, multiSourceControl.repositories],
+  );
+  const focusedSourceControl = focusedRepository?.summary ?? sourceControl;
 
   const toggleSourceControl = useCallback(() => {
     cycleSidebarView("source-control");
@@ -117,5 +127,33 @@ export function useSourceControlContext({
     sidebarView,
   ]);
 
-  return { sourceControl, toggleSourceControl, openGitGraphFromContext };
+  const repositories = useMemo(
+    () =>
+      multiSourceControl.repositories.map((repository) => {
+        const status = repository.status;
+        return {
+          repoRoot: repository.repo.repoRoot,
+          label: repository.repo.repoRoot.replace(/\\/g, "/").split("/").filter(Boolean).slice(-1)[0] ?? repository.repo.repoRoot,
+          branch: status?.isDetached ? "detached" : status?.branch ?? repository.repo.branch,
+          ahead: status?.ahead ?? 0,
+          behind: status?.behind ?? 0,
+          stagedCount: status?.changedFiles.filter((file) => file.staged).length ?? 0,
+          unstagedCount: status?.changedFiles.filter((file) => file.unstaged).length ?? 0,
+          changedCount: status?.changedFiles.length ?? 0,
+          statusLabel: status?.isDetached ? "detached" : status?.branch ?? repository.repo.branch,
+          loading: repository.isLoading,
+          error: repository.error,
+        };
+      }),
+    [multiSourceControl.repositories],
+  );
+  return {
+    sourceControl: focusedSourceControl,
+    toggleSourceControl,
+    openGitGraphFromContext,
+    repositories,
+    focusedRoot: multiSourceControl.focusedRoot,
+    focusRepo: multiSourceControl.focusRepo,
+    allChangedCount: repositories.reduce((total, repository) => total + repository.changedCount, 0),
+  };
 }

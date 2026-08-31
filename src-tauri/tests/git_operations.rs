@@ -569,3 +569,48 @@ fn list_branches_keeps_current_branch_local_and_surfaces_worktrees() {
     assert!(!feature[0].is_head);
     assert!(feature[0].worktree_path.is_some());
 }
+
+#[test]
+fn list_repos_finds_nested_authorized_repositories() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    let nested = fx.repo_path.join("nested");
+    std::fs::create_dir_all(&nested).unwrap();
+    let nested_canonical = std::fs::canonicalize(&nested).unwrap();
+    fx.registry.authorize(&nested_canonical).unwrap();
+    run_git_in_test(&nested_canonical, &["init", "-q"]);
+    run_git_in_test(
+        &nested_canonical,
+        &["symbolic-ref", "HEAD", "refs/heads/main"],
+    );
+
+    let repos = operations::list_repos(&fx.registry, &fx.repo_str(), &fx.workspace).unwrap();
+    let roots: Vec<_> = repos.iter().map(|repo| repo.repo_root.as_str()).collect();
+    assert_eq!(repos.len(), 2);
+    assert!(roots.contains(&fx.repo_str().as_str()));
+    assert!(roots.contains(&to_canon(&nested_canonical).as_str()));
+}
+
+#[test]
+fn list_repos_rejects_unauthorized_directory() {
+    if skip_if_no_git() {
+        return;
+    }
+    let tmp = TempDir::new().unwrap();
+    let canonical = std::fs::canonicalize(tmp.path()).unwrap();
+    let registry = WorkspaceRegistry::default();
+
+    let result = operations::list_repos(&registry, &to_canon(&canonical), &WorkspaceEnv::Local);
+    assert!(matches!(result, Err(GitError::PathOutsideWorkspace(_))));
+}
+
+fn run_git_in_test(cwd: &std::path::Path, args: &[&str]) {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "git {args:?} failed");
+}

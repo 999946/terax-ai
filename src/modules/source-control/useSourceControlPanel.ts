@@ -51,6 +51,39 @@ export type SourceControlEntry = {
 
 export type CheckState = "checked" | "indeterminate" | "unchecked";
 
+/** Derive the deduped, staged/unstaged-merged file rows for a status. */
+export function deriveFileEntries(
+  status: GitStatusSnapshot | null,
+): SourceControlFileEntry[] {
+  const seen = new Set<string>();
+  const out: SourceControlFileEntry[] = [];
+  for (const file of status?.changedFiles ?? []) {
+    if (seen.has(file.path)) continue;
+    seen.add(file.path);
+    const checkState: CheckState =
+      file.staged && file.unstaged
+        ? "indeterminate"
+        : file.staged
+          ? "checked"
+          : "unchecked";
+    const statusCode = file.unstaged
+      ? statusCodeForMode("-", file)
+      : statusCodeForMode("+", file);
+    out.push({
+      key: file.path,
+      path: file.path,
+      originalPath: file.originalPath,
+      statusCode,
+      statusLabel: file.statusLabel,
+      checkState,
+      staged: file.staged,
+      unstaged: file.unstaged,
+      untracked: file.untracked,
+    });
+  }
+  return out;
+}
+
 /** One row per changed file (flat list) — merges the staged/unstaged split. */
 export type SourceControlFileEntry = {
   key: string;
@@ -426,35 +459,10 @@ export function useSourceControlPanel(
     [status],
   );
 
-  const fileEntries = useMemo<SourceControlFileEntry[]>(() => {
-    const seen = new Set<string>();
-    const out: SourceControlFileEntry[] = [];
-    for (const file of status?.changedFiles ?? []) {
-      if (seen.has(file.path)) continue;
-      seen.add(file.path);
-      const checkState: CheckState =
-        file.staged && file.unstaged
-          ? "indeterminate"
-          : file.staged
-            ? "checked"
-            : "unchecked";
-      const statusCode = file.unstaged
-        ? statusCodeForMode("-", file)
-        : statusCodeForMode("+", file);
-      out.push({
-        key: file.path,
-        path: file.path,
-        originalPath: file.originalPath,
-        statusCode,
-        statusLabel: file.statusLabel,
-        checkState,
-        staged: file.staged,
-        unstaged: file.unstaged,
-        untracked: file.untracked,
-      });
-    }
-    return out;
-  }, [status]);
+  const fileEntries = useMemo<SourceControlFileEntry[]>(
+    () => deriveFileEntries(status),
+    [status],
+  );
 
   const headerCheckState = useMemo<CheckState>(() => {
     if (fileEntries.length === 0) return "unchecked";

@@ -21,6 +21,19 @@ where
 }
 
 #[tauri::command]
+pub async fn git_list_repos(
+    cwd: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<Vec<GitRepoInfo>, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::list_repos(r, &cwd, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn git_resolve_repo(
     cwd: String,
     workspace: Option<WorkspaceEnv>,

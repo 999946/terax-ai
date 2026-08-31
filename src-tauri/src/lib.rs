@@ -1,6 +1,6 @@
 pub mod modules;
 
-use modules::{agent, control, plugin, fs, git, history, lsp, net, pty, secrets, shell, workspace};
+use modules::{agent, control, fs, git, history, lsp, net, plugin, pty, secrets, shell, workspace};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -278,6 +278,7 @@ pub fn run() {
             fs::grep::fs_grep,
             fs::grep::fs_grep_interactive,
             fs::grep::fs_glob,
+            git::commands::git_list_repos,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

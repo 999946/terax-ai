@@ -258,6 +258,11 @@ export const native = {
         exit_code: number | null;
       }[]
     >("shell_bg_list"),
+  gitListRepos: (cwd: string) =>
+    invoke<GitRepoInfo[]>("git_list_repos", {
+      cwd,
+      workspace: currentWorkspaceEnv(),
+    }),
   gitResolveRepo: (cwd: string) =>
     invoke<GitRepoInfo | null>("git_resolve_repo", {
       cwd,

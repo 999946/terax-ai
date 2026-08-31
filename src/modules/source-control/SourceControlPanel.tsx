@@ -107,6 +107,29 @@ type Props = {
   onNavigateToPath?: (path: string) => void;
   repositoryTarget: SourceControlRepositoryTarget;
   onFollowRepositoryContext: () => void;
+  /** Optional multi-repository discovery. When set, renders a repository strip
+   * and lets the user focus one repo; the `sourceControl` prop must be the
+   * focused repo's summary. */
+  repositories?: RepoRow[];
+  focusedRoot?: string | null;
+  onFocusRepo?: (root: string) => void;
+  /** Total changed files across all repositories (for the global badge). */
+  allChangedCount?: number;
+};
+
+/** Lightweight per-repo row for the repository strip. */
+export type RepoRow = {
+  repoRoot: string;
+  label: string;
+  branch: string | null;
+  ahead: number;
+  behind: number;
+  stagedCount: number;
+  unstagedCount: number;
+  changedCount: number;
+  statusLabel: string | null;
+  loading: boolean;
+  error: string | null;
 };
 
 const SOURCE_CONTROL_TOOLTIP_CLASS =
@@ -402,6 +425,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onNavigateToPath,
   repositoryTarget,
   onFollowRepositoryContext,
+  repositories = [],
+  focusedRoot,
+  onFocusRepo,
 }: Props) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
   const refreshAnimationRef = useRef<number | null>(null);
@@ -829,6 +855,34 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             </IconActionButton>
           </div>
         </header>
+
+        {repositories.length > 1 ? (
+          <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/40 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {repositories.map((repository) => {
+              const active = repository.repoRoot === focusedRoot;
+              return (
+                <button
+                  key={repository.repoRoot}
+                  type="button"
+                  title={repository.repoRoot}
+                  onClick={() => onFocusRepo?.(repository.repoRoot)}
+                  className={cn(
+                    "flex min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-colors",
+                    active
+                      ? "border-primary/35 bg-primary/10 text-foreground"
+                      : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground",
+                  )}
+                >
+                  <HugeiconsIcon icon={FolderGitTwoIcon} size={12} strokeWidth={1.8} />
+                  <span className="max-w-28 truncate text-[11px] font-medium">{repository.label}</span>
+                  {repository.loading ? <Spinner className="size-3" /> : repository.changedCount > 0 ? (
+                    <span className="rounded-full bg-foreground/10 px-1 text-[9px] tabular-nums">{repository.changedCount}</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         {onOpenGitGraph ? (
           <button

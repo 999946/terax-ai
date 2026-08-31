@@ -769,8 +769,15 @@ export default function App() {
     openSourceControl,
     openCommitHistoryTab,
   });
-  const { sourceControl, toggleSourceControl, openGitGraphFromContext } =
-    useSourceControlContext({
+  const {
+    sourceControl,
+    toggleSourceControl,
+    openGitGraphFromContext,
+    repositories,
+    focusedRoot,
+    focusRepo,
+    allChangedCount,
+  } = useSourceControlContext({
       activeTab,
       tabs,
       activeTerminalLeafCwd,
@@ -1457,7 +1464,7 @@ export default function App() {
                   <SidebarRail
                     activeView={sidebarView}
                     onSelectView={persistSidebarView}
-                    changedCount={sourceControl.changedCount}
+                    changedCount={allChangedCount || sourceControl.changedCount}
                   />
                   <div
                     key={sidebarView}
@@ -1494,6 +1501,10 @@ export default function App() {
                         onFollowRepositoryContext={
                           handleFollowRepositoryContext
                         }
+                        repositories={repositories}
+                        focusedRoot={focusedRoot}
+                        onFocusRepo={focusRepo}
+                        allChangedCount={allChangedCount}
                       />
                     )}
                   </div>
