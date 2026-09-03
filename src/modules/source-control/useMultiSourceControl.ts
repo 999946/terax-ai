@@ -219,8 +219,31 @@ export function useMultiSourceControl(
   );
 
   const refreshAll = useCallback(async () => {
-    await Promise.all(repos.map((r) => refreshRepo(r.repoRoot, "never")));
-  }, [refreshRepo, repos]);
+    if (!enabled || !contextPath) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const found = await native.gitListRepos(contextPath);
+      setRepos(found);
+      setFocusedRoot((current) =>
+        current && found.some((repo) => repo.repoRoot === current)
+          ? current
+          : found[0]?.repoRoot ?? null,
+      );
+      await Promise.all(found.map((repo) => refreshRepo(repo.repoRoot, "never")));
+      setLoading(false);
+    } catch (e) {
+      setLoading(false);
+      setError(normalizeError(e));
+      throw e;
+    }
+  }, [contextPath, enabled, refreshRepo]);
+
+  useEffect(() => {
+    const onFocus = () => void refreshAll().catch(() => {});
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshAll]);
 
   const runRemoteFor = useCallback(
     async (

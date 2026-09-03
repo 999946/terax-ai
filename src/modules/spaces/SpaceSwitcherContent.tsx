@@ -405,8 +405,15 @@ function SpaceRow({
             className="ml-0.5"
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
-            {space.name}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="min-w-0 truncate text-xs font-medium text-foreground">
+              {space.name}
+            </span>
+            {space.info?.summary ? (
+              <span className="min-w-0 truncate text-[10px] leading-tight text-muted-foreground">
+                {space.info.summary}
+              </span>
+            ) : null}
           </span>
         )}
         {!editing && (

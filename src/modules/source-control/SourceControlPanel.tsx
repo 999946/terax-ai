@@ -113,6 +113,7 @@ type Props = {
   repositories?: RepoRow[];
   focusedRoot?: string | null;
   onFocusRepo?: (root: string) => void;
+  onRefresh?: () => void;
   /** Total changed files across all repositories (for the global badge). */
   allChangedCount?: number;
 };
@@ -428,6 +429,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   repositories = [],
   focusedRoot,
   onFocusRepo,
+  onRefresh: refreshRepositories,
 }: Props) {
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
   const refreshAnimationRef = useRef<number | null>(null);
@@ -538,13 +540,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     if (refreshAnimationRef.current) {
       window.clearTimeout(refreshAnimationRef.current);
     }
-    void scm.refresh().finally(() => {
+    void Promise.all([scm.refresh(), refreshRepositories?.()]).finally(() => {
       refreshAnimationRef.current = window.setTimeout(() => {
         setRefreshAnimating(false);
         refreshAnimationRef.current = null;
       }, 450);
     });
-  }, [scm]);
+  }, [refreshRepositories, scm]);
 
   const handleFetch = useCallback(() => {
     void sourceControl.runRemoteAction("fetch");

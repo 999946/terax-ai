@@ -155,5 +155,6 @@ export function useSourceControlContext({
     focusedRoot: multiSourceControl.focusedRoot,
     focusRepo: multiSourceControl.focusRepo,
     allChangedCount: repositories.reduce((total, repository) => total + repository.changedCount, 0),
+    refresh: multiSourceControl.refresh,
   };
 }

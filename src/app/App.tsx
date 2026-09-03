@@ -126,6 +126,7 @@ import { WorkspaceSurface } from "./components/WorkspaceSurface";
 import { useAppCloseGuard } from "./hooks/useAppCloseGuard";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
+import { usePluginLifecycle } from "@/modules/plugin/usePluginLifecycle";
 
 export default function App() {
   const {
@@ -232,6 +233,7 @@ export default function App() {
   const activeSpaceId = useSpaces((s) => s.activeId);
   const { t } = useTranslation();
   const spacesHydrated = useSpaces((s) => s.hydrated);
+  const spaces = useSpaces((s) => s.spaces);
   const activeSpaceIdRef = useRef(activeSpaceId);
   useLayoutEffect(() => {
     tabsRef.current = tabs;
@@ -252,6 +254,12 @@ export default function App() {
 
   useSpacesDirectorySync();
 
+  usePluginLifecycle({
+    spacesHydrated,
+    spaces,
+    activeSpaceId,
+  });
+
   useSpacesBoot({
     ready: launchCwdResolved,
     launchCwd,
@@ -262,6 +270,12 @@ export default function App() {
     setActiveSpaceForNewTabs,
     adoptWorkspaceEnv,
   });
+
+  useEffect(() => {
+    if (!spacesHydrated || !activeSpaceId) return;
+    const root = spaces.find((space) => space.id === activeSpaceId)?.root;
+    if (root) void native.workspaceAuthorize(root);
+  }, [activeSpaceId, spaces, spacesHydrated]);
 
   useSpacePersistence({
     tabs,
@@ -280,7 +294,10 @@ export default function App() {
     const meta = useSpaces
       .getState()
       .spaces.find((s) => s.id === activeSpaceId);
-    if (meta) void adoptWorkspaceEnv(meta.env);
+    if (meta) {
+      void adoptWorkspaceEnv(meta.env);
+      if (meta.root) void native.workspaceAuthorize(meta.root);
+    }
     const inSpace = tabsRef.current.filter((t) => t.spaceId === activeSpaceId);
     if (inSpace.length === 0) return;
     // Keep the active tab if it already belongs to the newly active space (a
@@ -349,7 +366,6 @@ export default function App() {
   useThemeFileEditing({ tabsRef, openFileTab });
 
   // 文件树根目录来自当前 Space 的 root，不依赖终端 cwd
-  const spaces = useSpaces((s) => s.spaces);
   const activeSpace = useMemo(
     () => spaces.find((s) => s.id === activeSpaceId),
     [spaces, activeSpaceId],
@@ -777,6 +793,7 @@ export default function App() {
     focusedRoot,
     focusRepo,
     allChangedCount,
+    refresh: refreshSourceControl,
   } = useSourceControlContext({
       activeTab,
       tabs,
@@ -1504,6 +1521,7 @@ export default function App() {
                         repositories={repositories}
                         focusedRoot={focusedRoot}
                         onFocusRepo={focusRepo}
+                        onRefresh={refreshSourceControl}
                         allChangedCount={allChangedCount}
                       />
                     )}

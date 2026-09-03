@@ -1,10 +1,11 @@
 import { create } from "zustand";
 import { pluginBridge } from "./bridge";
 import type { Plugin, PluginDispatchResult, PluginSnapshot } from "./types";
-import type { PluginEvent } from "./events";
+import type { PluginEvent, SpaceInfo } from "./events";
 
 type PluginStore = {
   snapshot: PluginSnapshot;
+  spaceInfo: Record<string, SpaceInfo>;
   results: PluginDispatchResult[];
   load: () => Promise<void>;
   register: (plugin: Plugin) => Promise<void>;
@@ -25,6 +26,7 @@ let loadPromise: Promise<void> | null = null;
 
 export const usePluginStore = create<PluginStore>((set) => ({
   snapshot: emptySnapshot,
+  spaceInfo: {},
   results: [],
   load: async () => {
     if (loadPromise) return loadPromise;
@@ -52,7 +54,17 @@ export const usePluginStore = create<PluginStore>((set) => ({
   entryWrite: pluginBridge.entryWrite,
   dispatchEvent: async (event) => {
     const results = await pluginBridge.dispatchEvent(event);
-    set({ results });
+    set((state) => {
+      const spaceInfo = { ...state.spaceInfo };
+      for (const item of results) {
+        if (item.result?.type === "space.info.updated") {
+          spaceInfo[item.result.spaceId] = item.result.info;
+        } else if (item.result?.type === "spaces.info.updated") {
+          Object.assign(spaceInfo, item.result.spaces);
+        }
+      }
+      return { results, spaceInfo };
+    });
     return results;
   },
 }));

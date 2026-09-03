@@ -1,6 +1,7 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
 import type { WorkspaceEnv } from "@/modules/workspace";
 import type { SerializedTab } from "./serialize";
+import type { SpaceInfo } from "@/modules/plugin/events";
 
 export type SpaceMeta = {
   id: string;
@@ -11,6 +12,7 @@ export type SpaceMeta = {
   color?: number;
   createdAt: number;
   updatedAt: number;
+  info?: SpaceInfo;
 };
 
 export type SpaceState = {
