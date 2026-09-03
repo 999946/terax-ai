@@ -171,6 +171,14 @@ Issues and PRs are welcome! Feel free to open issues, suggest features, or submi
 
 Windows builds are signed with a free code signing certificate provided by [SignPath.io](https://signpath.io), certificate by the [SignPath Foundation](https://signpath.org).
 
+macOS DMGs are currently ad-hoc signed but not notarized. On a Mac, downloaded builds may be blocked by Gatekeeper with an “app is damaged” message. After verifying that the DMG came from the expected release, use **Open** from the app’s context menu, or remove the download quarantine attribute:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Terax.app
+```
+
+This is a temporary workaround. Developer ID signing and Apple notarization are required for a release that opens directly after download.
+
 <br clear="left" />
 
 ## License
