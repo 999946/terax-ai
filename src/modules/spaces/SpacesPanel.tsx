@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { Tab } from "@/modules/tabs";
 import { useSpaces } from "./lib/useSpaces";
 import { useSpacesPanel, SPACES_PANEL_WIDTH, SPACES_PANEL_COLLAPSED_WIDTH } from "./lib/useSpacesPanel";
+import { cn } from "@/lib/utils";
 import { SpaceAvatar } from "./SpaceAvatar";
 import { SpaceSwitcherContent } from "./SpaceSwitcherContent";
 
@@ -33,7 +34,8 @@ export function SpacesPanel({
   onReorderSpaces,
 }: Props) {
   const { t } = useTranslation();
-  const { collapsed, expand, collapse, scheduleCollapse } = useSpacesPanel();
+  const { collapsed, expand, collapse, scheduleCollapse, pinned, togglePinned } =
+    useSpacesPanel();
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
   const activeSpace = spaces.find((s) => s.id === activeId);
@@ -78,17 +80,58 @@ export function SpacesPanel({
             <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
               {t("spaces.title")}
             </span>
-            <button
-              type="button"
-              aria-label={t("spaces.collapsePanel", "Collapse spaces")}
-              aria-expanded={true}
-              onClick={collapse}
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label={
+                  pinned
+                    ? t("spaces.unpinPanel", "Unpin spaces")
+                    : t("spaces.pinPanel", "Pin spaces open")
+                }
+                aria-pressed={pinned}
+                onClick={togglePinned}
+                className={cn(
+                  "rounded p-1 transition-colors hover:bg-accent",
+                  pinned
+                    ? "text-primary hover:text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {pinned ? (
+                    <>
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </>
+                  ) : (
+                    <>
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                    </>
+                  )}
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label={t("spaces.collapsePanel", "Collapse spaces")}
+                aria-expanded={true}
+                onClick={collapse}
               className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M7 3L4 6L7 9" />
               </svg>
             </button>
+            </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <SpaceSwitcherContent

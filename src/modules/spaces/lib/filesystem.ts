@@ -15,7 +15,7 @@ export function spaceRootPath(root: string, name: string): string {
 export async function listSpaceFolders(root: string): Promise<string[]> {
   const entries = await invoke<DirEntry[]>("fs_read_dir", {
     path: root,
-    showHidden: true,
+    showHidden: false,
     gitDecorations: false,
     workspace: currentWorkspaceEnv(),
   });
