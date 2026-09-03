@@ -74,14 +74,19 @@ jobs:
           test -n "$app"
           test -n "$dmg"
 
-          main_binary=$(find "$app/Contents/MacOS" -maxdepth 1 -type f -perm -111 -print -quit)
-          test -n "$main_binary"
-          file "$main_binary"
           case "${{ matrix.target }}" in
-            aarch64-apple-darwin) file "$main_binary" | grep -q 'arm64' ;;
-            x86_64-apple-darwin) file "$main_binary" | grep -q 'x86_64' ;;
+            aarch64-apple-darwin) expected_arch='arm64' ;;
+            x86_64-apple-darwin) expected_arch='x86_64' ;;
             *) echo "Unexpected target: ${{ matrix.target }}" >&2; exit 1 ;;
           esac
+
+          # Check every executable, including the bundled terax-cli sidecar.
+          # A single Intel Mach-O inside an arm64 app can make launch fail.
+          while IFS= read -r executable; do
+            description=$(file "$executable")
+            printf '%s\n' "$description"
+            printf '%s\n' "$description" | grep -q "$expected_arch"
+          done < <(find "$app/Contents" -type f -perm -111 -print)
 
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv --verbose=4 "$app" 2>&1 | grep -E 'Identifier=|TeamIdentifier=|Signature=' || true
