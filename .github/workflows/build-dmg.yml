@@ -69,9 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           bundle_dir="src-tauri/target/${{ matrix.target }}/release/bundle"
-          app=$(find "$bundle_dir/macos" -maxdepth 1 -type d -name '*.app' -print -quit)
           dmg=$(find "$bundle_dir/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
-          test -n "$app"
           test -n "$dmg"
 
           case "${{ matrix.target }}" in
@@ -80,18 +78,7 @@ jobs:
             *) echo "Unexpected target: ${{ matrix.target }}" >&2; exit 1 ;;
           esac
 
-          # Check every executable, including the bundled terax-cli sidecar.
-          # A single Intel Mach-O inside an arm64 app can make launch fail.
-          while IFS= read -r executable; do
-            description=$(file "$executable")
-            printf '%s\n' "$description"
-            printf '%s\n' "$description" | grep -q "$expected_arch"
-          done < <(find "$app/Contents" -type f -perm -111 -print)
-
-          codesign --verify --deep --strict --verbose=2 "$app"
-          codesign -dv --verbose=4 "$app" 2>&1 | grep -E 'Identifier=|TeamIdentifier=|Signature=' || true
           hdiutil verify "$dmg"
-
           mount_point=$(mktemp -d)
           cleanup() {
             hdiutil detach "$mount_point" -quiet 2>/dev/null || true
@@ -101,7 +88,20 @@ jobs:
           hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_point" >/dev/null
           mounted_app=$(find "$mount_point" -maxdepth 1 -type d -name '*.app' -print -quit)
           test -n "$mounted_app"
+
+          # Check every executable, including the bundled terax-cli sidecar.
+          # A single Intel Mach-O inside an arm64 app can make launch fail.
+          executable_count=0
+          while IFS= read -r executable; do
+            executable_count=$((executable_count + 1))
+            description=$(file "$executable")
+            printf '%s\n' "$description"
+            printf '%s\n' "$description" | grep -q "$expected_arch"
+          done < <(find "$mounted_app/Contents" -type f -perm -111 -print)
+          test "$executable_count" -gt 0
+
           codesign --verify --deep --strict --verbose=2 "$mounted_app"
+          codesign -dv --verbose=4 "$mounted_app" 2>&1 | grep -E 'Identifier=|TeamIdentifier=|Signature=' || true
 
           # Ad-hoc builds are not notarized, so Gatekeeper rejection is
           # expected until Developer ID signing and notarization are added.
