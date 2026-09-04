@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Tab } from "@/modules/tabs";
 import {
   activeRepositoryContextPath,
   clearRepositoryTargetForSpace,
@@ -9,33 +8,6 @@ import {
   setRepositoryTargetForSpace,
   sourceControlRepositoryPath,
 } from "./repositoryTarget";
-
-const terminalTab: Tab = {
-  id: 1,
-  kind: "terminal",
-  spaceId: "space-a",
-  title: "shell",
-  paneTree: { kind: "leaf", id: 10 },
-  activeLeafId: 10,
-};
-
-const editorTab: Tab = {
-  id: 2,
-  kind: "editor",
-  spaceId: "space-a",
-  title: "main.ts",
-  path: "C:\\repo\\src\\main.ts",
-  dirty: false,
-  preview: false,
-};
-
-const historyTab: Tab = {
-  id: 3,
-  kind: "git-history",
-  spaceId: "space-a",
-  title: "History",
-  repoRoot: "/repos/history",
-};
 
 describe("repository targets", () => {
   it("keeps fixed repositories isolated by Space", () => {
@@ -113,56 +85,46 @@ describe("repository targets", () => {
 });
 
 describe("activeRepositoryContextPath", () => {
-  it("prefers the focused terminal leaf cwd", () => {
+  it("always returns the space root (explorerRoot), ignoring focused tabs", () => {
     expect(
       activeRepositoryContextPath({
-        activeTab: terminalTab,
-        activeTerminalLeafCwd: "/repos/terminal/packages/app",
-        explorerRoot: "/repos/explorer",
+        explorerRoot: "/repos/space-root",
         workspaceFallbackPath: "/fallback",
       }),
-    ).toBe("/repos/terminal/packages/app");
+    ).toBe("/repos/space-root");
   });
 
-  it("uses the editor parent directory across Windows paths", () => {
+  it("falls back to the workspace path when no space root is set", () => {
     expect(
       activeRepositoryContextPath({
-        activeTab: editorTab,
-        activeTerminalLeafCwd: null,
-        explorerRoot: "/repos/explorer",
+        explorerRoot: null,
         workspaceFallbackPath: "/fallback",
       }),
-    ).toBe("C:/repo/src");
+    ).toBe("/fallback");
   });
 
   it("preserves Unix and Windows filesystem roots", () => {
     expect(
       activeRepositoryContextPath({
-        activeTab: { ...editorTab, path: "/main.ts" },
-        activeTerminalLeafCwd: null,
-        explorerRoot: null,
+        explorerRoot: "/",
         workspaceFallbackPath: null,
       }),
     ).toBe("/");
     expect(
       activeRepositoryContextPath({
-        activeTab: { ...editorTab, path: "C:\\main.ts" },
-        activeTerminalLeafCwd: null,
-        explorerRoot: null,
+        explorerRoot: "C:/",
         workspaceFallbackPath: null,
       }),
     ).toBe("C:/");
   });
 
-  it("keeps a Git tab bound to its own repository", () => {
+  it("returns null when neither root nor fallback is available", () => {
     expect(
       activeRepositoryContextPath({
-        activeTab: historyTab,
-        activeTerminalLeafCwd: null,
-        explorerRoot: "/repos/explorer",
-        workspaceFallbackPath: "/fallback",
+        explorerRoot: null,
+        workspaceFallbackPath: null,
       }),
-    ).toBe("/repos/history");
+    ).toBeNull();
   });
 });
 

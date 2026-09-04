@@ -795,9 +795,7 @@ export default function App() {
     allChangedCount,
     refresh: refreshSourceControl,
   } = useSourceControlContext({
-      activeTab,
       tabs,
-      activeTerminalLeafCwd,
       explorerRoot,
       launchCwd,
       launchCwdResolved,

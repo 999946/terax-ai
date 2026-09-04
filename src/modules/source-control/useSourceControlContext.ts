@@ -12,9 +12,7 @@ import { useSourceControl } from "./useSourceControl";
 import { useMultiSourceControl } from "./useMultiSourceControl";
 
 type Params = {
-  activeTab: Tab | undefined;
   tabs: Tab[];
-  activeTerminalLeafCwd: string | null;
   explorerRoot: string | null;
   launchCwd: string | null;
   launchCwdResolved: boolean;
@@ -34,9 +32,7 @@ type Params = {
  * per-session path so tab switches / cd don't re-fire git IPC.
  */
 export function useSourceControlContext({
-  activeTab,
   tabs,
-  activeTerminalLeafCwd,
   explorerRoot,
   launchCwd,
   launchCwdResolved,
@@ -50,8 +46,6 @@ export function useSourceControlContext({
     ? (launchCwd ?? home ?? null)
     : null;
   const sourceControlContextPath = activeRepositoryContextPath({
-    activeTab,
-    activeTerminalLeafCwd,
     explorerRoot,
     workspaceFallbackPath,
   });

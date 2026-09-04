@@ -1,5 +1,4 @@
 import type { SidebarViewId } from "@/modules/sidebar";
-import type { Tab } from "@/modules/tabs";
 
 export type SourceControlRepositoryTarget =
   | { mode: "follow-context" }
@@ -15,18 +14,6 @@ const FOLLOW_CONTEXT: SourceControlRepositoryTarget = {
 
 function targetScopeKey(spaceId: string, workspaceKey: string): string {
   return `${spaceId}\0${workspaceKey}`;
-}
-
-function dirname(path: string | null): string | null {
-  if (!path) return null;
-  const normalized = path.replace(/\\/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index < 0) return normalized;
-  if (index === 0) return "/";
-  if (index === 2 && /^[A-Za-z]:\//.test(normalized)) {
-    return normalized.slice(0, 3);
-  }
-  return normalized.slice(0, index);
 }
 
 export function repositoryTargetForSpace(
@@ -64,23 +51,12 @@ export function clearRepositoryTargetForSpace(
 }
 
 export function activeRepositoryContextPath({
-  activeTab,
-  activeTerminalLeafCwd,
   explorerRoot,
   workspaceFallbackPath,
 }: {
-  activeTab: Tab | undefined;
-  activeTerminalLeafCwd: string | null;
   explorerRoot: string | null;
   workspaceFallbackPath: string | null;
 }): string | null {
-  if (activeTab?.kind === "terminal") {
-    return activeTerminalLeafCwd ?? explorerRoot ?? workspaceFallbackPath;
-  }
-  if (activeTab?.kind === "editor") return dirname(activeTab.path);
-  if (activeTab?.kind === "git-diff") return activeTab.repoRoot;
-  if (activeTab?.kind === "git-commit-file") return activeTab.repoRoot;
-  if (activeTab?.kind === "git-history") return activeTab.repoRoot;
   return explorerRoot ?? workspaceFallbackPath;
 }
 
