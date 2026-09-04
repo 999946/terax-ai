@@ -8,6 +8,7 @@ If a guide conflicts with `TERAX.md`, `TERAX.md` wins.
 
 - [TERAX.md](../TERAX.md) - the architecture source of truth; read this first
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - how to contribute, quality bar, project layout
+- [功能清单与实现细节](FEATURES.md) - complete feature inventory, implementation details, security, release, and test reference
 
 ## Architecture guides
 
