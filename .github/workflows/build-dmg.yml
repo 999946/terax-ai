@@ -54,7 +54,12 @@ jobs:
       - name: Read application version
         id: version
         shell: bash
-        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          # Split the command substitution onto its own line: nesting it inside
+          # double quotes (`echo "version=$(...)"`) loses the inner quotes through
+          # YAML->bash escaping and `node -p "require(...)"` silently returns empty.
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build DMG
         env:
