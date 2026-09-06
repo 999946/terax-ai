@@ -83,12 +83,12 @@ export function useMultiSourceControl(
   useEffect(() => {
     mountedRef.current = true;
     const requestId = ++requestIdRef.current;
+    setRepos([]);
+    setData({});
+    setFocusedRoot(null);
+    setLoading(false);
+    setError(null);
     if (!enabled || !contextPath) {
-      setRepos([]);
-      setData({});
-      setFocusedRoot(null);
-      setLoading(false);
-      setError(null);
       return () => {
         mountedRef.current = false;
       };

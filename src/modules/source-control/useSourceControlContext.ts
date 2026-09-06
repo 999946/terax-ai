@@ -14,6 +14,7 @@ import { useMultiSourceControl } from "./useMultiSourceControl";
 type Params = {
   tabs: Tab[];
   explorerRoot: string | null;
+  spacesHydrated: boolean;
   launchCwd: string | null;
   launchCwdResolved: boolean;
   home: string | null;
@@ -27,13 +28,14 @@ type Params = {
 };
 
 /**
- * Resolves the source-control context path off the active tab and feeds the
- * source-control summary. When git is not active the badge tracks a stable
+ * Resolves the source-control context from the active Space root and feeds
+ * the source-control summary. When git is not active the badge tracks a stable
  * per-session path so tab switches / cd don't re-fire git IPC.
  */
 export function useSourceControlContext({
   tabs,
   explorerRoot,
+  spacesHydrated,
   launchCwd,
   launchCwdResolved,
   home,
@@ -45,10 +47,12 @@ export function useSourceControlContext({
   const workspaceFallbackPath = launchCwdResolved
     ? (launchCwd ?? home ?? null)
     : null;
-  const sourceControlContextPath = activeRepositoryContextPath({
-    explorerRoot,
-    workspaceFallbackPath,
-  });
+  const sourceControlContextPath = spacesHydrated
+    ? activeRepositoryContextPath({
+        explorerRoot,
+        workspaceFallbackPath,
+      })
+    : null;
   const hasOpenGitTab = useMemo(
     () =>
       tabs.some(

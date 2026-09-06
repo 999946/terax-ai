@@ -797,6 +797,7 @@ export default function App() {
   } = useSourceControlContext({
       tabs,
       explorerRoot,
+      spacesHydrated,
       launchCwd,
       launchCwdResolved,
       home,
