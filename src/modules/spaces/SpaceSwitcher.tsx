@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useShortcutLabel } from "@/modules/shortcuts";
-import { type Tab } from "@/modules/tabs";
+import type { Tab } from "@/modules/tabs";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -25,7 +25,6 @@ type Props = {
     targetTabId: number,
     edge: "top" | "bottom",
   ) => void;
-  onReorderSpaces: (orderedIds: string[]) => void;
 };
 
 export function SpaceSwitcher({
@@ -41,7 +40,6 @@ export function SpaceSwitcher({
   onCloseTab,
   onMoveTabToSpace,
   onReorderTab,
-  onReorderSpaces,
 }: Props) {
   const { t } = useTranslation();
   const spaces = useSpaces((s) => s.spaces);
@@ -88,7 +86,6 @@ export function SpaceSwitcher({
           onCloseTab={onCloseTab}
           onMoveTabToSpace={onMoveTabToSpace}
           onReorderTab={onReorderTab}
-          onReorderSpaces={onReorderSpaces}
         />
       </PopoverContent>
     </Popover>

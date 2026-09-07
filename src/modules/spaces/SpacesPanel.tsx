@@ -17,7 +17,6 @@ type Props = {
   onCloseTab: (id: number) => void;
   onMoveTabToSpace: (tabId: number, spaceId: string) => void;
   onReorderTab: (tabId: number, targetTabId: number, edge: "top" | "bottom") => void;
-  onReorderSpaces: (orderedIds: string[]) => void;
 };
 
 export function SpacesPanel({
@@ -31,7 +30,6 @@ export function SpacesPanel({
   onCloseTab,
   onMoveTabToSpace,
   onReorderTab,
-  onReorderSpaces,
 }: Props) {
   const { t } = useTranslation();
   const { collapsed, expand, collapse, scheduleCollapse, pinned, togglePinned } =
@@ -145,7 +143,6 @@ export function SpacesPanel({
               onCloseTab={onCloseTab}
               onMoveTabToSpace={onMoveTabToSpace}
               onReorderTab={onReorderTab}
-              onReorderSpaces={onReorderSpaces}
             />
           </div>
         </div>

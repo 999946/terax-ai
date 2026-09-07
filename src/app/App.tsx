@@ -1273,7 +1273,6 @@ export default function App() {
       onCloseTab={handleClose}
       onMoveTabToSpace={handleMoveTab}
       onReorderTab={handleReorderTab}
-      onReorderSpaces={(ids) => useSpaces.getState().reorder(ids)}
     />
   );
 

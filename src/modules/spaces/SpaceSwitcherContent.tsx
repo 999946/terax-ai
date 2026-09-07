@@ -6,7 +6,6 @@ import { Add01Icon, ArrowDown01Icon, ArrowRight01Icon, Cancel01Icon, Delete02Ico
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { InlineRename } from "./components/InlineRename";
-import { accentFor } from "./lib/spaceColor";
 import type { SpaceMeta } from "./lib/store";
 import { useSpaces } from "./lib/useSpaces";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -27,7 +26,6 @@ type Props = {
     targetTabId: number,
     edge: "top" | "bottom",
   ) => void;
-  onReorderSpaces: (orderedIds: string[]) => void;
 };
 
 type Edge = "top" | "bottom";
@@ -36,13 +34,12 @@ type DragState = {
   pointerId: number;
   startX: number;
   startY: number;
-  kind: "space" | "tab";
-  id: string | number;
+  kind: "tab";
+  id: number;
   active: boolean;
 };
 
 type DropTarget =
-  | { kind: "space"; spaceId: string; edge: Edge }
   | { kind: "tab"; tabId: number; edge: Edge }
   | { kind: "into-space"; spaceId: string };
 
@@ -70,7 +67,6 @@ export function SpaceSwitcherContent({
   onCloseTab,
   onMoveTabToSpace,
   onReorderTab,
-  onReorderSpaces,
 }: Props) {
   const { t } = useTranslation();
   const spaces = useSpaces((s) => s.spaces);
@@ -84,8 +80,8 @@ export function SpaceSwitcherContent({
   const drag = useRef<DragState | null>(null);
   const dropRef = useRef<DropTarget | null>(null);
   const [dragging, setDragging] = useState<{
-    kind: "space" | "tab";
-    id: string | number;
+    kind: "tab";
+    id: number;
   } | null>(null);
   const [drop, setDrop] = useState<DropTarget | null>(null);
   const [overlay, setOverlay] = useState<{ x: number; y: number } | null>(null);
@@ -103,10 +99,6 @@ export function SpaceSwitcherContent({
   const draggedTab =
     dragging?.kind === "tab"
       ? (tabs.find((t) => t.id === dragging.id) ?? null)
-      : null;
-  const draggedSpace =
-    dragging?.kind === "space"
-      ? (spaces.find((s) => s.id === dragging.id) ?? null)
       : null;
 
   useEffect(() => {
@@ -139,18 +131,14 @@ export function SpaceSwitcherContent({
     document.body.style.userSelect = "";
   };
 
-  const onPointerDown = (
-    e: React.PointerEvent,
-    kind: "space" | "tab",
-    id: string | number,
-  ) => {
+  const onPointerDown = (e: React.PointerEvent, id: number) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
     drag.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      kind,
+      kind: "tab",
       id,
       active: false,
     };
@@ -181,12 +169,7 @@ export function SpaceSwitcherContent({
     const edge: Edge = e.clientY < rect.top + rect.height / 2 ? "top" : "bottom";
     const kind = hit.getAttribute("data-drop");
     let next: DropTarget | null = null;
-    if (st.kind === "space") {
-      if (kind === "space") {
-        const spaceId = hit.getAttribute("data-space-id");
-        if (spaceId && spaceId !== st.id) next = { kind: "space", spaceId, edge };
-      }
-    } else if (kind === "tab") {
+    if (kind === "tab") {
       const tabId = Number(hit.getAttribute("data-tab-id"));
       if (tabId !== st.id) next = { kind: "tab", tabId, edge };
     } else if (kind === "space") {
@@ -201,18 +184,8 @@ export function SpaceSwitcherContent({
     const st = drag.current;
     const dt = dropRef.current;
     if (!st?.active || !dt) return;
-    if (st.kind === "space" && dt.kind === "space") {
-      const without = spaces.map((s) => s.id).filter((id) => id !== st.id);
-      let idx = without.indexOf(dt.spaceId);
-      if (idx < 0) return;
-      if (dt.edge === "bottom") idx += 1;
-      without.splice(idx, 0, st.id as string);
-      onReorderSpaces(without);
-    } else if (st.kind === "tab") {
-      if (dt.kind === "tab") onReorderTab(st.id as number, dt.tabId, dt.edge);
-      else if (dt.kind === "into-space")
-        onMoveTabToSpace(st.id as number, dt.spaceId);
-    }
+    if (dt.kind === "tab") onReorderTab(st.id, dt.tabId, dt.edge);
+    else if (dt.kind === "into-space") onMoveTabToSpace(st.id, dt.spaceId);
   };
 
   const onPointerUp = (e: React.PointerEvent, onActivate?: () => void) => {
@@ -270,20 +243,13 @@ export function SpaceSwitcherContent({
         </button>
       </div>
       {overlay &&
-        (draggedSpace || draggedTab) &&
+        draggedTab &&
         createPortal(
           <div
             className="pointer-events-none fixed z-[60]"
             style={{ left: overlay.x + 12, top: overlay.y + 8 }}
           >
-            {draggedSpace ? (
-              <OverlayChip
-                color={accentFor(draggedSpace)}
-                label={draggedSpace.name}
-              />
-            ) : draggedTab ? (
-              <OverlayChip tab={draggedTab} label={labelFor(draggedTab)} />
-            ) : null}
+            <OverlayChip tab={draggedTab} label={labelFor(draggedTab)} />
           </div>,
           document.body,
         )}
@@ -299,14 +265,10 @@ type SpaceRowProps = {
   expanded: boolean;
   showTabs: boolean;
   editing: boolean;
-  dragging: { kind: "space" | "tab"; id: string | number } | null;
+  dragging: { kind: "tab"; id: number } | null;
   drop: DropTarget | null;
   draggingTabFromOther: boolean;
-  onPointerDown: (
-    e: React.PointerEvent,
-    kind: "space" | "tab",
-    id: string | number,
-  ) => void;
+  onPointerDown: (e: React.PointerEvent, id: number) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent, onActivate?: () => void) => void;
   onToggle: () => void;
@@ -345,23 +307,16 @@ function SpaceRow({
   onCloseTab,
 }: SpaceRowProps) {
   const { t } = useTranslation();
-  const isDragging = dragging?.kind === "space" && dragging.id === space.id;
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
-  const reorderEdge =
-    drop?.kind === "space" && drop.spaceId === space.id ? drop.edge : null;
 
   return (
-    <div className={cn("relative", isDragging && "opacity-50")}>
-      {reorderEdge && <DropLine edge={reorderEdge} />}
+    <div className="relative">
       <div
         data-drop="space"
         data-space-id={space.id}
         role="button"
         tabIndex={editing ? -1 : 0}
-        onPointerDown={editing ? undefined : (e) => onPointerDown(e, "space", space.id)}
-        onPointerMove={onPointerMove}
-        onPointerUp={editing ? undefined : (e) => onPointerUp(e, onSwitch)}
-        onPointerCancel={(e) => onPointerUp(e)}
+        onClick={editing ? undefined : onSwitch}
         onKeyDown={(e) => {
           if (editing) return;
           if (e.key === "Enter") {
@@ -485,13 +440,9 @@ function TabRow({
   onClose,
 }: {
   tab: Tab;
-  dragging: { kind: "space" | "tab"; id: string | number } | null;
+  dragging: { kind: "tab"; id: number } | null;
   drop: DropTarget | null;
-  onPointerDown: (
-    e: React.PointerEvent,
-    kind: "space" | "tab",
-    id: string | number,
-  ) => void;
+  onPointerDown: (e: React.PointerEvent, id: number) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent, onActivate?: () => void) => void;
   onJump: () => void;
@@ -511,7 +462,7 @@ function TabRow({
         data-tab-id={tab.id}
         role="button"
         tabIndex={0}
-        onPointerDown={(e) => onPointerDown(e, "tab", tab.id)}
+        onPointerDown={(e) => onPointerDown(e, tab.id)}
         onPointerMove={onPointerMove}
         onPointerUp={(e) => onPointerUp(e, onJump)}
         onPointerCancel={(e) => onPointerUp(e)}
