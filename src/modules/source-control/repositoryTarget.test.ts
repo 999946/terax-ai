@@ -94,13 +94,13 @@ describe("activeRepositoryContextPath", () => {
     ).toBe("/repos/space-root");
   });
 
-  it("falls back to the workspace path when no space root is set", () => {
+  it("returns null when the space root is missing", () => {
     expect(
       activeRepositoryContextPath({
         explorerRoot: null,
         workspaceFallbackPath: "/fallback",
       }),
-    ).toBe("/fallback");
+    ).toBeNull();
   });
 
   it("preserves Unix and Windows filesystem roots", () => {
@@ -131,7 +131,7 @@ describe("activeRepositoryContextPath", () => {
 describe("sourceControlRepositoryPath", () => {
   const fixed = { mode: "fixed", repoRoot: "/repos/fixed" } as const;
 
-  it("applies a fixed target inside Source Control", () => {
+  it("always follows the active Space root inside Source Control", () => {
     expect(
       sourceControlRepositoryPath({
         contextPath: "/repos/active",
@@ -140,7 +140,7 @@ describe("sourceControlRepositoryPath", () => {
         hasOpenGitTab: false,
         target: fixed,
       }),
-    ).toBe("/repos/fixed");
+    ).toBe("/repos/active");
   });
 
   it("does not leak a fixed target into Explorer decorations or badges", () => {
@@ -167,14 +167,14 @@ describe("sourceControlRepositoryPath", () => {
     ).toBe("/repos/history");
   });
 
-  it("uses the fixed target for graph routing only from Source Control", () => {
+  it("uses the active Space root for graph routing, ignoring a fixed target", () => {
     expect(
       gitGraphRepositoryPath({
         contextPath: "/repos/active",
         sidebarView: "source-control",
         target: fixed,
       }),
-    ).toBe("/repos/fixed");
+    ).toBe("/repos/active");
     expect(
       gitGraphRepositoryPath({
         contextPath: "/repos/active",

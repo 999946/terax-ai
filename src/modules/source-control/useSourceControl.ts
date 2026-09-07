@@ -525,7 +525,12 @@ export function useSourceControl(
       const root = stateRef.current.repo?.repoRoot;
       const sameRepo = repositoryContainsContext(root ?? null, contextPath);
       const fresh = Date.now() - lastRefreshAtRef.current < SC_STATUS_TTL_MS;
-      if (fresh && sameRepo && stateRef.current.hasRepo) {
+      if (
+        fresh &&
+        sameRepo &&
+        stateRef.current.hasRepo &&
+        stateRef.current.contextPath === contextPath
+      ) {
         setState((current) =>
           current.contextPath === contextPath
             ? current

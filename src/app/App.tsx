@@ -299,7 +299,10 @@ export default function App() {
       if (meta.root) void native.workspaceAuthorize(meta.root);
     }
     const inSpace = tabsRef.current.filter((t) => t.spaceId === activeSpaceId);
-    if (inSpace.length === 0) return;
+    if (inSpace.length === 0) {
+      setActiveId(-1);
+      return;
+    }
     // Keep the active tab if it already belongs to the newly active space (a
     // cross-space jump set it explicitly); else fall to the space's last tab.
     if (inSpace.some((t) => t.id === activeId)) return;
@@ -356,7 +359,11 @@ export default function App() {
 
   const { hasComposer, keysLoaded } = useAiBootstrap();
 
-  const activeTab = tabs.find((t) => t.id === activeId);
+  const activeTab = tabs.find(
+    (tab) =>
+      tab.id === activeId &&
+      tab.spaceId === (activeSpaceId ?? DEFAULT_SPACE_ID),
+  );
   const isTerminalTab = activeTab?.kind === "terminal";
   const isBlockTab = activeTerminalTab?.blocks === true;
   const isEditorTab = activeTab?.kind === "editor";
@@ -798,9 +805,6 @@ export default function App() {
       tabs,
       explorerRoot,
       spacesHydrated,
-      launchCwd,
-      launchCwdResolved,
-      home,
       sidebarView,
       repositoryTarget: sourceControlRepositoryTarget,
       cycleSidebarView,

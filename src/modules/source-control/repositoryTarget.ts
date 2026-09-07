@@ -52,12 +52,11 @@ export function clearRepositoryTargetForSpace(
 
 export function activeRepositoryContextPath({
   explorerRoot,
-  workspaceFallbackPath,
 }: {
   explorerRoot: string | null;
-  workspaceFallbackPath: string | null;
+  workspaceFallbackPath?: string | null;
 }): string | null {
-  return explorerRoot ?? workspaceFallbackPath;
+  return explorerRoot;
 }
 
 export function sourceControlRepositoryPath({
@@ -65,7 +64,6 @@ export function sourceControlRepositoryPath({
   badgeContextPath,
   sidebarView,
   hasOpenGitTab,
-  target,
 }: {
   contextPath: string | null;
   badgeContextPath: string | null;
@@ -73,9 +71,9 @@ export function sourceControlRepositoryPath({
   hasOpenGitTab: boolean;
   target: SourceControlRepositoryTarget;
 }): string | null {
-  if (sidebarView === "source-control" && target.mode === "fixed") {
-    return target.repoRoot;
-  }
+  // Source Control always re-scopes to the active Space root. A previously
+  // pinned (fixed) repository must not re-point the panel at the settings root
+  // or an old repo when the current Space root has no repository.
   return hasOpenGitTab || sidebarView === "source-control"
     ? contextPath
     : badgeContextPath;
@@ -83,16 +81,14 @@ export function sourceControlRepositoryPath({
 
 export function gitGraphRepositoryPath({
   contextPath,
-  sidebarView,
-  target,
 }: {
   contextPath: string | null;
   sidebarView: SidebarViewId;
   target: SourceControlRepositoryTarget;
 }): string | null {
-  return sidebarView === "source-control" && target.mode === "fixed"
-    ? target.repoRoot
-    : contextPath;
+  // Same rule as the Source Control panel: always follow the active Space root,
+  // never a pinned fixed repository.
+  return contextPath;
 }
 
 export function repositoryTargetIsPending({

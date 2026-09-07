@@ -15,9 +15,6 @@ type Params = {
   tabs: Tab[];
   explorerRoot: string | null;
   spacesHydrated: boolean;
-  launchCwd: string | null;
-  launchCwdResolved: boolean;
-  home: string | null;
   sidebarView: SidebarViewId;
   repositoryTarget: SourceControlRepositoryTarget;
   cycleSidebarView: (view: SidebarViewId) => void;
@@ -36,22 +33,13 @@ export function useSourceControlContext({
   tabs,
   explorerRoot,
   spacesHydrated,
-  launchCwd,
-  launchCwdResolved,
-  home,
   sidebarView,
   repositoryTarget,
   cycleSidebarView,
   openCommitHistoryTab,
 }: Params) {
-  const workspaceFallbackPath = launchCwdResolved
-    ? (launchCwd ?? home ?? null)
-    : null;
   const sourceControlContextPath = spacesHydrated
-    ? activeRepositoryContextPath({
-        explorerRoot,
-        workspaceFallbackPath,
-      })
+    ? activeRepositoryContextPath({ explorerRoot })
     : null;
   const hasOpenGitTab = useMemo(
     () =>
@@ -66,7 +54,7 @@ export function useSourceControlContext({
   // Ambient path tracks the explorer root so the rail badge and explorer git
   // decorations reflect the repo you are actually looking at. cd-within-repo
   // churn is absorbed by the status TTL + reusable-root path in useSourceControl.
-  const badgeContextPath = explorerRoot ?? workspaceFallbackPath;
+  const badgeContextPath = explorerRoot;
   const sourceControlPath = sourceControlRepositoryPath({
     contextPath: sourceControlContextPath,
     badgeContextPath,

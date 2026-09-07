@@ -76,10 +76,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import {
-  repositoryTargetIsPending,
-  type SourceControlRepositoryTarget,
-} from "./repositoryTarget";
+import { type SourceControlRepositoryTarget } from "./repositoryTarget";
 import {
   buildChangeTree,
   directoryPaths,
@@ -447,19 +444,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     };
   }, []);
 
-  const fixedTargetPending = repositoryTargetIsPending({
-    target: repositoryTarget,
-    loadedContextPath: sourceControl.contextPath,
-    loadedRepoRoot: sourceControl.repo?.repoRoot ?? null,
-    isLoading: sourceControl.isLoading,
-  });
-  const panelState = fixedTargetPending ? "loading" : scm.panelState;
+  // Fixed repository pinning no longer re-scopes Source Control: the panel
+  // always reflects the active Space root, so there is never a pending
+  // fixed-target load that could mask a no-repo Space.
+  const fixedTargetPending = false;
+  const panelState = scm.panelState;
   const isRefreshing = panelState === "loading";
   const repoLabel = useMemo(() => {
-    if (fixedTargetPending) return "Loading";
     if (!scm.status) return "Source Control";
     return scm.status.isDetached ? "detached" : scm.status.branch;
-  }, [fixedTargetPending, scm.status]);
+  }, [scm.status]);
 
   const commitShortcut = IS_MAC ? "⌘↩" : "Ctrl+Enter";
   const generateShortcut = IS_MAC ? "⌘G" : "Ctrl+G";
@@ -751,15 +745,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 pb-2.5 pt-3">
           <div className="flex min-w-0 items-center gap-1.5">
             <BranchDropdown
-              repoRoot={
-                fixedTargetPending ? null : (scm.repo?.repoRoot ?? null)
-              }
+              repoRoot={scm.repo?.repoRoot ?? null}
               repoLabel={repoLabel}
-              displayRepoRoot={
-                repositoryTarget.mode === "fixed"
-                  ? repositoryTarget.repoRoot
-                  : (scm.repo?.repoRoot ?? null)
-              }
+              displayRepoRoot={scm.repo?.repoRoot ?? null}
               repositoryTarget={repositoryTarget}
               onFollowRepositoryContext={onFollowRepositoryContext}
               onNavigateToPath={onNavigateToPath}
