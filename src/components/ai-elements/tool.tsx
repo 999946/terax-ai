@@ -25,6 +25,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useTranslation } from "react-i18next";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import type { ComponentProps, ReactNode } from "react";
 import { isValidElement, memo, useState } from "react";
@@ -32,24 +33,24 @@ import { isValidElement, memo, useState } from "react";
 
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
-const TOOL_META: Record<string, { label: string; icon: typeof File01Icon }> = {
-  read_file: { label: "Read", icon: File01Icon },
-  list_directory: { label: "List", icon: FolderOpenIcon },
-  write_file: { label: "Write", icon: FilePlusIcon },
-  create_directory: { label: "Create dir", icon: FolderAddIcon },
-  edit: { label: "Edit", icon: FileEditIcon },
-  multi_edit: { label: "Edit", icon: Edit02Icon },
-  bash_run: { label: "Run", icon: TerminalIcon },
-  bash_background: { label: "Spawn", icon: TerminalIcon },
-  bash_logs: { label: "Logs", icon: TerminalIcon },
-  bash_list: { label: "Jobs", icon: TerminalIcon },
-  bash_kill: { label: "Kill", icon: TerminalIcon },
-  grep: { label: "Search", icon: GlobalSearchIcon },
-  glob: { label: "Glob", icon: Folder01Icon },
-  suggest_command: { label: "Suggest", icon: SparklesIcon },
-  open_preview: { label: "Preview", icon: EyeIcon },
-  run_subagent: { label: "Subagent", icon: RobotIcon },
-  todo_write: { label: "Todos", icon: CheckListIcon },
+const TOOL_META: Record<string, { labelKey: string; icon: typeof File01Icon }> = {
+  read_file: { labelKey: "ai.tool.meta.read", icon: File01Icon },
+  list_directory: { labelKey: "ai.tool.meta.list", icon: FolderOpenIcon },
+  write_file: { labelKey: "ai.tool.meta.write", icon: FilePlusIcon },
+  create_directory: { labelKey: "ai.tool.meta.createDir", icon: FolderAddIcon },
+  edit: { labelKey: "ai.tool.meta.edit", icon: FileEditIcon },
+  multi_edit: { labelKey: "ai.tool.meta.edit", icon: Edit02Icon },
+  bash_run: { labelKey: "ai.tool.meta.run", icon: TerminalIcon },
+  bash_background: { labelKey: "ai.tool.meta.spawn", icon: TerminalIcon },
+  bash_logs: { labelKey: "ai.tool.meta.logs", icon: TerminalIcon },
+  bash_list: { labelKey: "ai.tool.meta.jobs", icon: TerminalIcon },
+  bash_kill: { labelKey: "ai.tool.meta.kill", icon: TerminalIcon },
+  grep: { labelKey: "ai.tool.meta.search", icon: GlobalSearchIcon },
+  glob: { labelKey: "ai.tool.meta.glob", icon: Folder01Icon },
+  suggest_command: { labelKey: "ai.tool.meta.suggest", icon: SparklesIcon },
+  open_preview: { labelKey: "ai.tool.meta.preview", icon: EyeIcon },
+  run_subagent: { labelKey: "ai.tool.meta.subagent", icon: RobotIcon },
+  todo_write: { labelKey: "ai.tool.meta.todos", icon: CheckListIcon },
 };
 
 const STATUS_DOT: Record<ToolPart["state"], string> = {
@@ -63,13 +64,13 @@ const STATUS_DOT: Record<ToolPart["state"], string> = {
 };
 
 const STATUS_LABEL: Record<ToolPart["state"], string> = {
-  "approval-requested": "awaiting approval",
-  "approval-responded": "responded",
-  "input-streaming": "preparing",
-  "input-available": "running",
-  "output-available": "done",
-  "output-denied": "denied",
-  "output-error": "error",
+  "approval-requested": "ai.tool.status.approvalRequested",
+  "approval-responded": "ai.tool.status.approvalResponded",
+  "input-streaming": "ai.tool.status.preparing",
+  "input-available": "ai.tool.status.running",
+  "output-available": "ai.tool.status.done",
+  "output-denied": "ai.tool.status.denied",
+  "output-error": "ai.tool.status.error",
 };
 
 function deriveSummary(toolName: string, input: unknown): string | null {
@@ -104,9 +105,7 @@ function deriveSummary(toolName: string, input: unknown): string | null {
       return str("agent") ?? str("task");
     case "todo_write": {
       const items = Array.isArray(i.todos) ? i.todos : null;
-      return items
-        ? `${items.length} item${items.length === 1 ? "" : "s"}`
-        : null;
+      return items ? String(items.length) : null;
     }
     default:
       return null;
@@ -144,10 +143,15 @@ const ToolImpl = ({
   defaultOpen,
   ...props
 }: ToolProps) => {
+  const { t } = useTranslation();
   const meta = TOOL_META[toolName];
   const Icon = meta?.icon ?? ToolsIcon;
-  const label = meta?.label ?? toolName;
+  const label = meta ? t(meta.labelKey) : toolName;
   const summary = deriveSummary(toolName, input);
+  const summaryLabel =
+    toolName === "todo_write" && summary != null
+      ? t("ai.tool.todoCount", { count: Number(summary) })
+      : summary;
   const isError = state === "output-error";
   const open = defaultOpen ?? isError;
   const isHeavy = HEAVY_CONTENT_TOOLS.has(toolName);
@@ -175,7 +179,7 @@ const ToolImpl = ({
       >
         <span
           className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[state])}
-          aria-label={STATUS_LABEL[state]}
+          aria-label={t(STATUS_LABEL[state])}
         />
         <HugeiconsIcon
           icon={Icon}
@@ -184,16 +188,16 @@ const ToolImpl = ({
           className="shrink-0 text-muted-foreground"
         />
         <span className="shrink-0 font-medium text-foreground">{label}</span>
-        {summary ? (
+        {summaryLabel ? (
           <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-            {summary}
+            {summaryLabel}
           </span>
         ) : (
           <span className="flex-1" />
         )}
         {isError && (
           <span className="shrink-0 text-[10px] font-medium text-destructive">
-            failed
+            {t("ai.tool.failed")}
           </span>
         )}
       </CollapsibleTrigger>
@@ -236,13 +240,14 @@ export const Tool = memo(ToolImpl, (a, b) => {
 });
 
 function ToolInput({ toolName, input }: { toolName: string; input: unknown }) {
+  const { t } = useTranslation();
   if (input == null) return null;
   const preview = renderInputPreview(toolName, input);
   if (preview) {
     return (
       <div className="space-y-1">
         <div className="text-[10px] font-medium text-muted-foreground">
-          Input
+          {t("ai.tool.input")}
         </div>
         {preview}
       </div>
@@ -250,7 +255,9 @@ function ToolInput({ toolName, input }: { toolName: string; input: unknown }) {
   }
   return (
     <div className="space-y-1">
-      <div className="text-[10px] font-medium text-muted-foreground">Input</div>
+      <div className="text-[10px] font-medium text-muted-foreground">
+        {t("ai.tool.input")}
+      </div>
       <CodeBlockMini
         code={
           typeof input === "string" ? input : JSON.stringify(input, null, 2)
@@ -322,10 +329,13 @@ function ToolOutput({
   output: unknown;
   errorText?: string;
 }) {
+  const { t } = useTranslation();
   if (errorText) {
     return (
       <div className="space-y-1">
-        <div className="text-[10px] font-medium text-destructive">Error</div>
+        <div className="text-[10px] font-medium text-destructive">
+          {t("ai.tool.error")}
+        </div>
         <div className="rounded bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive whitespace-pre-wrap">
           {errorText}
         </div>
@@ -334,7 +344,7 @@ function ToolOutput({
   }
   if (output === undefined || output === null) return null;
 
-  const custom = renderToolOutput(toolName, output);
+  const custom = renderToolOutput(toolName, output, t);
   if (custom) return custom;
 
   let body: ReactNode;
@@ -351,14 +361,18 @@ function ToolOutput({
   return (
     <div className="space-y-1">
       <div className="text-[10px] font-medium text-muted-foreground">
-        Output
+        {t("ai.tool.output")}
       </div>
       {body}
     </div>
   );
 }
 
-function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
+function renderToolOutput(
+  toolName: string,
+  output: unknown,
+  t: (key: string, options?: Record<string, string | number>) => string,
+): ReactNode | null {
   if (!output || typeof output !== "object") return null;
   const o = output as Record<string, unknown>;
 
@@ -370,11 +384,11 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
     return (
       <div className="flex items-center gap-1.5 font-mono text-[11px]">
         <span className="text-emerald-600 dark:text-emerald-400">✓</span>
-        <span className="text-foreground">read</span>
+        <span className="text-foreground">{t("ai.tool.output.read")}</span>
         {path ? <span className="text-muted-foreground">· {path}</span> : null}
         {lines != null ? (
           <span className="text-muted-foreground">
-            ({lines} line{lines === 1 ? "" : "s"}
+            ({t("ai.tool.output.lineCount", { count: lines })}
             {size != null ? `, ${formatBytes(size)}` : ""})
           </span>
         ) : null}
@@ -388,7 +402,9 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
       : [];
     if (entries.length === 0) {
       return (
-        <div className="text-[11px] italic text-muted-foreground">empty</div>
+        <div className="text-[11px] italic text-muted-foreground">
+          {t("ai.tool.output.empty")}
+        </div>
       );
     }
     const dirs = entries.filter(
@@ -460,8 +476,10 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
     if (hits.length === 0) {
       return (
         <div className="text-[11px] italic text-muted-foreground">
-          no matches
-          {filesScanned != null ? ` · ${filesScanned} files scanned` : ""}
+          {t("ai.tool.output.noMatches")}
+          {filesScanned != null
+            ? ` · ${t("ai.tool.output.filesScanned", { count: filesScanned })}`
+            : ""}
         </div>
       );
     }
@@ -485,12 +503,14 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
         </div>
         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
           <span>
-            {hits.length} hit{hits.length === 1 ? "" : "s"}
-            {filesScanned != null ? ` · ${filesScanned} files` : ""}
+            {t("ai.tool.output.hitCount", { count: hits.length })}
+            {filesScanned != null
+              ? ` · ${t("ai.tool.output.filesScanned2", { count: filesScanned })}`
+              : ""}
           </span>
           {truncated ? (
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-700 dark:text-amber-400">
-              truncated
+              {t("ai.tool.output.truncated")}
             </span>
           ) : null}
         </div>
@@ -507,7 +527,7 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
     if (matches.length === 0) {
       return (
         <div className="text-[11px] italic text-muted-foreground">
-          no matches
+          {t("ai.tool.output.noMatches")}
         </div>
       );
     }
@@ -532,7 +552,7 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
           <span className="text-emerald-600 dark:text-emerald-400">✓</span>
           {reps != null ? (
             <span className="text-foreground">
-              {reps} replacement{reps === 1 ? "" : "s"}
+              {t("ai.tool.output.replacementCount", { count: reps })}
             </span>
           ) : null}
           {path ? (
@@ -550,7 +570,9 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
       <div className="flex items-center gap-1.5 font-mono text-[11px]">
         <span className="text-emerald-600 dark:text-emerald-400">✓</span>
         <span className="text-foreground">
-          {toolName === "create_directory" ? "created" : "wrote"}
+          {toolName === "create_directory"
+            ? t("ai.tool.output.created")
+            : t("ai.tool.output.wrote")}
         </span>
         {path ? <span className="text-muted-foreground">· {path}</span> : null}
         {bytes != null ? (
@@ -568,7 +590,7 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
         <div className="flex items-center gap-1.5">
           <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
           {handle ? <span className="text-foreground">{handle}</span> : null}
-          <span className="text-muted-foreground">running</span>
+          <span className="text-muted-foreground">{t("ai.tool.output.running")}</span>
         </div>
         {cmd ? (
           <div className="truncate text-muted-foreground">{cmd}</div>
@@ -581,6 +603,7 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
 }
 
 function BashRunOutput({ data }: { data: Record<string, unknown> }) {
+  const { t } = useTranslation();
   const stdout = typeof data.stdout === "string" ? data.stdout : "";
   const stderr = typeof data.stderr === "string" ? data.stderr : "";
   const exit = typeof data.exit_code === "number" ? data.exit_code : null;
@@ -598,8 +621,8 @@ function BashRunOutput({ data }: { data: Record<string, unknown> }) {
     label: string;
     count: number;
   }> = [
-    { key: "stdout", label: "stdout", count: stdout.length },
-    { key: "stderr", label: "stderr", count: stderr.length },
+    { key: "stdout", label: t("ai.tool.output.stdout"), count: stdout.length },
+    { key: "stderr", label: t("ai.tool.output.stderr"), count: stderr.length },
   ];
 
   return (
@@ -635,17 +658,17 @@ function BashRunOutput({ data }: { data: Record<string, unknown> }) {
                 : "bg-destructive/15 text-destructive",
             )}
           >
-            exit {exit}
+            {t("ai.tool.output.exit", { code: exit })}
           </span>
         ) : null}
         {timedOut ? (
           <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-700 dark:text-amber-400">
-            timed out
+            {t("ai.tool.output.timedOut")}
           </span>
         ) : null}
         {truncated ? (
           <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[10px] text-amber-700 dark:text-amber-400">
-            truncated
+            {t("ai.tool.output.truncated")}
           </span>
         ) : null}
       </div>
@@ -654,7 +677,7 @@ function BashRunOutput({ data }: { data: Record<string, unknown> }) {
       </pre>
       {cwdAfter ? (
         <div className="font-mono text-[10px] text-muted-foreground">
-          cwd → {cwdAfter}
+          {t("ai.tool.output.cwd", { path: cwdAfter })}
         </div>
       ) : null}
     </div>
@@ -708,6 +731,7 @@ function SuggestCommandCard({
   command: string;
   explanation: string | null;
 }) {
+  const { t } = useTranslation();
   const [inserted, setInserted] = useState(false);
   const onInsert = () => {
     const ok = useChatStore
@@ -735,14 +759,16 @@ function SuggestCommandCard({
             "disabled:opacity-60 disabled:cursor-default disabled:hover:bg-transparent",
             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           )}
-          aria-label="Insert into active terminal"
+          aria-label={t("ai.tool.insertIntoTerminal")}
         >
           <HugeiconsIcon
             icon={inserted ? TerminalIcon : ArrowRight01Icon}
             size={12}
             strokeWidth={1.75}
           />
-          <span>{inserted ? "Inserted" : "Insert"}</span>
+          <span>
+            {inserted ? t("ai.tool.inserted") : t("ai.tool.insert")}
+          </span>
         </button>
       </div>
     </div>

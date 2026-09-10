@@ -23,6 +23,7 @@ import {
   useState,
 } from "react";
 import { Streamdown } from "streamdown";
+import { useTranslation } from "react-i18next";
 import { ChatStreamingProvider } from "./chat-code";
 import { MarkdownCode } from "./markdown-code";
 
@@ -256,11 +257,12 @@ export const MessageBranchPrevious = ({
   children,
   ...props
 }: MessageBranchPreviousProps) => {
+  const { t } = useTranslation();
   const { goToPrevious, totalBranches } = useMessageBranch();
 
   return (
     <Button
-      aria-label="Previous branch"
+      aria-label={t("ai.message.previousBranch")}
       disabled={totalBranches <= 1}
       onClick={goToPrevious}
       size="icon-sm"
@@ -279,11 +281,12 @@ export const MessageBranchNext = ({
   children,
   ...props
 }: MessageBranchNextProps) => {
+  const { t } = useTranslation();
   const { goToNext, totalBranches } = useMessageBranch();
 
   return (
     <Button
-      aria-label="Next branch"
+      aria-label={t("ai.message.nextBranch")}
       disabled={totalBranches <= 1}
       onClick={goToNext}
       size="icon-sm"
@@ -302,6 +305,7 @@ export const MessageBranchPage = ({
   className,
   ...props
 }: MessageBranchPageProps) => {
+  const { t } = useTranslation();
   const { currentBranch, totalBranches } = useMessageBranch();
 
   return (
@@ -312,7 +316,10 @@ export const MessageBranchPage = ({
       )}
       {...props}
     >
-      {currentBranch + 1} of {totalBranches}
+      {t("ai.message.branchPage", {
+        current: currentBranch + 1,
+        total: totalBranches,
+      })}
     </ButtonGroupText>
   );
 };

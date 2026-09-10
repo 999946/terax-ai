@@ -9,6 +9,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { LanguageModelUsage } from "ai";
+import { useTranslation } from "react-i18next";
 import type { ComponentProps } from "react";
 import { createContext, useContext, useMemo } from "react";
 
@@ -57,6 +58,7 @@ export const Context = ({
 };
 
 const ContextIcon = () => {
+  const { t } = useTranslation();
   const { usedTokens, maxTokens } = useContextValue();
   const circumference = 2 * Math.PI * ICON_RADIUS;
   const usedPercent = usedTokens / maxTokens;
@@ -64,7 +66,7 @@ const ContextIcon = () => {
 
   return (
     <svg
-      aria-label="Model context usage"
+      aria-label={t("ai.context.modelContextUsage")}
       height="20"
       role="img"
       style={{ color: "currentcolor" }}
@@ -228,6 +230,7 @@ export const ContextInputUsage = ({
   children,
   ...props
 }: ContextInputUsageProps) => {
+  const { t } = useTranslation();
   const { usage } = useContextValue();
   const inputTokens = usage?.inputTokens ?? 0;
 
@@ -239,7 +242,7 @@ export const ContextInputUsage = ({
     return null;
   }
 
-  return <UsageRow label="Input" tokens={inputTokens} {...props} />;
+  return <UsageRow label={t("ai.context.input")} tokens={inputTokens} {...props} />;
 };
 
 export type ContextOutputUsageProps = ComponentProps<"div">;
@@ -248,6 +251,7 @@ export const ContextOutputUsage = ({
   children,
   ...props
 }: ContextOutputUsageProps) => {
+  const { t } = useTranslation();
   const { usage } = useContextValue();
   const outputTokens = usage?.outputTokens ?? 0;
 
@@ -259,7 +263,7 @@ export const ContextOutputUsage = ({
     return null;
   }
 
-  return <UsageRow label="Output" tokens={outputTokens} {...props} />;
+  return <UsageRow label={t("ai.context.output")} tokens={outputTokens} {...props} />;
 };
 
 export type ContextReasoningUsageProps = ComponentProps<"div">;
@@ -268,6 +272,7 @@ export const ContextReasoningUsage = ({
   children,
   ...props
 }: ContextReasoningUsageProps) => {
+  const { t } = useTranslation();
   const { usage } = useContextValue();
   const reasoningTokens = usage?.reasoningTokens ?? 0;
 
@@ -279,7 +284,7 @@ export const ContextReasoningUsage = ({
     return null;
   }
 
-  return <UsageRow label="Reasoning" tokens={reasoningTokens} {...props} />;
+  return <UsageRow label={t("ai.context.reasoning")} tokens={reasoningTokens} {...props} />;
 };
 
 export type ContextCacheUsageProps = ComponentProps<"div">;
@@ -288,6 +293,7 @@ export const ContextCacheUsage = ({
   children,
   ...props
 }: ContextCacheUsageProps) => {
+  const { t } = useTranslation();
   const { usage } = useContextValue();
   const cacheTokens = usage?.cachedInputTokens ?? 0;
 
@@ -299,5 +305,5 @@ export const ContextCacheUsage = ({
     return null;
   }
 
-  return <UsageRow label="Cache" tokens={cacheTokens} {...props} />;
+  return <UsageRow label={t("ai.context.cache")} tokens={cacheTokens} {...props} />;
 };

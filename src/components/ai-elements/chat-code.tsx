@@ -10,6 +10,7 @@ import {
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useTranslation } from "react-i18next";
 import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 
 import { Shimmer } from "./shimmer";
@@ -74,11 +75,14 @@ export function ChatCodeBlock({ code, lang }: ChatCodeBlockProps) {
 }
 
 function GeneratingPlaceholder({ label }: { label: string }) {
+  const { t } = useTranslation();
   return (
     <div className="not-prose my-2 flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
       <span className="inline-block size-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
       <Shimmer duration={1.2}>
-        {label === "text" ? "Generating code…" : `Generating ${label}…`}
+        {label === "text"
+          ? t("ai.chat.generatingCode")
+          : t("ai.chat.generatingCodeFor", { language: label })}
       </Shimmer>
     </div>
   );
@@ -213,6 +217,7 @@ function CommandCard({ code, lang }: { code: string; lang: string }) {
 }
 
 function RunInTerminalButton({ command }: { command: string }) {
+  const { t } = useTranslation();
   const [sent, setSent] = useState(false);
   const tRef = useRef<number>(0);
   useEffect(() => () => window.clearTimeout(tRef.current), []);
@@ -229,20 +234,21 @@ function RunInTerminalButton({ command }: { command: string }) {
       variant="ghost"
       onClick={onRun}
       className="h-5 gap-1 px-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
-      aria-label="Run in active terminal"
-      title="Run in active terminal"
+      aria-label={t("ai.code.runInActiveTerminal")}
+      title={t("ai.code.runInActiveTerminal")}
     >
       <HugeiconsIcon
         icon={sent ? TerminalIcon : ArrowRight01Icon}
         size={11}
         strokeWidth={1.75}
       />
-      <span>{sent ? "Sent" : "Run"}</span>
+      <span>{sent ? t("ai.common.sent") : t("ai.common.run")}</span>
     </Button>
   );
 }
 
 function CopyButton({ text }: { text: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const tRef = useRef<number>(0);
 
@@ -266,7 +272,7 @@ function CopyButton({ text }: { text: string }) {
       variant="ghost"
       onClick={onCopy}
       className="size-5 shrink-0 text-muted-foreground hover:text-foreground"
-      aria-label="Copy code"
+      aria-label={t("ai.common.copyCode")}
     >
       <HugeiconsIcon
         icon={copied ? CheckmarkCircle01Icon : CopyIcon}
