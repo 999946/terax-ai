@@ -5,6 +5,7 @@ import { unifiedMergeView } from "@codemirror/merge";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   commitDiffKey,
@@ -137,6 +138,7 @@ function loadStateFromCache(source: WorkingSource | CommitSource): LoadState {
 }
 
 export function GitDiffPane({ source, chipLabel, active }: Props) {
+  const { t } = useTranslation();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const themeExt = useEditorThemeExt();
   const [state, setState] = useState<LoadState>(() =>
@@ -305,7 +307,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
         ) : useFallback ? (
           <ScrollArea className="h-full">
             <pre className="min-h-full whitespace-pre-wrap wrap-break-word p-4 font-mono text-[12px] leading-relaxed text-muted-foreground">
-              {fallbackPatch || "Diff preview is not available for this file."}
+              {fallbackPatch || t("editor.diffPreviewUnavailable")}
             </pre>
           </ScrollArea>
         ) : (

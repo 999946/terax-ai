@@ -7,6 +7,7 @@ import { EditorView } from "@codemirror/view";
 import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
+import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildSharedExtensions,
@@ -70,10 +71,10 @@ const DIFF_THEME = EditorView.theme({
   },
 });
 
-const STATUS_LABEL: Record<AiDiffStatus, string> = {
-  pending: "Pending review",
-  approved: "Applied",
-  rejected: "Rejected",
+const STATUS_KEY: Record<AiDiffStatus, string> = {
+  pending: "editor.aiDiffPendingReview",
+  approved: "editor.aiDiffApplied",
+  rejected: "editor.aiDiffRejected",
 };
 
 const STATUS_BADGE: Record<
@@ -94,6 +95,7 @@ export function AiDiffPane({
   onAccept,
   onReject,
 }: Props) {
+  const { t } = useTranslation();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const themeExt = useEditorThemeExt();
 
@@ -145,7 +147,7 @@ export function AiDiffPane({
             className="text-[11px] px-2.5 py-2.5"
             variant={STATUS_BADGE[status]}
           >
-            {STATUS_LABEL[status]}
+            {t(STATUS_KEY[status])}
           </Badge>
           {isNewFile ? (
             <span className="shrink-0 rounded-full border border-border/60 bg-accent/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">

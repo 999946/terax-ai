@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo } from "react";
@@ -142,6 +143,7 @@ export function PendingRow({
   onCommit,
   onCancel,
 }: PendingRowProps) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex h-6 w-full min-w-0 items-center gap-2 px-1.5 text-[13px]"
@@ -157,7 +159,7 @@ export function PendingRow({
       />
       <InlineInput
         initial=""
-        placeholder={kind === "dir" ? "New folder" : "New file"}
+        placeholder={kind === "dir" ? t("explorer.newFolder") : t("explorer.newFile")}
         onCommit={onCommit}
         onCancel={onCancel}
       />

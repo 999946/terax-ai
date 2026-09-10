@@ -27,6 +27,7 @@ import { fileIconUrl } from "./lib/iconResolver";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type SearchHit = {
   path: string;
@@ -73,6 +74,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
 }: Props,
   ref,
 ) {
+  const { t } = useTranslation();
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
@@ -208,7 +210,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                 }
               }
             }}
-            placeholder="Search files…"
+            placeholder={t("explorer.searchFiles")}
             className="h-7 pr-7 pl-6.5 text-xs"
           />
           {query ? (
@@ -216,7 +218,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
               type="button"
               onClick={() => setQuery("")}
               className="absolute top-1/2 right-3.5 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-              aria-label="Clear search"
+              aria-label={t("common.clearSearch")}
             >
               <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
             </button>
@@ -229,11 +231,11 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
           <div className="py-1" ref={scrollRef}>
             {searching && results.length === 0 ? (
               <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                Searching…
+                {t("explorer.searching")}
               </div>
             ) : results.length === 0 ? (
               <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                No matches
+                {t("explorer.noMatches")}
               </div>
             ) : (
               results.map((hit, index) => {
@@ -279,7 +281,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           className={COMPACT_ITEM}
                           onSelect={() => onOpenFile(hit.path)}
                         >
-                          Open
+                          {t("explorer.open")}
                         </ContextMenuItem>
                       )}
                       {hit.is_dir && onRevealInTerminal && (
@@ -287,7 +289,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           className={COMPACT_ITEM}
                           onSelect={() => onRevealInTerminal(hit.path)}
                         >
-                          Open in Terminal
+                          {t("explorer.openInTerminal")}
                         </ContextMenuItem>
                       )}
                       {hit.is_dir && onOpenInSourceControl && (
@@ -295,7 +297,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           className={COMPACT_ITEM}
                           onSelect={() => onOpenInSourceControl(hit.path)}
                         >
-                          Open in Source Control
+                          {t("explorer.openInSourceControl")}
                         </ContextMenuItem>
                       )}
                       {hit.is_dir && onOpenGitHistory && (
@@ -303,28 +305,28 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
                           className={COMPACT_ITEM}
                           onSelect={() => onOpenGitHistory(hit.path)}
                         >
-                          Open Git History
+                          {t("explorer.openGitHistory")}
                         </ContextMenuItem>
                       )}
                       <ContextMenuItem
                         className={COMPACT_ITEM}
                         onSelect={() => void revealInFinder(hit.path)}
                       >
-                        Reveal in Finder
+                        {t("explorer.revealInFinder")}
                       </ContextMenuItem>
                       <ContextMenuSeparator />
                       <ContextMenuItem
                         className={COMPACT_ITEM}
                         onSelect={() => void copyToClipboard(hit.path)}
                       >
-                        Copy Path
+                        {t("explorer.copyPath")}
                       </ContextMenuItem>
                       <ContextMenuSeparator />
                       <ContextMenuItem
                         className={COMPACT_ITEM}
                         onSelect={() => onAttachToAgent?.(hit.path)}
                       >
-                        Attach to Agent
+                        {t("explorer.attachToAgent")}
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
@@ -333,7 +335,7 @@ export const ExplorerSearch = forwardRef<ExplorerSearchHandle, Props>(function E
             )}
             {truncated && results.length > 0 ? (
               <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
-                Showing partial results — refine your query.
+                {t("explorer.showingPartialResults")}
               </div>
             ) : null}
           </div>

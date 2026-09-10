@@ -195,22 +195,21 @@ export const EditorPane = memo(
           try {
             res = await lspFormatDocument(view);
           } catch (e) {
-            toast.error("Language server format failed", {
+            toast.error(t("editor.languageServerFormatFailed"), {
               description: String(e),
             });
           }
           if (res === "unsupported" && !warnedNoFormatRef.current) {
             warnedNoFormatRef.current = true;
-            toast.warning("Format on save skipped", {
+            toast.warning(t("editor.formatOnSaveSkipped"), {
               description:
-                "The active language server has no formatter. Pick an external one in Settings (Ruff for Python, Prettier, rustfmt, ...).",
+                t("editor.noFormatterInLanguageServer"),
             });
           }
         } else if (!warnedNoLspRef.current) {
           warnedNoLspRef.current = true;
-          toast.warning("Format on save skipped", {
-            description:
-              "No active language server for this file. Enable one in the statusbar, or pick an external formatter in Settings.",
+          toast.warning(t("editor.formatOnSaveSkipped"), {
+            description: t("editor.noActiveLanguageServer"),
           });
         }
       }

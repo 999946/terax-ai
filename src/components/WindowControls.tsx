@@ -8,6 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function WindowControls({ closeOnly = false }: Props) {
+  const { t } = useTranslation();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -41,11 +43,11 @@ export function WindowControls({ closeOnly = false }: Props) {
     <div className="flex h-full shrink-0 items-center gap-0.5 pr-1">
       {!closeOnly && (
         <>
-          <CtlButton ariaLabel="Minimize" onClick={() => void w.minimize()}>
+          <CtlButton ariaLabel={t("windowControls.minimize")} onClick={() => void w.minimize()}>
             <HugeiconsIcon icon={MinusSignIcon} size={12} strokeWidth={2} />
           </CtlButton>
           <CtlButton
-            ariaLabel={maximized ? "Restore" : "Maximize"}
+            ariaLabel={maximized ? t("windowControls.restore") : t("windowControls.maximize")}
             onClick={() => void w.toggleMaximize()}
           >
             <HugeiconsIcon
@@ -56,7 +58,7 @@ export function WindowControls({ closeOnly = false }: Props) {
           </CtlButton>
         </>
       )}
-      <CtlButton ariaLabel="Close" onClick={() => void w.close()} danger>
+      <CtlButton ariaLabel={t("common.close")} onClick={() => void w.close()} danger>
         <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
       </CtlButton>
     </div>

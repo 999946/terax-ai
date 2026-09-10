@@ -1,6 +1,7 @@
 import { cn, isMarkdownPath } from "@/lib/utils";
 import { MarkdownViewToggle } from "@/modules/markdown";
 import type { EditorTab, Tab } from "@/modules/tabs";
+import { useTranslation } from "react-i18next";
 import { useEffect, useRef } from "react";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 
@@ -21,8 +22,9 @@ export function EditorStack({
   onCloseTab,
   onSetMarkdownView,
 }: Props) {
+  const { t } = useTranslation();
   const editors = tabs.filter(
-    (t): t is EditorTab => t.kind === "editor" && !t.cold,
+    (tab): tab is EditorTab => tab.kind === "editor" && !tab.cold,
   );
 
   // Stable per-tab callbacks. Inline arrows in `ref` and `onDirtyChange`
@@ -76,7 +78,7 @@ export function EditorStack({
 
   // Drop callback entries for closed tabs to avoid unbounded growth.
   useEffect(() => {
-    const live = new Set(editors.map((t) => t.id));
+    const live = new Set(editors.map((tab) => tab.id));
     for (const id of refCallbacks.current.keys()) {
       if (!live.has(id)) refCallbacks.current.delete(id);
     }
@@ -91,11 +93,11 @@ export function EditorStack({
   if (editors.length === 0) return null;
   return (
     <div className="relative h-full w-full">
-      {editors.map((t) => {
-        const visible = t.id === activeId;
+      {editors.map((tab) => {
+        const visible = tab.id === activeId;
         return (
           <div
-            key={t.id}
+            key={tab.id}
             className={cn(
               "absolute inset-0",
               !visible && "invisible pointer-events-none",
@@ -103,20 +105,20 @@ export function EditorStack({
             aria-hidden={!visible}
           >
             <div className="relative h-full overflow-hidden bg-background">
-              {isMarkdownPath(t.path) && (
+              {isMarkdownPath(tab.path) && (
                 <MarkdownViewToggle
                   mode="raw"
-                  onChange={(mode) => onSetMarkdownView(t.id, mode)}
-                  renderedDisabled={t.dirty}
-                  renderedHint="Save to preview"
+                  onChange={(mode) => onSetMarkdownView(tab.id, mode)}
+                  renderedDisabled={tab.dirty}
+                  renderedHint={t("editor.saveToPreview")}
                 />
               )}
               <EditorPane
-                ref={getRefCallback(t.id)}
-                path={t.path}
-                overrideLanguage={t.overrideLanguage}
-                onDirtyChange={getDirtyCallback(t.id)}
-                onClose={getCloseCallback(t.id)}
+                ref={getRefCallback(tab.id)}
+                path={tab.path}
+                overrideLanguage={tab.overrideLanguage}
+                onDirtyChange={getDirtyCallback(tab.id)}
+                onClose={getCloseCallback(tab.id)}
               />
             </div>
           </div>
