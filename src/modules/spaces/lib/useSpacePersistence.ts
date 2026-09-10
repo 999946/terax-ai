@@ -68,6 +68,18 @@ export function useSpacePersistence({
       last.current.set(spaceId, { json, activeTabIndex });
       void saveState(spaceId, { tabs: serialized, activeTabIndex });
     }
+
+    // Persist emptiness: a space whose last tab was closed (active or not) must
+    // not be restored on the next launch. Spaces absent from `groups` currently
+    // hold zero tabs, so write an empty slate for any space we know about that
+    // no longer appears. "Known" = seeded from disk or written this session.
+    for (const [spaceId, prev] of last.current) {
+      if (groups.has(spaceId)) continue;
+      if (prev && prev.json === "[]") continue;
+      const activeTabIndex = prev?.activeTabIndex ?? 0;
+      last.current.set(spaceId, { json: "[]", activeTabIndex });
+      void saveState(spaceId, { tabs: [], activeTabIndex });
+    }
   }, []);
 
   useEffect(() => {

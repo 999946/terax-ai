@@ -309,7 +309,8 @@ export function pickTabBySpaceIndex(
 }
 
 // Next active after close, scoped to the closing tab's space. null = last tab of
-// its space, which callers treat as "refuse to close".
+// its space. Callers diverge on null: closeTab/closePaneByLeaf use it as the -1
+// empty-space sentinel (allow the close), while pane-close refusals guard on it.
 export function nextActiveInSpace(
   tabs: Tab[],
   closingId: number,
@@ -622,7 +623,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const replaceTabs = useCallback((next: Tab[], nextActiveId: number) => {
-    if (next.length === 0) return;
     tabsRef.current = next;
     activeIdRef.current = nextActiveId;
     setTabs(next);
@@ -1133,14 +1133,15 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   const closeTab = useCallback((id: number) => {
     let toDispose: number[] = [];
     setTabs((curr) => {
-      const fallback = nextActiveInSpace(curr, id);
-      if (fallback === null) return curr;
       const target = curr.find((t) => t.id === id);
-      if (target?.kind === "terminal") {
+      if (!target) return curr;
+      const fallback = nextActiveInSpace(curr, id);
+      if (target.kind === "terminal") {
         toDispose = leafIds(target.paneTree);
       }
       const next = curr.filter((t) => t.id !== id);
-      setActiveId((active) => (id === active ? fallback : active));
+      // -1 represents an empty active space when its last tab is closed.
+      setActiveId((active) => (id === active ? (fallback ?? -1) : active));
       return next;
     });
     for (const lid of toDispose) disposeSession(lid);
@@ -1321,10 +1322,12 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       if (tab?.kind !== "terminal") return curr;
       const newTree = removeLeaf(tab.paneTree, leafId);
       if (newTree === null) {
+        // Last pane of the space's last terminal: empty the space rather than
+        // refuse (same -1 sentinel as closeTab), so an exited shell pane can
+        // actually be dismissed and the emptiness persists across restart.
         const fallback = nextActiveInSpace(curr, tab.id);
-        if (fallback === null) return curr;
         const next = curr.filter((x) => x.id !== tab.id);
-        setActiveId((active) => (active === tab.id ? fallback : active));
+        setActiveId((active) => (active === tab.id ? (fallback ?? -1) : active));
         didRemove = true;
         return next;
       }

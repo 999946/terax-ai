@@ -36,7 +36,6 @@ type State = {
   rename: (id: string, name: string, root?: string) => void;
   setEnv: (id: string, env: WorkspaceEnv) => void;
   setColor: (id: string, color: number | undefined) => void;
-  reorder: (orderedIds: string[]) => void;
   remove: (id: string) => string | null;
   setActive: (id: string) => void;
 };
@@ -116,21 +115,6 @@ export const useSpaces = create<State>((set, get) => ({
     );
     set({ spaces });
     void saveSpacesList(spaces);
-  },
-
-  reorder: (orderedIds) => {
-    const byId = new Map(get().spaces.map((s) => [s.id, s]));
-    const next: SpaceMeta[] = [];
-    for (const id of orderedIds) {
-      const s = byId.get(id);
-      if (s) next.push(s);
-    }
-    for (const s of get().spaces) {
-      if (!next.includes(s)) next.push(s);
-    }
-    if (next.length !== get().spaces.length) return;
-    set({ spaces: next });
-    void saveSpacesList(next);
   },
 
   remove: (id) => {

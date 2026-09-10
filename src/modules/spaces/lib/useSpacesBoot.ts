@@ -118,7 +118,12 @@ export function useSpacesBoot({
         const restoredHome = await adoptWorkspaceEnv(env);
 
         // Active space must never be empty, else its tab list shows nothing.
-        if (!restored.some((t) => t.spaceId === active)) {
+        // Exception: a space whose last tab was closed is persisted as empty,
+        // and closing the last tab is a deliberate action that should survive a
+        // restart. Only spaces with no persisted state still get a starter
+        // terminal, so a brand-new space opens with a shell.
+        const activeHadState = states.get(active) !== undefined;
+        if (!restored.some((t) => t.spaceId === active) && !activeHadState) {
           const cwd = freshTabCwd(env, restoredHome, launchCwd, home);
           restored.push(freshTerminalTab(active, cwd, allocId));
         }
@@ -134,8 +139,10 @@ export function useSpacesBoot({
 
         const inActive = restored.filter((t) => t.spaceId === active);
         const idx = states.get(active)?.activeTabIndex ?? 0;
-        const activeTab = inActive[idx] ?? inActive[0] ?? restored[0];
-        replaceTabs(restored, activeTab.id);
+        const activeTab = inActive[idx] ?? inActive[0];
+        // -1 is the empty-strip sentinel; use it whenever the active space has
+        // no restored tab (all of its tabs were closed before quitting).
+        replaceTabs(restored, activeTab ? activeTab.id : -1);
       } catch (e) {
         console.error("[terax] spaces boot failed:", e);
       } finally {
