@@ -12,6 +12,25 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+      },
+    },
+    rules: {
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
+  {
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["**/*.test.ts", "**/*.test.tsx"],
     languageOptions: {
