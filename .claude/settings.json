@@ -1,5 +1,0 @@
-{
-  "env": {
-    "PATH": "$HOME/.cargo/bin:$HOME/.rustup/toolchains/stable-x86_64-apple-darwin/bin:$PATH"
-  }
-}
