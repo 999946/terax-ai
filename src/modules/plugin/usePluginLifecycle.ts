@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useSpaces } from "@/modules/spaces/lib/useSpaces";
 import { usePluginStore } from "./store";
 import type { PluginEvent, PluginEventType } from "./events";
+import type { WorkspaceEnv } from "@/modules/workspace";
 
 let eventSequence = 0;
 
@@ -35,7 +36,7 @@ export function usePluginLifecycle({
   activeSpaceId,
 }: {
   spacesHydrated: boolean;
-  spaces: { id: string; name: string; root: string | null }[];
+  spaces: { id: string; name: string; root: string | null; env?: WorkspaceEnv }[];
   activeSpaceId: string | null;
 }): void {
   const lastActiveSpaceId = useRef<string | null>(null);
@@ -91,7 +92,12 @@ export function usePluginLifecycle({
       .getState()
       .dispatchEvent(
         makeEvent("space.activated", {
-          space: { id: space.id, name: space.name, root: space.root },
+          space: {
+            id: space.id,
+            name: space.name,
+            root: space.root,
+            env: space.env,
+          },
         }),
       );
   }, [spacesHydrated, activeSpaceId, spaces]);

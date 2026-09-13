@@ -1,7 +1,11 @@
 function toSpaceInfo(space) {
+  // Surface the workspace scope as the subtitle so the default plugin's output
+  // is visible (and distinct from the space name already shown as the title).
+  const env = space?.env;
+  const isWsl = env?.kind === "wsl";
   return {
-    summary: typeof space?.name === "string" ? space.name : "",
-    status: "unknown",
+    summary: isWsl ? `WSL · ${env.distro}` : "Local",
+    status: isWsl ? "unknown" : "online",
     onlineAt: null,
     lastTestedAt: null,
   };
