@@ -325,7 +325,7 @@ export function TabBar({
                   onPointerCancel={(e) => endDrag(e.currentTarget)}
                   onDoubleClick={() => isPreview && onPin(t.id)}
                   onAuxClick={(e) => {
-                    if (e.button === 1 && tabs.length > 1) {
+                    if (e.button === 1) {
                       e.preventDefault();
                       e.stopPropagation();
                       onClose(t.id);
@@ -479,32 +479,30 @@ export function TabBar({
                       />
                     ) : null}
                   </span>
-                  {tabs.length > 1 && (
-                    <span
-                      role="button"
-                      aria-label={tr("tabs.closeTab")}
-                      data-no-drag
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onClose(t.id);
-                      }}
-                      className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
-                    >
-                      <HugeiconsIcon
-                        icon={Cancel01Icon}
-                        size={11}
-                        strokeWidth={2}
-                      />
-                    </span>
-                  )}
+                  <span
+                    role="button"
+                    aria-label={tr("tabs.closeTab")}
+                    data-no-drag
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose(t.id);
+                    }}
+                    className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+                  >
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      size={11}
+                      strokeWidth={2}
+                    />
+                  </span>
                 </TabsTrigger>
               );
 
@@ -530,22 +528,18 @@ export function TabBar({
                           />
                           <span className="flex-1">{tr("tabs.rename")}</span>
                         </ContextMenuItem>
-                        {tabs.length > 1 && (
-                          <>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                              onSelect={() => onClose(t.id)}
-                            >
-                              <HugeiconsIcon
-                                icon={Cancel01Icon}
-                                size={13}
-                                strokeWidth={1.75}
-                              />
-                              <span className="flex-1">{tr("tabs.close")}</span>
-                            </ContextMenuItem>
-                          </>
-                        )}
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+                          onSelect={() => onClose(t.id)}
+                        >
+                          <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={13}
+                            strokeWidth={1.75}
+                          />
+                          <span className="flex-1">{tr("tabs.close")}</span>
+                        </ContextMenuItem>
                       </>
                     )}
                     <ContextMenuItem
