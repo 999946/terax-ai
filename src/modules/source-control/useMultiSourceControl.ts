@@ -77,20 +77,28 @@ export function useMultiSourceControl(
   const [focusedRoot, setFocusedRoot] = useState<string | null>(null);
   const focusedRootRef = useRef<string | null>(null);
   focusedRootRef.current = focusedRoot;
-  const requestIdRef = useRef(0);
-  const mountedRef = useRef(true);
+  // Repo-list discovery (Effect 1) and per-repo status loads (Effect 2) each
+  // get their own request/mount guards so one never cancels the other's
+  // in-flight IPC: Effect 2 re-runs on every repos change, and its request-id
+  // bump would otherwise discard Effect 1's just-issued gitListRepos result,
+  // leaving the panel stale until a manual refresh.
+  const listRequestIdRef = useRef(0);
+  const listMountedRef = useRef(true);
+  const statusRequestIdRef = useRef(0);
+  const statusMountedRef = useRef(true);
 
   useEffect(() => {
-    mountedRef.current = true;
-    const requestId = ++requestIdRef.current;
+    listMountedRef.current = true;
+    const requestId = ++listRequestIdRef.current;
     setRepos([]);
     setData({});
     setFocusedRoot(null);
+    focusedRootRef.current = null;
     setLoading(false);
     setError(null);
     if (!enabled || !contextPath) {
       return () => {
-        mountedRef.current = false;
+        listMountedRef.current = false;
       };
     }
 
@@ -99,30 +107,32 @@ export function useMultiSourceControl(
     void (async () => {
       try {
         const found = await native.gitListRepos(contextPath);
-        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        if (!listMountedRef.current || requestId !== listRequestIdRef.current)
+          return;
         setRepos(found);
         if (!focusedRootRef.current && found.length > 0) {
           setFocusedRoot(found[0].repoRoot);
         }
         setLoading(false);
       } catch (e) {
-        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        if (!listMountedRef.current || requestId !== listRequestIdRef.current)
+          return;
         setLoading(false);
         setError(normalizeError(e));
       }
     })();
 
-    const requestIds = requestIdRef;
+    const requestIds = listRequestIdRef;
     return () => {
-      mountedRef.current = false;
+      listMountedRef.current = false;
       requestIds.current++;
     };
   }, [enabled, contextPath]);
 
   // Load status for each repo (keyed by repoRoot). Runs when repos change.
   useEffect(() => {
-    const requestId = ++requestIdRef.current;
-    mountedRef.current = true;
+    statusMountedRef.current = true;
+    const requestId = ++statusRequestIdRef.current;
     const roots = repos.map((r) => r.repoRoot);
     setData((prev) => {
       const next: Record<string, RepoData> = {};
@@ -141,10 +151,15 @@ export function useMultiSourceControl(
     });
     void (async () => {
       for (const root of roots) {
-        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        if (!statusMountedRef.current || requestId !== statusRequestIdRef.current)
+          return;
         try {
           const status = await native.gitStatus(root);
-          if (!mountedRef.current || requestId !== requestIdRef.current) return;
+          if (
+            !statusMountedRef.current ||
+            requestId !== statusRequestIdRef.current
+          )
+            return;
           setData((prev) => ({
             ...prev,
             [root]: prev[root]
@@ -157,7 +172,11 @@ export function useMultiSourceControl(
                 },
           }));
         } catch (e) {
-          if (!mountedRef.current || requestId !== requestIdRef.current) return;
+          if (
+            !statusMountedRef.current ||
+            requestId !== statusRequestIdRef.current
+          )
+            return;
           setData((prev) => ({
             ...prev,
             [root]: prev[root]
@@ -172,9 +191,10 @@ export function useMultiSourceControl(
         }
       }
     })();
-    const requestIds = requestIdRef;
+
+    const requestIds = statusRequestIdRef;
     return () => {
-      mountedRef.current = false;
+      statusMountedRef.current = false;
       requestIds.current++;
     };
   }, [repos]);
