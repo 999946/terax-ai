@@ -2,10 +2,20 @@ use super::{entry_path, Plugin};
 use serde_json::{json, Value};
 use std::{
     fs,
-    io::{BufRead, BufReader, Write},
-    process::{Command, Stdio},
-    sync::OnceLock,
+    io::{Read, Write},
+    process::{Child, Command, Stdio},
+    sync::{Arc, Mutex, OnceLock},
+    thread,
+    time::{Duration, Instant},
 };
+
+/// Upper bound on how long a plugin's Node process may run per event. Guards
+/// the global `Mutex<PluginRuntime>` (held across dispatch) against a hung
+/// plugin freezing every subsequent event.
+const PLUGIN_DISPATCH_TIMEOUT: Duration = Duration::from_secs(5);
+/// Keep only the tail of a plugin's stderr so a noisy plugin can't balloon
+/// memory in the buffered reader.
+const STDERR_TAIL_LINES: usize = 12;
 
 pub fn minimal_script() -> &'static str {
     include_str!("../../../../scripts/plugin/index.mjs")
@@ -118,24 +128,143 @@ for await (const line of input) {
         .arg(entry_path(&plugin.id))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| e.to_string())?;
     let mut stdin = child.stdin.take().ok_or("plugin stdin unavailable")?;
-    writeln!(stdin, "{}", json!({ "id": 1, "event": event }))
-        .map_err(|e| e.to_string())?;
+    writeln!(stdin, "{}", json!({ "id": 1, "event": event })).map_err(|e| e.to_string())?;
     drop(stdin);
-    let stdout = child.stdout.take().ok_or("plugin stdout unavailable")?;
-    let mut line = String::new();
-    BufReader::new(stdout)
-        .read_line(&mut line)
-        .map_err(|e| e.to_string())?;
-    let _ = child.kill();
-    let response: Value = serde_json::from_str(&line).map_err(|e| e.to_string())?;
+
+    // Drain stdout + stderr on reader threads so a plugin that writes a lot
+    // (or errors hard) can't deadlock on a full pipe, then wait with a timeout.
+    let (stdout, stderr, timed_out) = run_plugin(&mut child)?;
+    if timed_out {
+        return Err("plugin timed out (no response within 5s)".into());
+    }
+
+    let mut line = stdout.lines().next().unwrap_or("").trim().to_string();
+    let response: Value = match serde_json::from_str(&line) {
+        Ok(v) => v,
+        Err(_) => {
+            // The first line wasn't JSON; fall back to the whole stdout so a
+            // plugin that emits nothing parseable still surfaces its stderr.
+            line = stdout.trim().to_string();
+            match serde_json::from_str(&line) {
+                Ok(v) => v,
+                Err(parse_err) => {
+                    return Err(format!(
+                        "plugin produced no parseable output: {parse_err}{}",
+                        stderr_tail(&stderr)
+                    ));
+                }
+            }
+        }
+    };
     if let Some(error) = response.get("error").and_then(Value::as_str) {
-        return Err(error.to_string());
+        let detail = stderr_tail(&stderr);
+        if detail.is_empty() {
+            return Err(error.to_string());
+        }
+        return Err(format!("{error}{detail}"));
     }
     Ok(response.get("result").cloned().unwrap_or(Value::Null))
+}
+
+/// Spawn reader threads for the child's stdout/stderr, wait (with timeout) for
+/// it to exit, then join the readers and return the captured streams plus
+/// whether the child had to be killed for exceeding the timeout.
+fn run_plugin(child: &mut Child) -> Result<(String, String, bool), String> {
+    let out_buf = Arc::new(Mutex::new(String::new()));
+    let err_buf = Arc::new(Mutex::new(String::new()));
+    let mut handles: Vec<thread::JoinHandle<()>> = Vec::new();
+
+    if let Some(mut stdout) = child.stdout.take() {
+        let out = out_buf.clone();
+        if let Ok(handle) = thread::Builder::new()
+            .name("terax-plugin-stdout".into())
+            .spawn(move || {
+                let mut buf = [0u8; 4096];
+                while let Ok(n) = stdout.read(&mut buf) {
+                    if n == 0 {
+                        break;
+                    }
+                    if let Ok(mut s) = out.lock() {
+                        s.push_str(&String::from_utf8_lossy(&buf[..n]));
+                    }
+                }
+            })
+        {
+            handles.push(handle);
+        }
+    }
+    if let Some(mut stderr) = child.stderr.take() {
+        let err = err_buf.clone();
+        if let Ok(handle) = thread::Builder::new()
+            .name("terax-plugin-stderr".into())
+            .spawn(move || {
+                let mut buf = [0u8; 4096];
+                while let Ok(n) = stderr.read(&mut buf) {
+                    if n == 0 {
+                        break;
+                    }
+                    if let Ok(mut s) = err.lock() {
+                        s.push_str(&String::from_utf8_lossy(&buf[..n]));
+                    }
+                }
+            })
+        {
+            handles.push(handle);
+        }
+    }
+
+    // Wait with a timeout; on expiry kill the child so its pipes close and the
+    // reader threads hit EOF and finish. The read loops run on separate
+    // threads, so a chatty plugin can't deadlock this wait.
+    let deadline = Instant::now() + PLUGIN_DISPATCH_TIMEOUT;
+    let mut timed_out = false;
+    loop {
+        match child.try_wait().map_err(|e| e.to_string())? {
+            Some(_) => break,
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                timed_out = true;
+                // Brief reap loop so the killed child doesn't linger as a zombie.
+                for _ in 0..50 {
+                    if child.try_wait().map_err(|e| e.to_string())?.is_some() {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(5));
+                }
+                break;
+            }
+            None => thread::sleep(Duration::from_millis(20)),
+        }
+    }
+    for handle in handles {
+        let _ = handle.join();
+    }
+
+    let stdout = out_buf.lock().map_err(|e| e.to_string())?.clone();
+    let stderr = err_buf.lock().map_err(|e| e.to_string())?.clone();
+    Ok((stdout, stderr, timed_out))
+}
+
+/// Format the trailing lines of a plugin's stderr so it reads well when
+/// appended to a dispatch error.
+fn stderr_tail(stderr: &str) -> String {
+    if stderr.trim().is_empty() {
+        return String::new();
+    }
+    let mut lines: Vec<&str> = stderr.lines().collect();
+    if lines.len() > STDERR_TAIL_LINES {
+        lines = lines[lines.len() - STDERR_TAIL_LINES..].to_vec();
+    }
+    format!(
+        "\n--- plugin stderr (last {} line{}) ---\n{}",
+        lines.len(),
+        if lines.len() == 1 { "" } else { "s" },
+        lines.join("\n")
+    )
 }
 
 pub struct PluginRuntime {

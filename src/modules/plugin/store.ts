@@ -6,6 +6,8 @@ import type { PluginEvent, SpaceInfo } from "./events";
 type PluginStore = {
   snapshot: PluginSnapshot;
   spaceInfo: Record<string, SpaceInfo>;
+  /** Last dispatch error per plugin id, so failures are visible instead of silent. */
+  lastErrorByPlugin: Record<string, string>;
   results: PluginDispatchResult[];
   load: () => Promise<void>;
   register: (plugin: Plugin) => Promise<void>;
@@ -27,6 +29,7 @@ let loadPromise: Promise<void> | null = null;
 export const usePluginStore = create<PluginStore>((set) => ({
   snapshot: emptySnapshot,
   spaceInfo: {},
+  lastErrorByPlugin: {},
   results: [],
   load: async () => {
     if (loadPromise) return loadPromise;
@@ -40,10 +43,12 @@ export const usePluginStore = create<PluginStore>((set) => ({
   setEnabled: async (id, enabled) => {
     await pluginBridge.setPluginEnabled(id, enabled);
     set((state) => ({
-      snapshot: normalize(state.snapshot.plugins.map((plugin) => ({
-        ...plugin,
-        enabled: plugin.id === id ? enabled : enabled ? false : plugin.enabled,
-      }))),
+      snapshot: normalize(
+        state.snapshot.plugins.map((plugin) => ({
+          ...plugin,
+          enabled: plugin.id === id ? enabled : plugin.enabled,
+        })),
+      ),
     }));
   },
   delete: async (id) => {
@@ -56,14 +61,17 @@ export const usePluginStore = create<PluginStore>((set) => ({
     const results = await pluginBridge.dispatchEvent(event);
     set((state) => {
       const spaceInfo = { ...state.spaceInfo };
+      const lastErrorByPlugin = { ...state.lastErrorByPlugin };
       for (const item of results) {
         if (item.result?.type === "space.info.updated") {
           spaceInfo[item.result.spaceId] = item.result.info;
         } else if (item.result?.type === "spaces.info.updated") {
           Object.assign(spaceInfo, item.result.spaces);
         }
+        if (item.error) lastErrorByPlugin[item.pluginId] = item.error;
+        else delete lastErrorByPlugin[item.pluginId];
       }
-      return { results, spaceInfo };
+      return { results, spaceInfo, lastErrorByPlugin };
     });
     return results;
   },

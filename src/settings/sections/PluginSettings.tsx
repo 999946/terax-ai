@@ -11,7 +11,14 @@ type Pending = { action: "edit"; plugin: Plugin } | { action: "add" };
 
 export function PluginSettings() {
   const { t } = useTranslation();
-  const { snapshot: s, load, register, setEnabled, delete: remove } = usePluginStore();
+  const {
+    snapshot: s,
+    load,
+    register,
+    setEnabled,
+    delete: remove,
+    lastErrorByPlugin,
+  } = usePluginStore();
   const [edit, setEdit] = useState<Plugin | null>(null);
   const [original, setOriginal] = useState<Plugin | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -94,6 +101,12 @@ export function PluginSettings() {
                 onCheckedChange={(v) => void setEnabled(p.id, v)}
               />
             </div>
+
+            {lastErrorByPlugin[p.id] && (
+              <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded border border-red-500/30 bg-red-500/5 p-2 text-[11px] leading-relaxed text-red-600">
+                {lastErrorByPlugin[p.id]}
+              </pre>
+            )}
 
             {edit?.id === p.id && (
               <div className="mt-3 grid gap-2">

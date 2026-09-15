@@ -41,6 +41,11 @@ export function usePluginLifecycle({
 }): void {
   const lastActiveSpaceId = useRef<string | null>(null);
   const loadedOnce = useRef(false);
+  // Tracks the set of root-backed spaces so a later add/remove re-fires
+  // spaces.loaded (the built-in plugin only handles that + space.activated).
+  // Initialized on the first hydrated render so it never duplicates the
+  // one-shot `spaces.loaded` below.
+  const seenSpaceIds = useRef<string | null>(null);
   // Mirror plugin-produced SpaceInfo into the spaces store on any plugin-store
   // change. Live subscription avoids effect loops from `spaces` in deps.
   useEffect(() => {
@@ -73,6 +78,29 @@ export function usePluginLifecycle({
   useEffect(() => {
     if (!spacesHydrated || loadedOnce.current) return;
     loadedOnce.current = true;
+    void usePluginStore
+      .getState()
+      .dispatchEvent(
+        makeEvent("spaces.loaded", { spaces: spaces.filter((s) => s.root) }),
+      );
+  }, [spacesHydrated, spaces]);
+
+  // Re-fire `spaces.loaded` when the set of root-backed spaces changes after
+  // boot, so a space created or removed mid-session picks up plugin output
+  // without requiring an app restart.
+  useEffect(() => {
+    if (!spacesHydrated) return;
+    const ids = spaces
+      .filter((s) => s.root)
+      .map((s) => s.id)
+      .sort()
+      .join(",");
+    if (seenSpaceIds.current === null) {
+      seenSpaceIds.current = ids;
+      return;
+    }
+    if (seenSpaceIds.current === ids) return;
+    seenSpaceIds.current = ids;
     void usePluginStore
       .getState()
       .dispatchEvent(
