@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { InlineRename } from "./components/InlineRename";
 import type { SpaceMeta } from "./lib/store";
 import { useSpaces } from "./lib/useSpaces";
+import { usePluginStore } from "@/modules/plugin";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SpaceAvatar } from "./SpaceAvatar";
 
@@ -71,6 +72,16 @@ export function SpaceSwitcherContent({
   const { t } = useTranslation();
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
+  // Subscribe to the plugin store's spaceInfo so subtitles reflect the plugin's
+  // result on every render, including after reconcile/create rebuild the spaces
+  // array with fresh (info-less) objects — deriving here means info is never
+  // dropped by a wholesale array replace.
+  const spaceInfo = usePluginStore((s) => s.spaceInfo);
+  const spacesWithInfo = useMemo(
+    () =>
+      spaces.map((s) => (spaceInfo[s.id] ? { ...s, info: spaceInfo[s.id] } : s)),
+    [spaces, spaceInfo],
+  );
   const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() =>
@@ -198,7 +209,7 @@ export function SpaceSwitcherContent({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1">
-        {spaces.map((sp) => (
+        {spacesWithInfo.map((sp) => (
           <SpaceRow
             key={sp.id}
             space={sp}

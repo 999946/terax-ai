@@ -79,14 +79,29 @@ export const usePluginStore = create<PluginStore>((set) => ({
     set((state) => {
       const spaceInfo = { ...state.spaceInfo };
       const lastErrorByPlugin = { ...state.lastErrorByPlugin };
+      let producedInfo = false;
+      let producedError = false;
       for (const item of results) {
         if (item.result?.type === "space.info.updated") {
           spaceInfo[item.result.spaceId] = item.result.info;
+          producedInfo = true;
         } else if (item.result?.type === "spaces.info.updated") {
           Object.assign(spaceInfo, item.result.spaces);
+          producedInfo = true;
         }
-        if (item.error) lastErrorByPlugin[item.pluginId] = item.error;
-        else delete lastErrorByPlugin[item.pluginId];
+        if (item.error) {
+          lastErrorByPlugin[item.pluginId] = item.error;
+          producedError = true;
+        } else {
+          delete lastErrorByPlugin[item.pluginId];
+        }
+      }
+      if (results.length > 0 && !producedInfo && !producedError) {
+        console.warn(
+          "[plugin] dispatch produced no space-info and no error",
+          event?.type,
+          results,
+        );
       }
       return { results, spaceInfo, lastErrorByPlugin };
     });
