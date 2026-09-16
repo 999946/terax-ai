@@ -115,9 +115,9 @@ for await (const line of input) {
     const result = typeof handler === 'function'
       ? await handler(request.event.payload)
       : { type: 'handled' };
-    process.stdout.write(JSON.stringify({ id: request.id, result }) + '\\n');
+    process.stdout.write(JSON.stringify({ id: request.id, result }) + '\n');
   } catch (error) {
-    process.stdout.write(JSON.stringify({ id: request.id, error: String(error?.message ?? error) }) + '\\n');
+    process.stdout.write(JSON.stringify({ id: request.id, error: String(error?.message ?? error) }) + '\n');
   }
 }
 "#;
@@ -155,7 +155,8 @@ for await (const line of input) {
                     // Include a preview of the raw stdout (truncated), with each
                     // char escaped so invisible bytes (BOM, CR, extra newlines,
                     // leading/trailing whitespace) are visible instead of just
-                    // "one line of JSON".
+                    // "one line of JSON". Also log byte/line breakdown so we can
+                    // tell whether trailing bytes really exist vs a logic bug.
                     let esc: String = stdout
                         .chars()
                         .take(1000)
@@ -168,8 +169,26 @@ for await (const line of input) {
                             c => c.to_string(),
                         })
                         .collect();
+                    let breakdown: String = stdout
+                        .lines()
+                        .enumerate()
+                        .map(|(i, l)| format!("  line{i} len={}", l.len()))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let hex_tail: String = stdout
+                        .bytes()
+                        .rev()
+                        .take(8)
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<Vec<_>>()
+                        .join(" ");
                     return Err(format!(
-                        "plugin produced no parseable output: {parse_err}\n--- raw stdout (first 1000 chars, escaped) ---\n{esc}{}",
+                        "plugin produced no parseable output: {parse_err}\nstdout len={} bytes, {} lines (hex tail: {hex_tail}):\n{breakdown}\n--- raw stdout (first 1000 chars, escaped) ---\n{esc}{}",
+                        stdout.len(),
+                        stdout.lines().count(),
                         stderr_tail(&stderr)
                     ));
                 }
