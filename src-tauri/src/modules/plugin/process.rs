@@ -152,8 +152,12 @@ for await (const line of input) {
             match serde_json::from_str(&line) {
                 Ok(v) => v,
                 Err(parse_err) => {
+                    // Include a preview of the raw stdout (truncated) so the
+                    // exact trailing characters are visible in logs when a
+                    // plugin's output ends up with extra content after the JSON.
+                    let stdout_preview: String = stdout.chars().take(1000).collect();
                     return Err(format!(
-                        "plugin produced no parseable output: {parse_err}{}",
+                        "plugin produced no parseable output: {parse_err}\n--- raw stdout (first 1000 chars) ---\n{stdout_preview}{}",
                         stderr_tail(&stderr)
                     ));
                 }

@@ -199,6 +199,14 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
+                // Per-version log file so each release gets a fresh log and old
+                // versions' records never pollute the current one while debugging.
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some(concat!("terax-", env!("CARGO_PKG_VERSION")).into()),
+                    }),
+                ])
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
