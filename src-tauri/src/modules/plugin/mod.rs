@@ -93,7 +93,17 @@ pub fn plugin_dispatch_event(
     event: PluginEvent,
 ) -> Result<Vec<PluginDispatchResult>, String> {
     let runtime = state.0.lock().map_err(|e| e.to_string())?;
-    runtime
+    let enabled: Vec<String> = runtime
+        .plugins
+        .iter()
+        .filter(|p| p.enabled)
+        .map(|p| p.id.clone())
+        .collect();
+    log::info!(
+        "[plugin] dispatch event={} enabled={enabled:?}",
+        event.event_type
+    );
+    let results: Result<Vec<PluginDispatchResult>, String> = runtime
         .plugins
         .iter()
         .filter(|plugin| plugin.enabled)
@@ -114,7 +124,16 @@ pub fn plugin_dispatch_event(
                 }),
             }
         })
-        .collect()
+        .collect();
+    let results = results?;
+    for r in &results {
+        match (&r.result, &r.error) {
+            (Some(v), _) => log::info!("[plugin] {} -> {v}", r.plugin_id),
+            (_, Some(e)) => log::warn!("[plugin] {} -> error: {e}", r.plugin_id),
+            _ => log::warn!("[plugin] {} -> no result", r.plugin_id),
+        }
+    }
+    Ok(results)
 }
 
 #[tauri::command]

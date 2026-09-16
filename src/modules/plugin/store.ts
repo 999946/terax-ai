@@ -58,7 +58,24 @@ export const usePluginStore = create<PluginStore>((set) => ({
   entryRead: pluginBridge.entryRead,
   entryWrite: pluginBridge.entryWrite,
   dispatchEvent: async (event) => {
-    const results = await pluginBridge.dispatchEvent(event);
+    let results: PluginDispatchResult[];
+    try {
+      results = await pluginBridge.dispatchEvent(event);
+    } catch (error) {
+      // IPC-level failure (unregistered command, ACL denial, panic in the
+      // command) rejects here and used to swallow silently: no spaceInfo
+      // update and no visible error. Surface it so something renders.
+      console.error("[plugin] dispatchEvent failed", event?.type, error);
+      set((state) => {
+        const message = `dispatch failed: ${String(error)}`;
+        const lastErrorByPlugin = { ...state.lastErrorByPlugin };
+        for (const plugin of state.snapshot.plugins) {
+          if (plugin.enabled) lastErrorByPlugin[plugin.id] = message;
+        }
+        return { lastErrorByPlugin };
+      });
+      return [];
+    }
     set((state) => {
       const spaceInfo = { ...state.spaceInfo };
       const lastErrorByPlugin = { ...state.lastErrorByPlugin };
