@@ -152,12 +152,24 @@ for await (const line of input) {
             match serde_json::from_str(&line) {
                 Ok(v) => v,
                 Err(parse_err) => {
-                    // Include a preview of the raw stdout (truncated) so the
-                    // exact trailing characters are visible in logs when a
-                    // plugin's output ends up with extra content after the JSON.
-                    let stdout_preview: String = stdout.chars().take(1000).collect();
+                    // Include a preview of the raw stdout (truncated), with each
+                    // char escaped so invisible bytes (BOM, CR, extra newlines,
+                    // leading/trailing whitespace) are visible instead of just
+                    // "one line of JSON".
+                    let esc: String = stdout
+                        .chars()
+                        .take(1000)
+                        .map(|c| match c {
+                            '\n' => "\\n".into(),
+                            '\r' => "\\r".into(),
+                            '\t' => "\\t".into(),
+                            ' ' => "·".into(),
+                            c if c.is_control() => format!("\\u{:04x}", c as u32),
+                            c => c.to_string(),
+                        })
+                        .collect();
                     return Err(format!(
-                        "plugin produced no parseable output: {parse_err}\n--- raw stdout (first 1000 chars) ---\n{stdout_preview}{}",
+                        "plugin produced no parseable output: {parse_err}\n--- raw stdout (first 1000 chars, escaped) ---\n{esc}{}",
                         stderr_tail(&stderr)
                     ));
                 }
