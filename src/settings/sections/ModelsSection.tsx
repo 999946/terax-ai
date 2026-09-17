@@ -1109,7 +1109,7 @@ function CustomEndpointCard({
         />
         <ProviderIcon provider="openai-compatible" size={15} />
         <span className="text-[12.5px] font-medium truncate">
-          {endpoint.name || "OpenAI Compatible"}
+          {endpoint.name || t("settings.models.openAiCompatible")}
         </span>
         {endpoint.modelId.trim() && (
           <span className="text-[10.5px] text-muted-foreground truncate font-mono">

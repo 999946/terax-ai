@@ -615,8 +615,8 @@ export function GeneralSection() {
           </div>
         </SettingRow>
         <SettingRow
-          title="Notification sound"
-          description="Play a sound with agent notifications and in-app alerts."
+          title={t("settings.general.notificationSound")}
+          description={t("settings.general.notificationSoundDescription")}
         >
           <Switch
             checked={agentNotificationSound}
