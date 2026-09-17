@@ -280,7 +280,7 @@ export function CommandPalette({
                   const rows = rankedCommands.filter((a) => a.group === group);
                   if (rows.length === 0) return null;
                   return (
-                    <CommandGroup key={group} heading={group}>
+                    <CommandGroup key={group} heading={t(`commandPalette.group.${group}`)}>
                       {rows.map((item) => (
                         <ActionItem
                           key={item.id}
@@ -418,6 +418,7 @@ function ActionItem({
   shortcutLabel: string | null;
   onRun: () => void;
 }) {
+  const { t } = useTranslation();
   const rightLabel = item.disabledReason ?? item.trailing ?? shortcutLabel;
   return (
     <CommandItem
@@ -434,7 +435,7 @@ function ActionItem({
           className="text-muted-foreground"
         />
       ) : null}
-      <span className="truncate">{item.title}</span>
+      <span className="truncate">{t(`commandPalette.cmd.${item.id}`)}</span>
       {rightLabel ? (
         <CommandShortcut
           className={item.disabledReason ? "normal-case tracking-normal" : ""}
