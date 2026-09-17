@@ -44,6 +44,16 @@ type DropTarget =
   | { kind: "tab"; tabId: number; edge: Edge }
   | { kind: "into-space"; spaceId: string };
 
+/** Status → text color for the plugin info's presence line. `unknown` (and any
+ *  unexpected value) falls back to muted gray. `emerald` matches the running
+ *  LSP dot in LspServersGroup; `destructive` is the app's red token. */
+const STATUS_COLOR: Record<string, string> = {
+  online: "text-emerald-500",
+  offline: "text-destructive",
+  degraded: "text-amber-500",
+  unknown: "text-muted-foreground",
+};
+
 function subtitleFor(tab: Tab): string | null {
   if (tab.kind === "terminal") {
     if (!tab.cwd) return null;
@@ -319,6 +329,7 @@ function SpaceRow({
 }: SpaceRowProps) {
   const { t } = useTranslation();
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
+  const info = space.info;
 
   return (
     <div className="relative">
@@ -375,9 +386,20 @@ function SpaceRow({
             <span className="min-w-0 truncate text-xs font-medium text-foreground">
               {space.name}
             </span>
-            {space.info?.summary ? (
-              <span className="min-w-0 truncate text-[10px] leading-tight text-muted-foreground">
-                {space.info.summary}
+            {info?.summary ? (
+              <span className="min-w-0 whitespace-pre-wrap break-words text-[10px] leading-tight text-muted-foreground">
+                {info.summary}
+              </span>
+            ) : null}
+            {info ? (
+              <span
+                className={cn(
+                  "min-w-0 truncate text-[10px] leading-tight",
+                  STATUS_COLOR[info.status] ?? "text-muted-foreground",
+                )}
+              >
+                {info.status}
+                {info.onlineAt ? ` ${info.onlineAt}` : null}
               </span>
             ) : null}
           </span>
