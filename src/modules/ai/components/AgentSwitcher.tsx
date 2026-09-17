@@ -20,6 +20,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useTranslation } from "react-i18next";
 import type { AgentIconId } from "../lib/agents";
 import { useAgentsStore } from "../store/agentsStore";
 
@@ -33,6 +34,7 @@ const ICONS: Record<AgentIconId, typeof CodeIcon> = {
 };
 
 export function AgentSwitcher({ isMiniWindow }: { isMiniWindow?: boolean }) {
+  const { t } = useTranslation();
   // Subscribe to customAgents + activeId so the trigger updates live.
   const customAgents = useAgentsStore((s) => s.customAgents);
   const activeId = useAgentsStore((s) => s.activeId);
@@ -57,7 +59,7 @@ export function AgentSwitcher({ isMiniWindow }: { isMiniWindow?: boolean }) {
               ? "flex h-6 items-center gap-1 rounded-md border border-border/60 bg-card px-1.5 text-[10.5px] text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground"
               : "text-xs mr-1",
           )}
-          title={`Agent: ${active.name}`}
+          title={t("ai.agentNamed", { name: active.name })}
         >
           <HugeiconsIcon icon={ActiveIcon} size={11} strokeWidth={1.75} />
           <span className="max-w-[7rem] truncate">{active.name}</span>
