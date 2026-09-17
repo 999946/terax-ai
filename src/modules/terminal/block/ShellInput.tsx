@@ -3,6 +3,7 @@ import { fmtShortcut, MOD_KEY } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/modules/theme";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   clearLeafBlockSelection,
   getLeafDraft,
@@ -39,6 +40,7 @@ export default function ShellInput({
   onInterrupt,
   getCwd,
 }: Props) {
+  const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<ShellEditorHandle | null>(null);
   const commandsRef = useRef<string[]>([]);
@@ -78,7 +80,9 @@ export default function ShellInput({
       fontFamily: fontRef.current.fontFamily,
       fontSize: fontRef.current.fontSize,
       fontWeight: fontRef.current.fontWeight,
-      placeholderText: `Run a command  -  ↑ history  ${fmtShortcut(MOD_KEY, "U")} switch to AI`,
+      placeholderText: t("terminal.shellPlaceholder", {
+        shortcut: fmtShortcut(MOD_KEY, "U"),
+      }),
       commandNames: () => commandsRef.current,
       getCwd: () => cbRef.current.getCwd(),
       onChange: (text) =>
@@ -102,7 +106,8 @@ export default function ShellInput({
       handle.destroy();
       handleRef.current = null;
     };
-  }, []);
+    // `t` is stable across renders, so this still runs only on mount.
+  }, [t]);
 
   // Retarget the single editor to the active leaf: register its focus callback
   // and swap drafts so each leaf keeps its own unsent command. New or switched
