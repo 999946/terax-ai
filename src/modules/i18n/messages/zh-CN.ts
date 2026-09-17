@@ -815,6 +815,8 @@ export const zhCN: Record<string, string> = {
   "commandPalette.searchFailed": "搜索失败",
   "commandPalette.searching": "搜索中……",
   "commandPalette.emptyHint": "未找到命令。输入 ? 查看搜索模式。",
+  "app.branchChip": "分支：{branch}",
+  "app.modeShell": "终端",
   "spaces.pinPanel": "固定空间面板",
   "spaces.unpinPanel": "取消固定空间面板",
 };

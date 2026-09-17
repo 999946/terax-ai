@@ -816,6 +816,8 @@ export const en: Record<string, string> = {
   "commandPalette.searchFailed": "Search failed",
   "commandPalette.searching": "Searching...",
   "commandPalette.emptyHint": "No commands found. Type ? to see search modes.",
+  "app.branchChip": "Branch: {branch}",
+  "app.modeShell": "Shell",
   "spaces.pinPanel": "Pin spaces open",
   "spaces.unpinPanel": "Unpin spaces",
 } as const;

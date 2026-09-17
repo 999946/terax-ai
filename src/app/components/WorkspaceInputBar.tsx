@@ -14,6 +14,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { OsIcon } from "./OsIcon";
 import { useGitBranch } from "./useGitBranch";
 import { useSystemInfo } from "./useSystemInfo";
@@ -50,6 +51,7 @@ export function WorkspaceInputBar({
   keysLoaded,
   onConnect,
 }: Props) {
+  const { t } = useTranslation();
   const c = useComposer();
   const { os, shell } = useSystemInfo();
 
@@ -111,7 +113,7 @@ export function WorkspaceInputBar({
         </Chip>
       )}
       {branch && (
-        <Chip tone="violet" icon={GitBranchIcon} title={`Branch: ${branch}`}>
+        <Chip tone="violet" icon={GitBranchIcon} title={t("app.branchChip", { branch })}>
           {branch}
         </Chip>
       )}
@@ -198,6 +200,7 @@ function ModeToggle({
   mode: "shell" | "ai";
   onChange: (next: "shell" | "ai") => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="relative grid shrink-0 grid-cols-2 rounded-md p-0.5 text-[10.5px] ring-1 ring-inset ring-border/35">
       <span
@@ -210,7 +213,7 @@ function ModeToggle({
       <SegButton
         active={mode === "shell"}
         icon={TerminalIcon}
-        label="Shell"
+        label={t("app.modeShell")}
         onClick={() => onChange("shell")}
       />
       <SegButton
