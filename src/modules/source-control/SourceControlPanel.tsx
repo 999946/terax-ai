@@ -76,6 +76,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { type SourceControlRepositoryTarget } from "./repositoryTarget";
 import {
   buildChangeTree,
@@ -162,8 +163,11 @@ function entryPathLabel(entry: SourceControlFileEntry): string {
   return dirname(entry.path);
 }
 
-function upstreamBadgeLabel(upstream: string | null | undefined): string {
-  if (!upstream) return "No upstream";
+function upstreamBadgeLabel(
+  upstream: string | null | undefined,
+  noUpstreamLabel: string,
+): string {
+  if (!upstream) return noUpstreamLabel;
   return upstream;
 }
 
@@ -207,6 +211,7 @@ function BranchDropdown({
   onNavigateToPath?: (path: string) => void;
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<GitBranchEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -305,7 +310,7 @@ function BranchDropdown({
         {displayRepoRoot ? (
           <>
             <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-              Repository
+              {t("sourceControl.repository")}
             </DropdownMenuLabel>
             <div
               className="truncate px-2 pb-1.5 text-[11px] text-muted-foreground"
@@ -321,7 +326,7 @@ function BranchDropdown({
                 }}
                 className="cursor-pointer text-[12px]"
               >
-                Follow Active Context
+                {t("sourceControl.followActiveContext")}
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
@@ -330,7 +335,7 @@ function BranchDropdown({
         {loading ? (
           <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
             <Spinner className="size-3" />
-            Loading branches…
+            {t("sourceControl.loadingBranches")}
           </div>
         ) : error ? (
           <div className="px-3 py-3 text-[11px] leading-snug text-destructive">
@@ -341,7 +346,7 @@ function BranchDropdown({
             {localBranches.length > 0 && (
               <>
                 <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-                  Local Branches
+                  {t("sourceControl.localBranches")}
                 </DropdownMenuLabel>
                 <DropdownMenuGroup>
                   {localBranches.map((b) => (
@@ -370,7 +375,7 @@ function BranchDropdown({
               <>
                 {localBranches.length > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-                  Worktrees
+                  {t("sourceControl.worktrees")}
                 </DropdownMenuLabel>
                 <DropdownMenuGroup>
                   {worktrees.map((b) => (
@@ -404,7 +409,7 @@ function BranchDropdown({
             )}
             {branches.length === 0 && (
               <div className="px-3 py-3 text-[11px] text-muted-foreground">
-                No branches found.
+                {t("sourceControl.noBranchesFound")}
               </div>
             )}
           </>
@@ -428,6 +433,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onFocusRepo,
   onRefresh: refreshRepositories,
 }: Props) {
+  const { t } = useTranslation();
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
   const refreshAnimationRef = useRef<number | null>(null);
   const [refreshAnimating, setRefreshAnimating] = useState(false);
@@ -451,9 +457,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const panelState = scm.panelState;
   const isRefreshing = panelState === "loading";
   const repoLabel = useMemo(() => {
-    if (!scm.status) return "Source Control";
-    return scm.status.isDetached ? "detached" : scm.status.branch;
-  }, [scm.status]);
+    if (!scm.status) return t("sourceControl.branchLabelFallback");
+    return scm.status.isDetached
+      ? t("sourceControl.detached")
+      : scm.status.branch;
+  }, [scm.status, t]);
 
   const commitShortcut = IS_MAC ? "⌘↩" : "Ctrl+Enter";
   const generateShortcut = IS_MAC ? "⌘G" : "Ctrl+G";
@@ -463,24 +471,29 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     !fixedTargetPending &&
     !scm.actionBusy;
   const commitDisabledReason = scm.actionBusy
-    ? "Wait for the current Git action to finish."
+    ? t("sourceControl.waitActionFinish")
     : scm.stagedEntries.length === 0
-      ? "Stage changes to enable commit."
+      ? t("sourceControl.stageToCommit")
       : scm.commitMessage.trim().length === 0
-        ? "Enter a commit message to enable commit."
+        ? t("sourceControl.enterMessageToCommit")
         : null;
   const commitHint = canCommit
-    ? `Commit with ${commitShortcut}.`
-    : (commitDisabledReason ?? `Commit with ${commitShortcut}.`);
-  const pushHint = scm.pushHint ?? "Push is unavailable right now.";
+    ? t("sourceControl.commitShortcutHint", { shortcut: commitShortcut })
+    : (commitDisabledReason ??
+       t("sourceControl.commitShortcutHint", { shortcut: commitShortcut }));
+  const pushHint =
+    scm.pushHint ?? t("sourceControl.pushUnavailable");
   const pushDisabledReason = fixedTargetPending
-    ? "Wait for the selected repository to finish loading."
+    ? t("sourceControl.waitRepoLoad")
     : scm.actionBusy
-      ? "Wait for the current Git action to finish."
+      ? t("sourceControl.waitActionFinish")
       : pushHint;
   const stagedCount = scm.stagedEntries.length;
   const changedCount = scm.fileEntries.length;
-  const pushStatusLabel = upstreamBadgeLabel(scm.status?.upstream);
+  const pushStatusLabel = upstreamBadgeLabel(
+    scm.status?.upstream,
+    t("sourceControl.noUpstream"),
+  );
   const hasUpstream = !!scm.status?.upstream;
   const isDiverged =
     !!scm.status && scm.status.ahead > 0 && scm.status.behind > 0;
@@ -779,13 +792,13 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             ) : null}
             {scm.status?.isDetached ? (
               <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                detached
+                {t("sourceControl.detached")}
               </span>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
             <IconActionButton
-              label={fetchBusy ? "Fetching…" : "Fetch from remote"}
+              label={fetchBusy ? t("sourceControl.fetching") : t("sourceControl.fetchFromRemote")}
               disabled={!canFetch}
               onClick={handleFetch}
               side="bottom"
@@ -803,14 +816,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
             <IconActionButton
               label={
                 pullBusy
-                  ? "Pulling…"
+                  ? t("sourceControl.pulling")
                   : isDiverged
-                    ? "Branch diverged — resolve in terminal"
+                    ? t("sourceControl.branchDiverged")
                     : !hasUpstream
-                      ? "No upstream configured"
+                      ? t("sourceControl.noUpstreamCfg")
                       : (scm.status?.behind ?? 0) === 0
-                        ? "Already up to date"
-                        : `Pull ${scm.status?.behind ?? 0} commits (fast-forward)`
+                        ? t("sourceControl.upToDate")
+                        : (scm.status?.behind ?? 0) === 1
+                          ? t("sourceControl.pullCommitOne", { count: scm.status?.behind })
+                          : t("sourceControl.pullCommitMany", { count: scm.status?.behind })
               }
               disabled={!canPull}
               onClick={handlePull}
@@ -827,7 +842,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               )}
             </IconActionButton>
             <IconActionButton
-              label="Refresh source control"
+              label={t("sourceControl.refreshSrcCtrl")}
               disabled={isRefreshing || !!scm.actionBusy}
               onClick={handleRefresh}
               side="bottom"
@@ -886,7 +901,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               strokeWidth={1.85}
               className="shrink-0"
             />
-            <span className="flex-1 text-[12px] font-medium">Commit Graph</span>
+            <span className="flex-1 text-[12px] font-medium">{t("sourceControl.commitGraph")}</span>
             <HugeiconsIcon
               icon={ArrowRight01Icon}
               size={12}
@@ -897,23 +912,23 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         ) : null}
 
         {panelState === "loading" ? (
-          <PanelCenter title="Loading repository" />
+          <PanelCenter title={t("sourceControl.loadingRepo")} />
         ) : null}
 
         {panelState === "no-repo" ? (
           <PanelCenter
-            title="No repository"
-            body="The active workspace is not inside a Git repository."
+            title={t("sourceControl.noRepository")}
+            body={t("sourceControl.noRepoBody")}
           />
         ) : null}
 
         {panelState === "error" ? (
           <PanelCenter
-            title="Source control error"
-            body={scm.statusError ?? "Unknown source control error"}
+            title={t("sourceControl.error")}
+            body={scm.statusError ?? t("sourceControl.unknownError")}
             action={
               <Button size="sm" onClick={() => void scm.refresh()}>
-                Retry
+                {t("common.retry")}
               </Button>
             }
           />
@@ -935,7 +950,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   value={scm.commitMessage}
                   onChange={(event) => scm.setCommitMessage(event.target.value)}
                   onKeyDown={handleCommitShortcut}
-                  placeholder="Commit message"
+                  placeholder={t("sourceControl.commitMessagePlaceholder")}
                   rows={3}
                   className={cn(
                     "min-h-[72px] border-border resize-none rounded-lg bg-transparent px-3 pb-7 pt-2.5 text-[12.5px] leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus:border-0",
@@ -943,10 +958,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <div className="pointer-events-none absolute inset-x-3 bottom-1.5 flex items-center justify-between p-1 gap-2 text-[10px] tabular-nums text-muted-foreground/55">
                   {scm.commitMessage.length > 0 ? (
-                    <span>Ch: {scm.commitMessage.length}</span>
+                    <span>{t("sourceControl.charCount", { count: scm.commitMessage.length })}</span>
                   ) : (
                     <span className="flex gap-2 items-center">
-                      {commitShortcut} <p>to commit</p>
+                      {commitShortcut} <p>{t("sourceControl.toCommit")}</p>
                     </span>
                   )}
                 </div>
@@ -1001,8 +1016,10 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <span className="truncate font-medium text-foreground/85">
                   {stagedCount === 0
-                    ? "Nothing staged"
-                    : `${stagedCount} ${stagedCount === 1 ? "file" : "files"} staged`}
+                    ? t("sourceControl.nothingStaged")
+                    : stagedCount === 1
+                      ? t("sourceControl.stagedFileOne", { count: stagedCount })
+                      : t("sourceControl.stagedFileMany", { count: stagedCount })}
                 </span>
                 <span className="ml-auto shrink-0 truncate text-muted-foreground/65">
                   {pushStatusLabel}
@@ -1018,7 +1035,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       disabled={!canCommit}
                       onClick={() => void scm.commit()}
                     >
-                      {scm.actionBusy === "commit" ? "Committing…" : "Commit"}
+                      {scm.actionBusy === "commit" ? t("sourceControl.committing") : t("sourceControl.commit")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -1042,7 +1059,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       }
                       onClick={() => void scm.push()}
                     >
-                      {scm.actionBusy === "push" ? "Pushing…" : "Push"}
+                      {scm.actionBusy === "push" ? t("sourceControl.pushing") : t("sourceControl.push")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -1067,7 +1084,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 ref={containerRef}
                 tabIndex={0}
                 role="listbox"
-                aria-label="Changed files"
+                aria-label={t("sourceControl.changedFilesAria")}
                 aria-activedescendant={
                   focusedRowKey ? `scm-row-${focusedRowKey}` : undefined
                 }
@@ -1134,21 +1151,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogTitle>{t("sourceControl.discardTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {scm.pendingDiscard?.scope === "all"
-                ? `This will discard ${scm.pendingDiscard.label} and cannot be undone.`
+                ? t("sourceControl.discardAllBody", { label: scm.pendingDiscard.label })
                 : scm.pendingDiscard
-                  ? `Discard changes in "${scm.pendingDiscard.label}"? This cannot be undone.`
+                  ? t("sourceControl.discardBody", { label: scm.pendingDiscard.label })
                   : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => scm.cancelPendingDiscard()}>
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={() => void scm.confirmPendingDiscard()}>
-              Discard
+              {t("sourceControl.discard")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1180,6 +1197,7 @@ function PanelCenter({
 }
 
 function CleanTreeHint({ repoLabel }: { repoLabel: string }) {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 px-4 text-center">
       <div className="flex size-8 items-center justify-center rounded-full border border-border/55 text-muted-foreground">
@@ -1190,10 +1208,10 @@ function CleanTreeHint({ repoLabel }: { repoLabel: string }) {
         />
       </div>
       <div className="text-[12px] font-medium text-foreground">
-        Working tree clean
+        {t("sourceControl.workingTreeClean")}
       </div>
       <div className="text-[10.5px] leading-snug text-muted-foreground">
-        on <span className="font-mono text-foreground/80">{repoLabel}</span>
+        {t("sourceControl.onBranch", { branch: repoLabel })}
       </div>
     </div>
   );
@@ -1230,6 +1248,7 @@ const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
 });
 
 function DivergedBanner() {
+  const { t } = useTranslation();
   return (
     <div className="mx-2 mt-1 flex h-7 items-center gap-1.5 rounded-md border border-border/60 bg-foreground/[0.04] px-2 text-[10.5px] leading-none text-muted-foreground">
       <HugeiconsIcon
@@ -1240,9 +1259,9 @@ function DivergedBanner() {
       />
       <span className="min-w-0 flex-1 truncate">
         <span className="font-medium text-foreground/85">
-          Diverged from upstream
+          {t("sourceControl.divergedFromUpstream")}
         </span>
-        <span className="ml-1 opacity-75">— resolve in terminal</span>
+        <span className="ml-1 opacity-75">{t("sourceControl.resolveInTerminal")}</span>
       </span>
     </div>
   );
@@ -1256,18 +1275,19 @@ function ListHeader({
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "list-header" }>;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex h-7 items-center gap-2 px-3">
       <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
-        Changes
+        {t("sourceControl.changes")}
       </span>
       <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-border/60 px-1 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
         {row.count}
       </span>
       <label className="ml-auto flex shrink-0 cursor-pointer select-none items-center gap-1.5 text-[10.5px] font-medium text-muted-foreground hover:text-foreground">
-        <span>All</span>
+        <span>{t("sourceControl.all")}</span>
         <Checkbox
-          aria-label="Stage all changes"
+          aria-label={t("sourceControl.stageAllAria")}
           checked={checkboxValue(headerCheckState)}
           disabled={actionBusy !== null}
           onCheckedChange={() => void onToggleAll()}
@@ -1330,6 +1350,7 @@ const EntryRow = memo(function EntryRow({
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "file" }>;
 }) {
+  const { t } = useTranslation();
   const entry = row.entry;
   const isSelected = selectedPath === entry.path;
   const fileName = basename(entry.path);
@@ -1346,7 +1367,9 @@ const EntryRow = memo(function EntryRow({
     ? joinPath(repoRoot.replace(/\\/g, "/"), entry.path.replace(/\\/g, "/"))
     : null;
   const isDeleted = entry.statusCode === "D";
-  const revealLabel = IS_MAC ? "Reveal in Finder" : "Reveal in File Manager";
+  const revealLabel = IS_MAC
+    ? t("sourceControl.revealInFinder")
+    : t("sourceControl.revealInFileManager");
 
   return (
     <ContextMenu>
@@ -1415,7 +1438,7 @@ const EntryRow = memo(function EntryRow({
           {showDiscard ? (
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">
               <IconActionButton
-                label={`Discard ${entry.path}`}
+                label={t("sourceControl.discardPath", { path: entry.path })}
                 disabled={disabled}
                 side="top"
                 onClick={() => onDiscardFile(entry)}
@@ -1438,7 +1461,7 @@ const EntryRow = memo(function EntryRow({
               <Spinner className="size-3" />
             ) : (
               <Checkbox
-                aria-label={`Stage ${entry.path}`}
+                aria-label={t("sourceControl.stagePathAria", { path: entry.path })}
                 checked={checkboxValue(entry.checkState)}
                 disabled={disabled}
                 onCheckedChange={() => void onToggleStageFile(entry)}
@@ -1458,14 +1481,14 @@ const EntryRow = memo(function EntryRow({
             void onSelectFile(entry);
           }}
         >
-          Open Diff
+          {t("sourceControl.openDiff")}
         </ContextMenuItem>
         {!isDeleted && onOpenFile && absolutePath ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
             onSelect={() => onOpenFile(absolutePath)}
           >
-            Open File
+            {t("sourceControl.openFile")}
           </ContextMenuItem>
         ) : null}
 
@@ -1477,7 +1500,9 @@ const EntryRow = memo(function EntryRow({
           disabled={disabled}
           onSelect={() => void onToggleStageFile(entry)}
         >
-          {entry.checkState === "checked" ? "Unstage" : "Stage"}
+          {entry.checkState === "checked"
+            ? t("sourceControl.unstage")
+            : t("sourceControl.stage")}
         </ContextMenuItem>
         {entry.unstaged ? (
           <ContextMenuItem
@@ -1486,7 +1511,7 @@ const EntryRow = memo(function EntryRow({
             disabled={disabled}
             onSelect={() => onDiscardFile(entry)}
           >
-            Discard Changes
+            {t("sourceControl.discardChanges")}
           </ContextMenuItem>
         ) : null}
 
@@ -1497,14 +1522,14 @@ const EntryRow = memo(function EntryRow({
           className={COMPACT_ITEM}
           onSelect={() => void copyToClipboard(entry.path.replace(/\\/g, "/"))}
         >
-          Copy Relative Path
+          {t("sourceControl.copyRelativePath")}
         </ContextMenuItem>
         {absolutePath ? (
           <ContextMenuItem
             className={COMPACT_ITEM}
             onSelect={() => void copyToClipboard(absolutePath)}
           >
-            Copy Absolute Path
+            {t("sourceControl.copyAbsolutePath")}
           </ContextMenuItem>
         ) : null}
 
