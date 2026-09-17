@@ -39,7 +39,7 @@ export function ChipsRow({
         <Chip
           key={`cmd-${cmd.name}`}
           icon={cmd.icon}
-          title={cmd.label}
+          title={t(`ai.slash.label.${cmd.name}`)}
           onRemove={() => onRemoveCommand(cmd.name)}
           removeLabel={t("ai.removeCommand")}
         >
