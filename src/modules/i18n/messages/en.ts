@@ -930,6 +930,8 @@ export const en: Record<string, string> = {
   "sourceControl.invalidAiMessage": "AI returned an invalid commit message. Try again or switch models.",
   "sourceControl.pushedTo": "Pushed to {upstream}",
   "sourceControl.pushCompleted": "Push completed",
+  "sourceControl.noRepoInFolder": "No Git repository contains this folder.",
+  "sourceControl.couldNotResolveRepo": "Could not resolve Git repository",
   "spaces.pinPanel": "Pin spaces open",
   "spaces.unpinPanel": "Unpin spaces",
 } as const;

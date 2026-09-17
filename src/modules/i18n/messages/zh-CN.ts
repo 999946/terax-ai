@@ -930,6 +930,8 @@ export const zhCN: Record<string, string> = {
   "sourceControl.invalidAiMessage": "AI 返回了无效的提交信息。请重试或切换模型。",
   "sourceControl.pushedTo": "已推送到 {upstream}",
   "sourceControl.pushCompleted": "推送完成",
+  "sourceControl.noRepoInFolder": "此文件夹中不包含任何 Git 仓库。",
+  "sourceControl.couldNotResolveRepo": "无法解析 Git 仓库",
   "spaces.pinPanel": "固定空间面板",
   "spaces.unpinPanel": "取消固定空间面板",
 };
