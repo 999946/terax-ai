@@ -776,6 +776,8 @@ export const en: Record<string, string> = {
   "agents.notif.kind.attention": "needs input",
   "agents.notif.kind.error": "failed",
   "agents.notif.kind.finished": "finished",
+  "agents.notif.attentionHeading": "{name} needs your input",
+  "agents.notif.finishedHeading": "{name} finished",
   "agents.status.waiting": "waiting",
   "agents.status.working": "working",
   "agents.toast.open": "Open",

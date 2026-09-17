@@ -773,6 +773,8 @@ export const zhCN: Record<string, string> = {
   "agents.notif.kind.attention": "需要输入",
   "agents.notif.kind.error": "失败",
   "agents.notif.kind.finished": "已完成",
+  "agents.notif.attentionHeading": "{name} 需要你的输入",
+  "agents.notif.finishedHeading": "{name} 已完成",
   "agents.notif.minutesAgo": "{count} 分钟前",
   "agents.notif.title": "代理通知",
   "agents.status.waiting": "等待中",
