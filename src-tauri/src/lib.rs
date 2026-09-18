@@ -329,6 +329,7 @@ pub fn run() {
             plugin::plugin_dispatch_event,
             plugin::plugin_entry_read,
             plugin::plugin_entry_write,
+            plugin::plugin_reset_builtin,
             get_launch_dir,
             get_launch_files,
             open_settings_window,

@@ -20,6 +20,7 @@ export const en: Record<string, string> = {
   "settings.plugin.saveAndSwitch": "Save and switch",
   "settings.plugin.discardChanges": "Discard changes",
   "settings.plugin.nameRequired": "Name is required",
+  "settings.plugin.resetToDefault": "Reset to default",
   "settings.general.title": "General",
   "settings.general.description": "Mode, terminal, and startup.",
   "settings.general.appearance": "Appearance",

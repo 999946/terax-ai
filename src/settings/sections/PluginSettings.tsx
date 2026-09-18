@@ -17,6 +17,7 @@ export function PluginSettings() {
     register,
     setEnabled,
     delete: remove,
+    resetBuiltin,
     lastErrorByPlugin,
   } = usePluginStore();
   const [edit, setEdit] = useState<Plugin | null>(null);
@@ -89,6 +90,19 @@ export function PluginSettings() {
               >
                 {t("settings.plugin.editPlugin")}
               </Button>
+              {p.id === "terax-builtin" && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => {
+                    setEdit(null);
+                    setOriginal(null);
+                    void resetBuiltin();
+                  }}
+                >
+                  {t("settings.plugin.resetToDefault")}
+                </Button>
+              )}
               <Button
                 size="xs"
                 variant="ghost"

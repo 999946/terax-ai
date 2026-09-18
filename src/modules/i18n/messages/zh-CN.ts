@@ -23,6 +23,7 @@ export const zhCN: Record<string, string> = {
   "settings.plugin.saveAndSwitch": "保存并切换",
   "settings.plugin.discardChanges": "放弃更改",
   "settings.plugin.nameRequired": "请输入名称",
+  "settings.plugin.resetToDefault": "恢复默认",
   "settings.general.title": "常规",
   "settings.general.description": "外观、终端和启动设置。",
   "settings.general.appearance": "外观",

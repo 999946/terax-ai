@@ -8,13 +8,25 @@ fn path() -> PathBuf {
         .join("plugins.json")
 }
 
-fn builtin() -> Plugin {
+pub(crate) fn builtin() -> Plugin {
     Plugin {
         id: "terax-builtin".into(),
         name: "space-info".into(),
         content: super::process::minimal_script().into(),
         schema_version: 1,
         enabled: true,
+    }
+}
+
+/// Seed the built-in plugin row if (and only if) it is absent. Once present,
+/// never overwrite it: user edits to the built-in plugin persist across
+/// restarts. Returns whether a seed was inserted.
+fn ensure_builtin(plugins: &mut Vec<Plugin>, b: &Plugin) -> bool {
+    if plugins.iter().any(|x| x.id == b.id) {
+        false
+    } else {
+        plugins.insert(0, b.clone());
+        true
     }
 }
 
@@ -26,15 +38,9 @@ pub fn load() -> Result<Vec<Plugin>, String> {
     } else {
         Vec::new()
     };
-    let b = builtin();
-    if let Some(existing) = plugins.iter_mut().find(|x| x.id == b.id) {
-        existing.name = b.name;
-        existing.content = b.content;
-        existing.schema_version = b.schema_version;
-    } else {
-        plugins.insert(0, b);
+    if ensure_builtin(&mut plugins, &builtin()) {
+        save(&plugins)?;
     }
-    save(&plugins)?;
     Ok(plugins)
 }
 
@@ -46,4 +52,39 @@ pub fn save(plugins: &[Plugin]) -> Result<(), String> {
         serde_json::to_vec_pretty(plugins).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_builtin_seeds_when_absent() {
+        let b = builtin();
+        let mut plugins = Vec::new();
+        assert!(ensure_builtin(&mut plugins, &b));
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].id, b.id);
+        assert_eq!(plugins[0].content, b.content);
+    }
+
+    #[test]
+    fn ensure_builtin_keeps_existing_row_untouched() {
+        let b = builtin();
+        // A row already exists, with a user-modified content (source differs).
+        let mut plugins = vec![Plugin {
+            id: b.id.clone(),
+            name: "renamed".into(),
+            content: "export default {};\n".into(),
+            schema_version: 1,
+            enabled: false,
+        }];
+        let snapshot = plugins[0].clone();
+        assert!(!ensure_builtin(&mut plugins, &b));
+        assert_eq!(plugins.len(), 1);
+        // User content, name, enabled are preserved, not re-seeded.
+        assert_eq!(plugins[0].content, snapshot.content);
+        assert_eq!(plugins[0].name, snapshot.name);
+        assert_eq!(plugins[0].enabled, snapshot.enabled);
+    }
 }

@@ -8,6 +8,7 @@ export const pluginBridge = {
   registerPlugin: (plugin: Plugin) => invoke<void>("plugin_register_plugin", { plugin }),
   setPluginEnabled: (id: string, enabled: boolean) => invoke<void>("plugin_set_plugin_enabled", { id, enabled }),
   deletePlugin: (id: string) => invoke<void>("plugin_delete_plugin", { id }),
+  resetBuiltin: () => invoke<void>("plugin_reset_builtin"),
   entryRead: (id: string) => invoke<string>("plugin_entry_read", { id }),
   entryWrite: (id: string, value: string) => invoke<void>("plugin_entry_write", { id, value }),
   dispatchEvent: (event: PluginEvent) =>

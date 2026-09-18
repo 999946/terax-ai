@@ -2,7 +2,7 @@ mod config;
 mod process;
 mod protocol;
 
-use config::{load, save};
+use config::{builtin, load, save};
 use process::PluginRuntime;
 use protocol::{PluginDispatchResult, PluginEvent};
 use serde::{Deserialize, Serialize};
@@ -68,6 +68,17 @@ pub fn plugin_delete_plugin(
 ) -> Result<(), String> {
     let mut runtime = state.0.lock().map_err(|e| e.to_string())?;
     runtime.plugins.retain(|item| item.id != id);
+    save(&runtime.plugins)
+}
+
+#[tauri::command]
+pub fn plugin_reset_builtin(state: tauri::State<'_, PluginState>) -> Result<(), String> {
+    let mut runtime = state.0.lock().map_err(|e| e.to_string())?;
+    // Replace the built-in row (wherever it sits) with the pristine source copy.
+    let b = builtin();
+    runtime.plugins.retain(|item| item.id != b.id);
+    runtime.plugins.insert(0, b.clone());
+    process::write_entry(&b)?;
     save(&runtime.plugins)
 }
 

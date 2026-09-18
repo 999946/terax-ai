@@ -13,6 +13,7 @@ type PluginStore = {
   register: (plugin: Plugin) => Promise<void>;
   setEnabled: (id: string, enabled: boolean) => Promise<void>;
   delete: (id: string) => Promise<void>;
+  resetBuiltin: () => Promise<void>;
   entryRead: (id: string) => Promise<string>;
   entryWrite: (id: string, value: string) => Promise<void>;
   dispatchEvent: (event: PluginEvent) => Promise<PluginDispatchResult[]>;
@@ -54,6 +55,10 @@ export const usePluginStore = create<PluginStore>((set) => ({
   delete: async (id) => {
     await pluginBridge.deletePlugin(id);
     set((state) => ({ snapshot: normalize(state.snapshot.plugins.filter((plugin) => plugin.id !== id)) }));
+  },
+  resetBuiltin: async () => {
+    await pluginBridge.resetBuiltin();
+    set({ snapshot: normalize(await pluginBridge.listPlugins()) });
   },
   entryRead: pluginBridge.entryRead,
   entryWrite: pluginBridge.entryWrite,
