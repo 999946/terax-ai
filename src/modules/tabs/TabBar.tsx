@@ -72,6 +72,8 @@ type Props = {
   onCloseTabsToRight: (id: number) => void;
   /** Chrome-style: close every tab except the given tab. */
   onCloseOtherTabs: (id: number) => void;
+  /** Close every tab in the given tab's space. */
+  onCloseAll: (id: number) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
   onPin: (id: number) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
@@ -96,6 +98,7 @@ export function TabBar({
   onClose,
   onCloseTabsToRight,
   onCloseOtherTabs,
+  onCloseAll,
   onPin,
   onRename,
   onReorder,
@@ -591,6 +594,32 @@ export function TabBar({
           onNewGitGraph={onNewGitGraph}
           onLaunchAgents={onLaunchAgents}
         />
+        <button
+          type="button"
+          role="button"
+          aria-label={tr("tabs.closeAllTabs")}
+          title={tr("tabs.closeAllTabs")}
+          data-no-drag
+          disabled={tabs.length === 0}
+          onClick={() => {
+            const anchor =
+              activeId >= 0 && tabs.some((t) => t.id === activeId)
+                ? activeId
+                : tabs[tabs.length - 1]?.id;
+            if (anchor !== undefined) onCloseAll(anchor);
+          }}
+          className={cn(
+            "rounded p-1 text-muted-foreground/60 transition-colors",
+            "hover:bg-accent hover:text-foreground",
+            "disabled:pointer-events-none disabled:opacity-40",
+          )}
+        >
+          <HugeiconsIcon
+            icon={CancelCircleIcon}
+            size={13}
+            strokeWidth={1.75}
+          />
+        </button>
       </div>
     </div>
   );

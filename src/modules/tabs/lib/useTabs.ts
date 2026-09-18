@@ -157,6 +157,9 @@ export type GitDiffOpenInput = {
 export type OpenFileTabOptions = {
   spaceId?: string;
   activate?: boolean;
+  /** When true (default), a preview open may reuse the shared preview slot,
+   *  evicting another preview. Set false to always open a new tab. */
+  reusePreview?: boolean;
 };
 
 export type CloseTabsPlan = {
@@ -208,6 +211,7 @@ export function planFileTabOpen(
   pin: boolean,
   spaceId: string,
   allocId: () => number,
+  reusePreview = true,
 ): { tabs: Tab[]; tabId: number } {
   if (pin) {
     const existing = tabs.find(
@@ -274,11 +278,15 @@ export function planFileTabOpen(
     dirty: false,
     preview: true,
   };
-  if (previewIndex === -1) return { tabs: [...tabs, tab], tabId };
-
-  const next = [...tabs];
-  next[previewIndex] = tab;
-  return { tabs: next, tabId };
+  // When a preview slot already exists and reuse is allowed, swap the new path
+  // into that slot (VSCode-style single-preview behavior). Otherwise append a
+  // fresh tab so a second file never evicts an open preview.
+  if (previewIndex !== -1 && reusePreview) {
+    const next = [...tabs];
+    next[previewIndex] = tab;
+    return { tabs: next, tabId };
+  }
+  return { tabs: [...tabs, tab], tabId };
 }
 
 function basename(path: string): string {
@@ -384,6 +392,25 @@ export function planCloseOtherTabs(
   return {
     closeIds,
     nextActiveId: closeIds.includes(activeId) ? anchorId : activeId,
+  };
+}
+
+/**
+ * Plans closing every tab in the anchor's space. The active id is left
+ * untouched (callers decide the empty-space sentinel -1 on apply).
+ */
+export function planCloseAllInSpace(
+  tabs: Tab[],
+  anchorId: number,
+  activeId: number,
+): CloseTabsPlan {
+  const anchor = tabs.find((t) => t.id === anchorId);
+  if (!anchor) return { closeIds: [], nextActiveId: activeId };
+  const spaceTabs = tabs.filter((t) => t.spaceId === anchor.spaceId);
+  if (spaceTabs.length === 0) return { closeIds: [], nextActiveId: activeId };
+  return {
+    closeIds: spaceTabs.map((t) => t.id),
+    nextActiveId: activeId,
   };
 }
 
@@ -849,6 +876,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         pin,
         targetSpaceId,
         () => nextIdRef.current++,
+        options.reusePreview,
       );
       tabsRef.current = plan.tabs;
       setTabs(plan.tabs);
@@ -1147,7 +1175,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
-  const closeTabs = useCallback(
+    const closeTabs = useCallback(
     (anchorId: number, plan: CloseTabsPlan): number[] => {
       const result = applyCloseTabsPlan(tabsRef.current, anchorId, plan);
       if (!result) return [];
@@ -1157,6 +1185,29 @@ export function useTabs(initial?: Partial<TerminalTab>) {
       setActiveId(result.nextActiveId);
       for (const leafId of result.disposeLeafIds) disposeSession(leafId);
       return result.closeIds;
+    },
+    [],
+  );
+
+  const closeAllInSpace = useCallback(
+    (spaceId: string): number[] => {
+      const closed: number[] = [];
+      const toDispose: number[] = [];
+      setTabs((curr) => {
+        const spaceTabs = curr.filter((t) => t.spaceId === spaceId);
+        if (spaceTabs.length === 0) return curr;
+        const closing = new Set(spaceTabs.map((t) => t.id));
+        closed.push(...spaceTabs.map((t) => t.id));
+        for (const t of spaceTabs) {
+          if (t.kind === "terminal") toDispose.push(...leafIds(t.paneTree));
+        }
+        const next = curr.filter((t) => !closing.has(t.id));
+        // -1 represents an empty active space when its last tab is closed.
+        setActiveId((active) => (closing.has(active) ? -1 : active));
+        return next;
+      });
+      for (const lid of toDispose) disposeSession(lid);
+      return closed;
     },
     [],
   );
@@ -1439,6 +1490,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     closeAiDiffTab,
     closeTab,
     closeTabs,
+    closeAllInSpace,
     updateTab,
     selectByIndex,
     setLeafCwd,

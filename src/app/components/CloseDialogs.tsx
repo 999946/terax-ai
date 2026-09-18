@@ -101,7 +101,9 @@ function closeManyMessage(pending: CloseManyPending, tabs: Tab[], t: (key: strin
   if (dirtyCount > 0) return t("close.manyDirty", { count: dirtyCount });
   return kind === "right"
     ? t("close.busyTabsRight", { count: busyCount })
-    : t("close.busyOtherTabs", { count: busyCount });
+    : kind === "all"
+      ? t("close.busyAllTabs", { count: busyCount })
+      : t("close.busyOtherTabs", { count: busyCount });
 }
 
 /** Confirmation dialogs for closing dirty editors and terminals with live processes. */
@@ -244,7 +246,9 @@ export function CloseDialogs({
             <AlertDialogTitle>
               {pendingCloseMany?.kind === "right"
                 ? t("close.tabsRight")
-                : t("close.otherTabs")}
+                : pendingCloseMany?.kind === "all"
+                  ? t("close.allTabs")
+                  : t("close.otherTabs")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingCloseMany ? closeManyMessage(pendingCloseMany, tabs, t) : ""}

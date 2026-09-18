@@ -161,6 +161,7 @@ export default function App() {
     openCommitFileDiffTab,
     closeTab,
     closeTabs,
+    closeAllInSpace,
     updateTab,
     selectByIndex,
     setLeafCwd,
@@ -426,6 +427,17 @@ export default function App() {
     [closeTabs],
   );
 
+  const disposeAllTabsInSpace = useCallback(
+    (spaceId: string) => {
+      const closedIds = closeAllInSpace(spaceId);
+      for (const id of closedIds) {
+        editorRefs.current.delete(id);
+        previewRefs.current.delete(id);
+      }
+    },
+    [closeAllInSpace],
+  );
+
   const {
     pendingCloseTab,
     pendingTerminalCloseTab,
@@ -435,6 +447,7 @@ export default function App() {
     handleClose,
     handleCloseTabsToRight,
     handleCloseOtherTabs,
+    handleCloseAll,
     confirmClose,
     cancelClose,
     confirmTerminalClose,
@@ -449,6 +462,7 @@ export default function App() {
     activeId,
     disposeTab,
     disposeTabs,
+    disposeAllTabsInSpace,
   });
 
   const { pendingAppClose, confirmAppClose, cancelAppClose } =
@@ -676,7 +690,7 @@ export default function App() {
       // it to the raw editor. Other files default to preview (pin=false);
       // explicit actions like context-menu "Open" pass pin=true to persist.
       if (isMarkdownPath(path)) newMarkdownTab(path);
-      else openFileTab(path, pin ?? false);
+      else openFileTab(path, pin ?? false, { reusePreview: false });
     },
     [openFileTab, newMarkdownTab],
   );
@@ -1439,6 +1453,7 @@ export default function App() {
               onClose={handleClose}
               onCloseTabsToRight={handleCloseTabsToRight}
               onCloseOtherTabs={handleCloseOtherTabs}
+              onCloseAll={handleCloseAll}
               onPin={pinTab}
               onRename={handleRenameTab}
               onReorder={reorderTabByGap}

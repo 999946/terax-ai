@@ -1,6 +1,6 @@
 import type { CloseTabsPlan } from "@/modules/tabs";
 
-export type CloseManyKind = "right" | "other";
+export type CloseManyKind = "right" | "other" | "all";
 
 export type CloseManyHazards = {
   dirtyIds: number[];
@@ -11,6 +11,8 @@ export type CloseManyPending = CloseManyHazards & {
   kind: CloseManyKind;
   anchorId: number;
   plan: CloseTabsPlan;
+  /** Space to close all tabs from when `kind === "all"`. */
+  spaceId?: string;
 };
 
 export function hasCloseManyHazards(hazards: CloseManyHazards): boolean {

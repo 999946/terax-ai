@@ -40,6 +40,8 @@ type Props = {
   onCloseTabsToRight: (id: number) => void;
   /** Chrome-style: close every tab except the given tab. */
   onCloseOtherTabs: (id: number) => void;
+  /** Close every tab in the given tab's space. */
+  onCloseAll: (id: number) => void;
   /** Promote a preview (transient) tab to persistent. */
   onPin: (id: number) => void;
   /** Set a terminal tab's custom label; empty string resets to default. */
@@ -72,6 +74,7 @@ export function Header({
   onClose,
   onCloseTabsToRight,
   onCloseOtherTabs,
+  onCloseAll,
   onPin,
   onRename,
   onReorder,
@@ -174,6 +177,7 @@ export function Header({
           onClose={onClose}
           onCloseTabsToRight={onCloseTabsToRight}
           onCloseOtherTabs={onCloseOtherTabs}
+          onCloseAll={onCloseAll}
           onPin={onPin}
           onRename={onRename}
           onReorder={onReorder}

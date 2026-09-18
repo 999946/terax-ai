@@ -12,6 +12,7 @@ export {
   nextActiveInSpace,
   planCloseTabsToRight,
   planCloseOtherTabs,
+  planCloseAllInSpace,
   type CloseTabsPlan,
   type Tab,
   type TerminalTab,

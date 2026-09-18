@@ -9,6 +9,7 @@ import {
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   type CloseTabsPlan,
+  planCloseAllInSpace,
   planCloseOtherTabs,
   planCloseTabsToRight,
   type Tab,
@@ -25,6 +26,7 @@ type Params = {
   activeId: number;
   disposeTab: (id: number) => void;
   disposeTabs: (anchorId: number, plan: CloseTabsPlan) => void;
+  disposeAllTabsInSpace: (spaceId: string) => void;
 };
 
 /**
@@ -37,6 +39,7 @@ export function useTabCloseGuards({
   activeId,
   disposeTab,
   disposeTabs,
+  disposeAllTabsInSpace,
 }: Params) {
   const tabsRef = useRef(tabs);
   const activeIdRef = useRef(activeId);
@@ -103,7 +106,9 @@ export function useTabCloseGuards({
     (kind: CloseManyKind, anchorId: number) =>
       kind === "right"
         ? planCloseTabsToRight(tabsRef.current, anchorId, activeIdRef.current)
-        : planCloseOtherTabs(tabsRef.current, anchorId, activeIdRef.current),
+        : kind === "other"
+          ? planCloseOtherTabs(tabsRef.current, anchorId, activeIdRef.current)
+          : planCloseAllInSpace(tabsRef.current, anchorId, activeIdRef.current),
     [],
   );
 
@@ -113,6 +118,18 @@ export function useTabCloseGuards({
       nextActiveId: activeIdRef.current,
     }),
     [],
+  );
+
+  const applyCloseMany = useCallback(
+    (kind: CloseManyKind, anchorId: number, plan: CloseTabsPlan) => {
+      if (kind === "all") {
+        const anchor = tabsRef.current.find((t) => t.id === anchorId);
+        if (anchor) disposeAllTabsInSpace(anchor.spaceId);
+        return;
+      }
+      disposeTabs(anchorId, withCurrentActive(plan));
+    },
+    [disposeAllTabsInSpace, disposeTabs, withCurrentActive],
   );
 
   const handleCloseMany = useCallback(
@@ -126,9 +143,9 @@ export function useTabCloseGuards({
         setPendingCloseMany({ kind, anchorId, plan, ...hazards });
         return;
       }
-      disposeTabs(anchorId, withCurrentActive(plan));
+      applyCloseMany(kind, anchorId, plan);
     },
-    [disposeTabs, evaluateCloseMany, planCloseMany, withCurrentActive],
+    [applyCloseMany, evaluateCloseMany, planCloseMany],
   );
 
   const handleCloseTabsToRight = useCallback(
@@ -145,6 +162,13 @@ export function useTabCloseGuards({
     [handleCloseMany],
   );
 
+  const handleCloseAll = useCallback(
+    (anchorId: number) => {
+      void handleCloseMany("all", anchorId);
+    },
+    [handleCloseMany],
+  );
+
   const confirmCloseMany = useCallback(async () => {
     if (pendingCloseMany === null) return;
     const requestId = ++closeManyRequestRef.current;
@@ -156,13 +180,14 @@ export function useTabCloseGuards({
       setCloseManyConfirming(false);
       return;
     }
-    disposeTabs(
+    applyCloseMany(
+      pendingCloseMany.kind,
       pendingCloseMany.anchorId,
-      withCurrentActive(pendingCloseMany.plan),
+      pendingCloseMany.plan,
     );
     setPendingCloseMany(null);
     setCloseManyConfirming(false);
-  }, [pendingCloseMany, disposeTabs, evaluateCloseMany, withCurrentActive]);
+  }, [pendingCloseMany, applyCloseMany, evaluateCloseMany]);
 
   const cancelCloseMany = useCallback(() => {
     closeManyRequestRef.current += 1;
@@ -227,6 +252,7 @@ export function useTabCloseGuards({
     handleClose,
     handleCloseTabsToRight,
     handleCloseOtherTabs,
+    handleCloseAll,
     confirmClose,
     cancelClose,
     confirmTerminalClose,
