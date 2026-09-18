@@ -394,7 +394,7 @@ function SpaceRow({
             {info ? (
               <span
                 className={cn(
-                  "min-w-0 truncate text-[10px] leading-tight",
+                  "mt-0.5 min-w-0 truncate text-[10px] leading-tight",
                   STATUS_COLOR[info.status] ?? "text-muted-foreground",
                 )}
               >
