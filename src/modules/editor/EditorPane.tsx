@@ -18,6 +18,13 @@ import { EditorView, keymap } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import {
   forwardRef,
@@ -301,6 +308,59 @@ export const EditorPane = memo(
       pendingFocusRef.current = null;
       if (pendingPath === path) focusWhenRendered(view, pendingPath);
     }, [focusWhenRendered, path]);
+
+    const hasSelection = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (!view) return false;
+      const s = view.state.selection.main;
+      return s.from !== s.to;
+    }, []);
+
+    const copySelection = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      const s = view.state.selection.main;
+      const text = view.state.sliceDoc(s.from, s.to);
+      void navigator.clipboard.writeText(text);
+    }, []);
+
+    const cutSelection = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      const s = view.state.selection.main;
+      const text = view.state.sliceDoc(s.from, s.to);
+      void navigator.clipboard.writeText(text);
+      view.dispatch({ changes: { from: s.from, to: s.to, insert: "" } });
+    }, []);
+
+    const pasteAtCursor = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      void navigator.clipboard
+        .readText()
+        .then((text) => {
+          view.dispatch(view.state.replaceSelection(text));
+        })
+        .catch(() => undefined);
+    }, []);
+
+    const selectAllContent = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        selection: { anchor: 0, head: view.state.doc.length },
+      });
+    }, []);
+
+    const undoEdit = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (view) undo(view);
+    }, []);
+
+    const redoEdit = useCallback(() => {
+      const view = cmRef.current?.view;
+      if (view) redo(view);
+    }, []);
 
     useEffect(() => {
       if (doc.status !== "ready") return;
@@ -653,28 +713,77 @@ export const EditorPane = memo(
     }
 
     return (
-      <div className="flex h-full min-h-0 flex-col zoom-exempt">
-        <CodeMirror
-          ref={cmRef}
-          value={doc.content}
-          onChange={onChange}
-          theme={themeExt}
-          extensions={extensions}
-          height="100%"
-          className="terax-code-editor flex-1 min-h-0 overflow-hidden"
-          basicSetup={{
-            lineNumbers: true,
-            highlightActiveLineGutter: true,
-            foldGutter: true,
-            bracketMatching: true,
-            closeBrackets: true,
-            autocompletion: true,
-            highlightActiveLine: true,
-            highlightSelectionMatches: true,
-            searchKeymap: true,
-          }}
-        />
-      </div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="flex h-full min-h-0 flex-col zoom-exempt">
+            <CodeMirror
+              ref={cmRef}
+              value={doc.content}
+              onChange={onChange}
+              theme={themeExt}
+              extensions={extensions}
+              height="100%"
+              className="terax-code-editor flex-1 min-h-0 overflow-hidden"
+              basicSetup={{
+                lineNumbers: true,
+                highlightActiveLineGutter: true,
+                foldGutter: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: true,
+                highlightActiveLine: true,
+                highlightSelectionMatches: true,
+                searchKeymap: true,
+              }}
+            />
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent
+          className="min-w-40 p-1"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            disabled={!hasSelection()}
+            onSelect={() => copySelection()}
+          >
+            <span className="flex-1">{t("editor.copy")}</span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            disabled={!hasSelection()}
+            onSelect={() => cutSelection()}
+          >
+            <span className="flex-1">{t("editor.cut")}</span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => pasteAtCursor()}
+          >
+            <span className="flex-1">{t("editor.paste")}</span>
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => selectAllContent()}
+          >
+            <span className="flex-1">{t("editor.selectAll")}</span>
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => undoEdit()}
+          >
+            <span className="flex-1">{t("editor.undo")}</span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => redoEdit()}
+          >
+            <span className="flex-1">{t("editor.redo")}</span>
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   }),
 );

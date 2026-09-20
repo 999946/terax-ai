@@ -1198,6 +1198,12 @@ export default function App() {
 
   const handleDeleteSpace = useCallback(
     (id: string) => {
+      const space = useSpaces.getState().spaces.find((s) => s.id === id);
+      if (space?.root) {
+        void import("@/modules/spaces/lib/filesystem")
+          .then(({ deleteSpaceFolder }) => deleteSpaceFolder(space.root!))
+          .catch((error) => console.error("delete space folder failed", error));
+      }
       const nextSpaceId = useSpaces.getState().remove(id);
       if (!nextSpaceId) return;
       const root = useSpaces

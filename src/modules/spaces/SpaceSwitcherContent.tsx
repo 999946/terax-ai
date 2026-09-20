@@ -4,6 +4,23 @@ import { useTranslation } from "react-i18next";
 import { labelFor, type Tab, TabIcon } from "@/modules/tabs";
 import { Add01Icon, ArrowDown01Icon, ArrowRight01Icon, Cancel01Icon, Delete02Icon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { InlineRename } from "./components/InlineRename";
 import type { SpaceMeta } from "./lib/store";
@@ -84,6 +101,7 @@ export function SpaceSwitcherContent({
   );
   const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletePending, setDeletePending] = useState<SpaceMeta | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() =>
     activeId ? new Set([activeId]) : new Set(),
   );
@@ -236,7 +254,7 @@ export function SpaceSwitcherContent({
               setEditingId(null);
             }}
             onCancelRename={() => setEditingId(null)}
-            onDelete={() => onDeleteSpace(sp.id)}
+            onRequestDelete={() => setDeletePending(sp)}
             onNewTab={() => onNewTabInSpace(sp.id)}
             onJumpTab={onJumpTab}
             onCloseTab={onCloseTab}
@@ -264,6 +282,38 @@ export function SpaceSwitcherContent({
           </div>,
           document.body,
         )}
+
+      <AlertDialog
+        open={deletePending !== null}
+        onOpenChange={(open) => !open && setDeletePending(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deletePending
+                ? t("spaces.deleteTitle", { name: deletePending.name })
+                : ""}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("spaces.deleteFolderDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletePending(null)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletePending) onDeleteSpace(deletePending.id);
+                setDeletePending(null);
+              }}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {t("spaces.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -287,7 +337,7 @@ type SpaceRowProps = {
   onStartRename: () => void;
   onCommitRename: (name: string) => void;
   onCancelRename: () => void;
-  onDelete: () => void;
+  onRequestDelete: () => void;
   onNewTab: () => void;
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
@@ -312,7 +362,7 @@ function SpaceRow({
   onStartRename,
   onCommitRename,
   onCancelRename,
-  onDelete,
+  onRequestDelete,
   onNewTab,
   onJumpTab,
   onCloseTab,
@@ -323,28 +373,30 @@ function SpaceRow({
 
   return (
     <div className="relative">
-      <div
-        data-drop="space"
-        data-space-id={space.id}
-        role="button"
-        tabIndex={editing ? -1 : 0}
-        onClick={editing ? undefined : onSwitch}
-        onKeyDown={(e) => {
-          if (editing) return;
-          if (e.key === "Enter") {
-            e.preventDefault();
-            onSwitch();
-          }
-        }}
-        className={cn(
-          "group relative flex cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 py-1.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
-          moveTarget
-            ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
-            : isActive
-              ? "bg-accent"
-              : "hover:bg-accent/50",
-        )}
-      >
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            data-drop="space"
+            data-space-id={space.id}
+            role="button"
+            tabIndex={editing ? -1 : 0}
+            onClick={editing ? undefined : onSwitch}
+            onKeyDown={(e) => {
+              if (editing) return;
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onSwitch();
+              }
+            }}
+            className={cn(
+              "group relative flex cursor-pointer select-none items-center gap-1.5 rounded-md px-1.5 py-1.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
+              moveTarget
+                ? "bg-primary/10 ring-1 ring-inset ring-primary/40"
+                : isActive
+                  ? "bg-accent"
+                  : "hover:bg-accent/50",
+            )}
+          >
         {showTabs && (
           <button
             type="button"
@@ -392,36 +444,42 @@ function SpaceRow({
           </span>
         )}
         {!editing && (
-          <>
-            <span className="shrink-0 px-1 text-[10px] tabular-nums text-muted-foreground/50 group-hover:hidden">
-              {tabs.length}
-            </span>
-            <div
-              data-no-drag
-              className="hidden shrink-0 items-center gap-0.5 group-hover:flex"
-            >
-              <RowAction
-                icon={PencilEdit02Icon}
-                label={t("spaces.rename")}
-                onClick={onStartRename}
-              />
-              <RowAction
-                icon={PlusSignIcon}
-                label={t("spaces.newTab")}
-                onClick={onNewTab}
-              />
-              {canDelete && (
-                <RowAction
-                  icon={Delete02Icon}
-                  label={t("spaces.delete")}
-                  destructive
-                  onClick={onDelete}
-                />
-              )}
-            </div>
-          </>
+          <span className="shrink-0 px-1 text-[10px] tabular-nums text-muted-foreground/50 group-hover:hidden">
+            {tabs.length}
+          </span>
         )}
-      </div>
+        </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent
+          className="min-w-40 p-1"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => onStartRename()}
+          >
+            <HugeiconsIcon icon={PencilEdit02Icon} size={13} strokeWidth={1.75} />
+            <span className="flex-1">{t("spaces.rename")}</span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => onNewTab()}
+          >
+            <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={1.75} />
+            <span className="flex-1">{t("spaces.newTab")}</span>
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            variant="destructive"
+            disabled={!canDelete}
+            onSelect={() => onRequestDelete()}
+          >
+            <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.75} />
+            <span className="flex-1">{t("spaces.delete")}</span>
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
       {showTabs && expanded && (
         <div className="flex flex-col gap-px py-0.5 pl-10 pr-0.5">
@@ -522,38 +580,6 @@ function TabRow({
         </button>
       </div>
     </div>
-  );
-}
-
-function RowAction({
-  icon,
-  label,
-  onClick,
-  destructive,
-}: {
-  icon: typeof Delete02Icon;
-  label: string;
-  onClick: () => void;
-  destructive?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className={cn(
-        "flex size-5 items-center justify-center rounded text-muted-foreground/70 transition-colors",
-        destructive
-          ? "hover:bg-destructive/10 hover:text-destructive"
-          : "hover:bg-accent hover:text-foreground",
-      )}
-    >
-      <HugeiconsIcon icon={icon} size={13} strokeWidth={1.75} />
-    </button>
   );
 }
 
