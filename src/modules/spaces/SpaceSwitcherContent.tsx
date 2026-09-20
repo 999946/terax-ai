@@ -387,7 +387,7 @@ function SpaceRow({
               {space.name}
             </span>
             {info?.summary ? (
-              <span className="min-w-0 whitespace-pre-wrap break-words text-[10px] leading-tight text-muted-foreground">
+              <span className="min-w-0 whitespace-pre-wrap break-words text-[10px] leading-tight text-foreground/80">
                 {info.summary}
               </span>
             ) : null}
@@ -399,7 +399,6 @@ function SpaceRow({
                 )}
               >
                 {info.status}
-                {info.onlineAt ? ` ${info.onlineAt}` : null}
               </span>
             ) : null}
           </span>

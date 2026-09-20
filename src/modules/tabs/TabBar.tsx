@@ -606,32 +606,6 @@ export function TabBar({
           onNewGitGraph={onNewGitGraph}
           onLaunchAgents={onLaunchAgents}
         />
-        <button
-          type="button"
-          role="button"
-          aria-label={tr("tabs.closeAllTabs")}
-          title={tr("tabs.closeAllTabs")}
-          data-no-drag
-          disabled={tabs.length === 0}
-          onClick={() => {
-            const anchor =
-              activeId >= 0 && tabs.some((t) => t.id === activeId)
-                ? activeId
-                : tabs[tabs.length - 1]?.id;
-            if (anchor !== undefined) onCloseAll(anchor);
-          }}
-          className={cn(
-            "rounded p-1 text-muted-foreground/60 transition-colors",
-            "hover:bg-accent hover:text-foreground",
-            "disabled:pointer-events-none disabled:opacity-40",
-          )}
-        >
-          <HugeiconsIcon
-            icon={CancelCircleIcon}
-            size={13}
-            strokeWidth={1.75}
-          />
-        </button>
       </div>
     </div>
   );
