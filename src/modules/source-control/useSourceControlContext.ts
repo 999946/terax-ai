@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { native } from "@/modules/ai/lib/native";
 import type { SidebarViewId } from "@/modules/sidebar";
 import type { Tab } from "@/modules/tabs";
@@ -38,6 +40,7 @@ export function useSourceControlContext({
   cycleSidebarView,
   openCommitHistoryTab,
 }: Params) {
+  const { t } = useTranslation();
   const sourceControlContextPath = spacesHydrated
     ? activeRepositoryContextPath({ explorerRoot })
     : null;
@@ -95,16 +98,25 @@ export function useSourceControlContext({
       });
       return;
     }
-    if (!graphContextPath) return;
+    if (!graphContextPath) {
+      toast.info(t("sourceControl.noRepoInFolder"));
+      return;
+    }
     try {
       const repo = await native.gitResolveRepo(graphContextPath);
-      if (!repo) return;
+      if (!repo) {
+        toast.info(t("sourceControl.noRepoInFolder"));
+        return;
+      }
       openCommitHistoryTab({ repoRoot: repo.repoRoot, branch: repo.branch });
-    } catch {
-      /* noop */
+    } catch (error) {
+      toast.error(t("sourceControl.couldNotResolveRepo"), {
+        description: String(error),
+      });
     }
   }, [
     openCommitHistoryTab,
+    t,
     sourceControl.hasRepo,
     sourceControl.repo,
     sourceControl.status?.branch,
