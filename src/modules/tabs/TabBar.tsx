@@ -569,6 +569,18 @@ export function TabBar({
                       />
                       <span className="flex-1">{tr("tabs.closeOtherTabs")}</span>
                     </ContextMenuItem>
+                    <ContextMenuItem
+                      className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+                      disabled={tabs.length === 0}
+                      onSelect={() => onCloseAll(t.id)}
+                    >
+                      <HugeiconsIcon
+                        icon={CancelCircleIcon}
+                        size={13}
+                        strokeWidth={1.75}
+                      />
+                      <span className="flex-1">{tr("tabs.closeAllTabs")}</span>
+                    </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
               );
