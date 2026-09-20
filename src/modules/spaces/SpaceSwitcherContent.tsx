@@ -44,16 +44,6 @@ type DropTarget =
   | { kind: "tab"; tabId: number; edge: Edge }
   | { kind: "into-space"; spaceId: string };
 
-/** Status → text color for the plugin info's presence line. `unknown` (and any
- *  unexpected value) falls back to muted gray. `emerald` matches the running
- *  LSP dot in LspServersGroup; `destructive` is the app's red token. */
-const STATUS_COLOR: Record<string, string> = {
-  online: "text-emerald-500",
-  offline: "text-destructive",
-  degraded: "text-amber-500",
-  unknown: "text-muted-foreground",
-};
-
 function subtitleFor(tab: Tab): string | null {
   if (tab.kind === "terminal") {
     if (!tab.cwd) return null;
@@ -392,13 +382,11 @@ function SpaceRow({
               </span>
             ) : null}
             {info ? (
-              <span
-                className={cn(
-                  "mt-0.5 min-w-0 truncate text-[10px] leading-tight",
-                  STATUS_COLOR[info.status] ?? "text-muted-foreground",
-                )}
-              >
+              <span className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-emerald-500">
                 {info.status}
+                {info.onlineAt ? (
+                  <span className="text-muted-foreground"> {info.onlineAt}</span>
+                ) : null}
               </span>
             ) : null}
           </span>
