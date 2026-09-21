@@ -60,6 +60,7 @@ import {
   FolderCloudIcon,
   FolderGitTwoIcon,
   GitBranchIcon,
+  MoreHorizontalIcon,
   Refresh01Icon,
   RemoveSquareIcon,
   Tick02Icon,
@@ -862,30 +863,29 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         </header>
 
         {repositories.length > 1 ? (
-          <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/40 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {repositories.map((repository) => {
-              const active = repository.repoRoot === focusedRoot;
-              return (
-                <button
+          <div className="shrink-0 border-b border-border/40 px-2 py-2">
+            <div className="flex items-center gap-1.5 px-1 pb-1.5">
+              <HugeiconsIcon
+                icon={FolderGitTwoIcon}
+                size={13}
+                strokeWidth={1.8}
+                className="shrink-0 text-muted-foreground"
+              />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
+                {t("sourceControl.repositoryList")}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              {repositories.map((repository) => (
+                <RepoRowItem
                   key={repository.repoRoot}
-                  type="button"
-                  title={repository.repoRoot}
-                  onClick={() => onFocusRepo?.(repository.repoRoot)}
-                  className={cn(
-                    "flex min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-left transition-colors",
-                    active
-                      ? "border-primary/35 bg-primary/10 text-foreground"
-                      : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground",
-                  )}
-                >
-                  <HugeiconsIcon icon={FolderGitTwoIcon} size={12} strokeWidth={1.8} />
-                  <span className="max-w-28 truncate text-[11px] font-medium">{repository.label}</span>
-                  {repository.loading ? <Spinner className="size-3" /> : repository.changedCount > 0 ? (
-                    <span className="rounded-full bg-foreground/10 px-1 text-[9px] tabular-nums">{repository.changedCount}</span>
-                  ) : null}
-                </button>
-              );
-            })}
+                  repository={repository}
+                  active={repository.repoRoot === focusedRoot}
+                  onFocus={() => onFocusRepo?.(repository.repoRoot)}
+                  onRefresh={() => handleRefresh()}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -1550,6 +1550,126 @@ const EntryRow = memo(function EntryRow({
   );
 });
 
+function RepoRowItem({
+  repository,
+  active,
+  onFocus,
+  onRefresh,
+}: {
+  repository: RepoRow;
+  active: boolean;
+  onFocus: () => void;
+  onRefresh: () => void;
+}) {
+  const { t } = useTranslation();
+  const normalizedRoot = repository.repoRoot.replace(/\\/g, "/");
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onFocus}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onFocus();
+        }
+      }}
+      className={cn(
+        "group relative flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
+        active ? "bg-accent" : "hover:bg-accent/50",
+      )}
+    >
+      <HugeiconsIcon
+        icon={FolderGitTwoIcon}
+        size={12}
+        strokeWidth={1.8}
+        className={cn(
+          "shrink-0",
+          active ? "text-foreground" : "text-muted-foreground",
+        )}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span
+          className={cn(
+            "truncate text-[11.5px] font-medium leading-tight",
+            active ? "text-foreground" : "text-foreground/90",
+          )}
+        >
+          {repository.label}
+        </span>
+        <span className="flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
+          <HugeiconsIcon icon={GitBranchIcon} size={9} strokeWidth={2} />
+          <span className="min-w-0 truncate">{repository.branch ?? "—"}</span>
+          {repository.ahead > 0 ? (
+            <span className="inline-flex shrink-0 items-center gap-0.5">
+              <HugeiconsIcon icon={ArrowUp01Icon} size={9} strokeWidth={2.2} />
+              {repository.ahead}
+            </span>
+          ) : null}
+          {repository.behind > 0 ? (
+            <span className="inline-flex shrink-0 items-center gap-0.5">
+              <HugeiconsIcon icon={ArrowDown01Icon} size={9} strokeWidth={2.2} />
+              {repository.behind}
+            </span>
+          ) : null}
+        </span>
+      </div>
+
+      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
+        {repository.changedCount > 0 ? repository.changedCount : ""}
+      </span>
+
+      <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <IconActionButton
+          label={t("sourceControl.refreshSrcCtrl")}
+          side="top"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRefresh();
+          }}
+        >
+          {repository.loading ? (
+            <Spinner className="size-3" />
+          ) : (
+            <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.9} />
+          )}
+        </IconActionButton>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("common.moreActions")}
+              onClick={(e) => e.stopPropagation()}
+              className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+            >
+              <HugeiconsIcon icon={MoreHorizontalIcon} size={13} strokeWidth={1.8} />
+            </button>
+          </ContextMenuTrigger>
+          <ContextMenuContent
+            className={COMPACT_CONTENT}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => void copyToClipboard(normalizedRoot)}
+            >
+              {t("sourceControl.copyRepoPath")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => void revealInFinder(normalizedRoot)}
+            >
+              {t("sourceControl.revealInFinder")}
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      </div>
+    </div>
+  );
+}
+
 function IconActionButton({
   label,
   disabled,
@@ -1560,7 +1680,7 @@ function IconActionButton({
   label: string;
   disabled?: boolean;
   side?: "left" | "top" | "right" | "bottom";
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: ReactNode;
 }) {
   return (
