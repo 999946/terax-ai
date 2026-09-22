@@ -99,52 +99,56 @@ pub fn plugin_set_plugin_enabled(
 }
 
 #[tauri::command]
-pub fn plugin_dispatch_event(
+pub async fn plugin_dispatch_event(
     state: tauri::State<'_, PluginState>,
     event: PluginEvent,
 ) -> Result<Vec<PluginDispatchResult>, String> {
-    let runtime = state.0.lock().map_err(|e| e.to_string())?;
-    let enabled: Vec<String> = runtime
-        .plugins
-        .iter()
-        .filter(|p| p.enabled)
-        .map(|p| p.id.clone())
-        .collect();
+    // Snapshot the enabled plugins under a brief lock, then drop the guard.
+    // The per-plugin Node dispatch below is moved onto the async runtime's
+    // blocking pool, so a slow plugin (up to its dispatch timeout) runs off the
+    // main thread and can't freeze the UI, and the global PluginRuntime lock is
+    // not held across the (potentially multi-second) Node process wait.
+    let enabled: Vec<Plugin> = {
+        let runtime = state.0.lock().map_err(|e| e.to_string())?;
+        runtime
+            .plugins
+            .iter()
+            .filter(|plugin| plugin.enabled)
+            .cloned()
+            .collect()
+    };
     log::info!(
         "[plugin] dispatch event={} enabled={enabled:?}",
         event.event_type
     );
-    let results: Result<Vec<PluginDispatchResult>, String> = runtime
-        .plugins
-        .iter()
-        .filter(|plugin| plugin.enabled)
-        .map(|plugin| {
-            match process::dispatch(
-                plugin,
-                &serde_json::to_value(&event).map_err(|e| e.to_string())?,
-            ) {
-                Ok(result) => Ok(PluginDispatchResult {
+    let event_value = serde_json::to_value(&event).map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let results: Vec<PluginDispatchResult> = enabled
+            .iter()
+            .map(|plugin| match process::dispatch(plugin, &event_value) {
+                Ok(result) => PluginDispatchResult {
                     plugin_id: plugin.id.clone(),
                     result: Some(result),
                     error: None,
-                }),
-                Err(error) => Ok(PluginDispatchResult {
+                },
+                Err(error) => PluginDispatchResult {
                     plugin_id: plugin.id.clone(),
                     result: None,
                     error: Some(error),
-                }),
+                },
+            })
+            .collect();
+        for r in &results {
+            match (&r.result, &r.error) {
+                (Some(v), _) => log::info!("[plugin] {} -> {v}", r.plugin_id),
+                (_, Some(e)) => log::warn!("[plugin] {} -> error: {e}", r.plugin_id),
+                _ => log::warn!("[plugin] {} -> no result", r.plugin_id),
             }
-        })
-        .collect();
-    let results = results?;
-    for r in &results {
-        match (&r.result, &r.error) {
-            (Some(v), _) => log::info!("[plugin] {} -> {v}", r.plugin_id),
-            (_, Some(e)) => log::warn!("[plugin] {} -> error: {e}", r.plugin_id),
-            _ => log::warn!("[plugin] {} -> no result", r.plugin_id),
         }
-    }
-    Ok(results)
+        Ok(results)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
