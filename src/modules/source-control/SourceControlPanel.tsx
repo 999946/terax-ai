@@ -20,14 +20,16 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -56,12 +58,12 @@ import {
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
   Download01Icon,
-  Folder01Icon,
   FolderCloudIcon,
   FolderGitTwoIcon,
   GitBranchIcon,
+  GitMergeIcon,
   MoreHorizontalIcon,
-  Refresh01Icon,
+  PlusSignIcon,
   RemoveSquareIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -84,7 +86,11 @@ import {
   directoryPaths,
   flattenChangeTree,
 } from "./changeTree";
-import type { SourceControlSummary } from "./useSourceControl";
+import type {
+  SourceControlRemoteActionMode,
+  SourceControlRemoteActionResult,
+  SourceControlSummary,
+} from "./useSourceControl";
 import {
   useSourceControlPanel,
   type CheckState,
@@ -130,6 +136,12 @@ export type RepoRow = {
   statusLabel: string | null;
   loading: boolean;
   error: string | null;
+  /** Run a remote action (fetch/pull/push) against this repo. */
+  runRemoteAction: (
+    mode?: SourceControlRemoteActionMode,
+  ) => Promise<SourceControlRemoteActionResult>;
+  /** Refresh this repo's status (used after branch operations). */
+  refresh: () => Promise<void>;
 };
 
 const SOURCE_CONTROL_TOOLTIP_CLASS =
@@ -195,240 +207,12 @@ function checkboxValue(state: CheckState): boolean | "indeterminate" {
   return false;
 }
 
-function BranchDropdown({
-  repoRoot,
-  repoLabel,
-  displayRepoRoot,
-  repositoryTarget,
-  onFollowRepositoryContext,
-  onNavigateToPath,
-  onRefresh,
-}: {
-  repoRoot: string | null;
-  repoLabel: string;
-  displayRepoRoot: string | null;
-  repositoryTarget: SourceControlRepositoryTarget;
-  onFollowRepositoryContext: () => void;
-  onNavigateToPath?: (path: string) => void;
-  onRefresh: () => void;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [branches, setBranches] = useState<GitBranchEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const requestRef = useRef(0);
-  const checkoutInFlight = useRef(false);
-
-  const loadBranches = useCallback(async () => {
-    const id = ++requestRef.current;
-    if (!repoRoot) {
-      setBranches([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await native.gitListBranches(repoRoot);
-      if (id !== requestRef.current) return;
-      setBranches(result.branches);
-    } catch (e) {
-      if (id !== requestRef.current) return;
-      setError(String(e));
-      setBranches([]);
-    } finally {
-      if (id === requestRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [repoRoot]);
-
-  useEffect(() => {
-    if (open) {
-      void loadBranches();
-    }
-  }, [open, loadBranches]);
-
-  const handleCheckout = useCallback(
-    async (branch: string) => {
-      if (!repoRoot || checkoutInFlight.current) return;
-      checkoutInFlight.current = true;
-      setCheckingOut(true);
-      try {
-        await native.gitCheckoutBranch(repoRoot, branch);
-        setBranches([]);
-        setOpen(false);
-        onRefresh();
-      } catch (e) {
-        toast.error(String(e));
-      } finally {
-        checkoutInFlight.current = false;
-        setCheckingOut(false);
-      }
-    },
-    [repoRoot, onRefresh],
-  );
-
-  const localBranches = useMemo(
-    () => branches.filter((b) => b.kind === "local"),
-    [branches],
-  );
-  const worktrees = useMemo(
-    () => branches.filter((b) => b.kind === "worktree"),
-    [branches],
-  );
-
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          disabled={checkingOut}
-          title={displayRepoRoot ?? repoLabel}
-          className="inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md bg-foreground/5 px-2 py-1 text-[11.5px] font-medium leading-none text-foreground transition-colors hover:bg-foreground/10 disabled:cursor-default disabled:opacity-70"
-        >
-          <HugeiconsIcon
-            icon={FolderGitTwoIcon}
-            size={12}
-            strokeWidth={1.9}
-            className="shrink-0 text-muted-foreground"
-          />
-          {displayRepoRoot ? (
-            <>
-              <span className="max-w-22 truncate">
-                {basename(displayRepoRoot)}
-              </span>
-              <span className="text-muted-foreground/60">/</span>
-            </>
-          ) : null}
-          <span className="max-w-24 truncate">{repoLabel}</span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {displayRepoRoot ? (
-          <>
-            <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-              {t("sourceControl.repository")}
-            </DropdownMenuLabel>
-            <div
-              className="truncate px-2 pb-1.5 text-[11px] text-muted-foreground"
-              title={displayRepoRoot}
-            >
-              {displayRepoRoot}
-            </div>
-            {repositoryTarget.mode === "fixed" ? (
-              <DropdownMenuItem
-                onSelect={() => {
-                  onFollowRepositoryContext();
-                  setOpen(false);
-                }}
-                className="cursor-pointer text-[12px]"
-              >
-                {t("sourceControl.followActiveContext")}
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        {loading ? (
-          <div className="flex items-center gap-2 px-3 py-3 text-[11px] text-muted-foreground">
-            <Spinner className="size-3" />
-            {t("sourceControl.loadingBranches")}
-          </div>
-        ) : error ? (
-          <div className="px-3 py-3 text-[11px] leading-snug text-destructive">
-            {error}
-          </div>
-        ) : (
-          <>
-            {localBranches.length > 0 && (
-              <>
-                <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-                  {t("sourceControl.localBranches")}
-                </DropdownMenuLabel>
-                <DropdownMenuGroup>
-                  {localBranches.map((b) => (
-                    <DropdownMenuItem
-                      key={b.name}
-                      onSelect={() => void handleCheckout(b.name)}
-                      className="flex cursor-pointer items-center gap-2 text-[12px]"
-                    >
-                      {b.isHead ? (
-                        <HugeiconsIcon
-                          icon={Tick02Icon}
-                          size={14}
-                          strokeWidth={1.8}
-                          className="shrink-0"
-                        />
-                      ) : (
-                        <span className="w-3.5 shrink-0" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </>
-            )}
-            {worktrees.length > 0 && (
-              <>
-                {localBranches.length > 0 && <DropdownMenuSeparator />}
-                <DropdownMenuLabel className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/85">
-                  {t("sourceControl.worktrees")}
-                </DropdownMenuLabel>
-                <DropdownMenuGroup>
-                  {worktrees.map((b) => (
-                    <DropdownMenuItem
-                      key={b.worktreePath ?? b.name}
-                      onSelect={() => {
-                        if (b.worktreePath && onNavigateToPath) {
-                          onNavigateToPath(b.worktreePath);
-                        }
-                      }}
-                      className="flex cursor-pointer items-center gap-2 text-[12px]"
-                    >
-                      <HugeiconsIcon
-                        icon={Folder01Icon}
-                        size={14}
-                        strokeWidth={1.5}
-                        className="shrink-0 text-muted-foreground"
-                      />
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate">{b.name}</span>
-                        {b.worktreePath && (
-                          <span className="truncate text-[10px] text-muted-foreground">
-                            {b.worktreePath}
-                          </span>
-                        )}
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </>
-            )}
-            {branches.length === 0 && (
-              <div className="px-3 py-3 text-[11px] text-muted-foreground">
-                {t("sourceControl.noBranchesFound")}
-              </div>
-            )}
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 export const SourceControlPanel = memo(function SourceControlPanel({
   open,
   sourceControl,
   onOpenGitGraph,
   onOpenDiff,
   onOpenFile,
-  onNavigateToPath,
-  repositoryTarget,
-  onFollowRepositoryContext,
   repositories = [],
   focusedRoot,
   onFocusRepo,
@@ -436,27 +220,21 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 }: Props) {
   const { t } = useTranslation();
   const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
-  const refreshAnimationRef = useRef<number | null>(null);
-  const [refreshAnimating, setRefreshAnimating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    return () => {
-      if (refreshAnimationRef.current) {
-        window.clearTimeout(refreshAnimationRef.current);
-      }
-    };
-  }, []);
+  const [reposCollapsed, setReposCollapsed] = useState(false);
+  const allChangedRepos = useMemo(
+    () => repositories.filter((r) => r.changedCount > 0).length,
+    [repositories],
+  );
 
   // Fixed repository pinning no longer re-scopes Source Control: the panel
   // always reflects the active Space root, so there is never a pending
   // fixed-target load that could mask a no-repo Space.
   const fixedTargetPending = false;
   const panelState = scm.panelState;
-  const isRefreshing = panelState === "loading";
   const repoLabel = useMemo(() => {
     if (!scm.status) return t("sourceControl.branchLabelFallback");
     return scm.status.isDetached
@@ -495,23 +273,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     scm.status?.upstream,
     t("sourceControl.noUpstream"),
   );
-  const hasUpstream = !!scm.status?.upstream;
   const isDiverged =
     !!scm.status && scm.status.ahead > 0 && scm.status.behind > 0;
-
-  const canPull =
-    hasUpstream &&
-    !!scm.status &&
-    scm.status.behind > 0 &&
-    !isDiverged &&
-    !fixedTargetPending &&
-    !scm.actionBusy &&
-    !sourceControl.busyAction;
-  const canFetch =
-    hasUpstream &&
-    !fixedTargetPending &&
-    !scm.actionBusy &&
-    !sourceControl.busyAction;
 
   const footerFeedback = useMemo(() => {
     if (scm.actionError)
@@ -544,25 +307,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   };
 
   const handleRefresh = useCallback(() => {
-    setRefreshAnimating(true);
-    if (refreshAnimationRef.current) {
-      window.clearTimeout(refreshAnimationRef.current);
-    }
-    void Promise.all([scm.refresh(), refreshRepositories?.()]).finally(() => {
-      refreshAnimationRef.current = window.setTimeout(() => {
-        setRefreshAnimating(false);
-        refreshAnimationRef.current = null;
-      }, 450);
-    });
+    void Promise.all([scm.refresh(), refreshRepositories?.()]);
   }, [refreshRepositories, scm]);
-
-  const handleFetch = useCallback(() => {
-    void sourceControl.runRemoteAction("fetch");
-  }, [sourceControl]);
-
-  const handlePull = useCallback(() => {
-    void sourceControl.runRemoteAction("pull");
-  }, [sourceControl]);
 
   const changeTree = useMemo(
     () => buildChangeTree(scm.fileEntries),
@@ -750,121 +496,28 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
   if (!open) return null;
 
-  const fetchBusy = sourceControl.busyAction === "fetch";
-  const pullBusy = sourceControl.busyAction === "pull";
-
   return (
     <TooltipProvider delayDuration={800} skipDelayDuration={300}>
       <aside className="flex h-full min-w-0 flex-col [contain:layout_style]">
-        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/50 px-3 pb-2.5 pt-3">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <BranchDropdown
-              repoRoot={scm.repo?.repoRoot ?? null}
-              repoLabel={repoLabel}
-              displayRepoRoot={scm.repo?.repoRoot ?? null}
-              repositoryTarget={repositoryTarget}
-              onFollowRepositoryContext={onFollowRepositoryContext}
-              onNavigateToPath={onNavigateToPath}
-              onRefresh={handleRefresh}
-            />
-            {scm.status && (scm.status.ahead > 0 || scm.status.behind > 0) ? (
-              <div className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold tabular-nums leading-none text-muted-foreground">
-                {scm.status.ahead > 0 ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
-                    <HugeiconsIcon
-                      icon={ArrowUp01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.status.ahead}
-                  </span>
-                ) : null}
-                {scm.status.behind > 0 ? (
-                  <span className="inline-flex items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
-                    <HugeiconsIcon
-                      icon={ArrowDown01Icon}
-                      size={9}
-                      strokeWidth={2.2}
-                    />
-                    {scm.status.behind}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-            {scm.status?.isDetached ? (
-              <span className="rounded bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {t("sourceControl.detached")}
-              </span>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <IconActionButton
-              label={fetchBusy ? t("sourceControl.fetching") : t("sourceControl.fetchFromRemote")}
-              disabled={!canFetch}
-              onClick={handleFetch}
-              side="bottom"
-            >
-              {fetchBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon
-                  icon={FolderCloudIcon}
-                  size={14}
-                  strokeWidth={1.85}
-                />
-              )}
-            </IconActionButton>
-            <IconActionButton
-              label={
-                pullBusy
-                  ? t("sourceControl.pulling")
-                  : isDiverged
-                    ? t("sourceControl.branchDiverged")
-                    : !hasUpstream
-                      ? t("sourceControl.noUpstreamCfg")
-                      : (scm.status?.behind ?? 0) === 0
-                        ? t("sourceControl.upToDate")
-                        : (scm.status?.behind ?? 0) === 1
-                          ? t("sourceControl.pullCommitOne", { count: scm.status?.behind })
-                          : t("sourceControl.pullCommitMany", { count: scm.status?.behind })
-              }
-              disabled={!canPull}
-              onClick={handlePull}
-              side="bottom"
-            >
-              {pullBusy ? (
-                <Spinner className="size-3" />
-              ) : (
-                <HugeiconsIcon
-                  icon={Download01Icon}
-                  size={14}
-                  strokeWidth={1.9}
-                />
-              )}
-            </IconActionButton>
-            <IconActionButton
-              label={t("sourceControl.refreshSrcCtrl")}
-              disabled={isRefreshing || !!scm.actionBusy}
-              onClick={handleRefresh}
-              side="bottom"
-            >
-              {isRefreshing ? (
-                <Spinner className="size-3.5" />
-              ) : (
-                <HugeiconsIcon
-                  icon={Refresh01Icon}
-                  size={14}
-                  strokeWidth={1.9}
-                  className={cn(refreshAnimating && "animate-spin")}
-                />
-              )}
-            </IconActionButton>
-          </div>
-        </header>
-
-        {repositories.length > 1 ? (
+        {repositories.length > 0 ? (
           <div className="shrink-0 border-b border-border/40 px-2 py-2">
             <div className="flex items-center gap-1.5 px-1 pb-1.5">
+              <button
+                type="button"
+                aria-label={
+                  reposCollapsed
+                    ? t("sourceControl.expandRepositories")
+                    : t("sourceControl.collapseRepositories")
+                }
+                onClick={() => setReposCollapsed((v) => !v)}
+                className="flex shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+              >
+                <HugeiconsIcon
+                  icon={reposCollapsed ? ArrowRight01Icon : ArrowDown01Icon}
+                  size={12}
+                  strokeWidth={2}
+                />
+              </button>
               <HugeiconsIcon
                 icon={FolderGitTwoIcon}
                 size={13}
@@ -874,18 +527,28 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/85">
                 {t("sourceControl.repositoryList")}
               </span>
+              {allChangedRepos > 0 ? (
+                <span className="ml-1 shrink-0 rounded-full bg-foreground/10 px-1.5 text-[9.5px] font-semibold tabular-nums text-muted-foreground">
+                  {repositories.length}
+                </span>
+              ) : (
+                <span className="ml-1 shrink-0 rounded-full border border-border/60 px-1.5 text-[9.5px] font-semibold tabular-nums text-muted-foreground/70">
+                  {repositories.length}
+                </span>
+              )}
             </div>
-            <div className="flex flex-col gap-1">
-              {repositories.map((repository) => (
-                <RepoRowItem
-                  key={repository.repoRoot}
-                  repository={repository}
-                  active={repository.repoRoot === focusedRoot}
-                  onFocus={() => onFocusRepo?.(repository.repoRoot)}
-                  onRefresh={() => handleRefresh()}
-                />
-              ))}
-            </div>
+            {!reposCollapsed ? (
+              <div className="flex flex-col gap-0.5">
+                {repositories.map((repository) => (
+                  <RepoRowItem
+                    key={repository.repoRoot}
+                    repository={repository}
+                    active={repository.repoRoot === focusedRoot}
+                    onFocus={() => onFocusRepo?.(repository.repoRoot)}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1554,15 +1217,110 @@ function RepoRowItem({
   repository,
   active,
   onFocus,
-  onRefresh,
 }: {
   repository: RepoRow;
   active: boolean;
   onFocus: () => void;
-  onRefresh: () => void;
 }) {
   const { t } = useTranslation();
   const normalizedRoot = repository.repoRoot.replace(/\\/g, "/");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [branches, setBranches] = useState<GitBranchEntry[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const loadRef = useRef(0);
+
+  const loadBranches = useCallback(async () => {
+    const id = ++loadRef.current;
+    setLoadingBranches(true);
+    setBranchError(null);
+    try {
+      const result = await native.gitListBranches(repository.repoRoot);
+      if (id !== loadRef.current) return;
+      setBranches(result.branches);
+    } catch (e) {
+      if (id !== loadRef.current) return;
+      setBranches([]);
+      setBranchError(String(e));
+    } finally {
+      if (id === loadRef.current) setLoadingBranches(false);
+    }
+  }, [repository.repoRoot]);
+
+  useEffect(() => {
+    if (menuOpen) void loadBranches();
+  }, [menuOpen, loadBranches]);
+
+  const localBranches = useMemo(
+    () => branches.filter((b) => b.kind === "local"),
+    [branches],
+  );
+
+  const handleCheckout = useCallback(
+    async (branch: string) => {
+      setBusy("checkout");
+      try {
+        await native.gitCheckoutBranch(repository.repoRoot, branch);
+        await repository.refresh();
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository],
+  );
+
+  const handleCreateBranch = useCallback(async () => {
+    const name = newBranchName.trim();
+    if (!name) return;
+    setBusy("create");
+    try {
+      await native.gitCreateBranch(repository.repoRoot, name);
+      await repository.refresh();
+      setCreateOpen(false);
+      setNewBranchName("");
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [newBranchName, repository]);
+
+  const handleMerge = useCallback(
+    async (branch: string) => {
+      setBusy("merge");
+      try {
+        await native.gitMergeBranch(repository.repoRoot, branch);
+        await repository.refresh();
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository],
+  );
+
+  const handleRemote = useCallback(
+    async (mode: SourceControlRemoteActionMode) => {
+      const result = await repository.runRemoteAction(mode);
+      if (result.ok) return;
+      if (result.blocked === "missing-upstream") {
+        toast.info(t("sourceControl.noUpstreamCfg"));
+      } else if (result.blocked === "diverged") {
+        toast.info(t("sourceControl.branchDiverged"));
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    },
+    [repository, t],
+  );
+
+  const branchBusy = busy !== null;
 
   return (
     <div
@@ -1576,7 +1334,7 @@ function RepoRowItem({
         }
       }}
       className={cn(
-        "group relative flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
+        "group relative flex h-[30px] min-w-0 items-center gap-1.5 rounded-md px-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
         active ? "bg-accent" : "hover:bg-accent/50",
       )}
     >
@@ -1589,32 +1347,30 @@ function RepoRowItem({
           active ? "text-foreground" : "text-muted-foreground",
         )}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span
-          className={cn(
-            "truncate text-[11.5px] font-medium leading-tight",
-            active ? "text-foreground" : "text-foreground/90",
-          )}
-        >
-          {repository.label}
-        </span>
-        <span className="flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
-          <HugeiconsIcon icon={GitBranchIcon} size={9} strokeWidth={2} />
-          <span className="min-w-0 truncate">{repository.branch ?? "—"}</span>
-          {repository.ahead > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-0.5">
-              <HugeiconsIcon icon={ArrowUp01Icon} size={9} strokeWidth={2.2} />
-              {repository.ahead}
-            </span>
-          ) : null}
-          {repository.behind > 0 ? (
-            <span className="inline-flex shrink-0 items-center gap-0.5">
-              <HugeiconsIcon icon={ArrowDown01Icon} size={9} strokeWidth={2.2} />
-              {repository.behind}
-            </span>
-          ) : null}
-        </span>
-      </div>
+      <span
+        className={cn(
+          "min-w-0 max-w-[46%] shrink-0 truncate text-[11.5px] font-medium leading-tight",
+          active ? "text-foreground" : "text-foreground/90",
+        )}
+      >
+        {repository.label}
+      </span>
+      <span className="flex min-w-0 flex-1 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
+        <HugeiconsIcon icon={GitBranchIcon} size={9} strokeWidth={2} className="shrink-0" />
+        <span className="min-w-0 truncate">{repository.branch ?? "—"}</span>
+        {repository.ahead > 0 ? (
+          <span className="inline-flex shrink-0 items-center gap-0.5">
+            <HugeiconsIcon icon={ArrowUp01Icon} size={9} strokeWidth={2.2} />
+            {repository.ahead}
+          </span>
+        ) : null}
+        {repository.behind > 0 ? (
+          <span className="inline-flex shrink-0 items-center gap-0.5">
+            <HugeiconsIcon icon={ArrowDown01Icon} size={9} strokeWidth={2.2} />
+            {repository.behind}
+          </span>
+        ) : null}
+      </span>
 
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
         {repository.changedCount > 0 ? repository.changedCount : ""}
@@ -1622,21 +1378,21 @@ function RepoRowItem({
 
       <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         <IconActionButton
-          label={t("sourceControl.refreshSrcCtrl")}
+          label={t("sourceControl.fetch")}
           side="top"
           onClick={(e) => {
             e.stopPropagation();
-            onRefresh();
+            void handleRemote("fetch");
           }}
         >
           {repository.loading ? (
             <Spinner className="size-3" />
           ) : (
-            <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.9} />
+            <HugeiconsIcon icon={FolderCloudIcon} size={11} strokeWidth={1.9} />
           )}
         </IconActionButton>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
             <button
               type="button"
               aria-label={t("common.moreActions")}
@@ -1645,27 +1401,190 @@ function RepoRowItem({
             >
               <HugeiconsIcon icon={MoreHorizontalIcon} size={13} strokeWidth={1.8} />
             </button>
-          </ContextMenuTrigger>
-          <ContextMenuContent
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
             className={COMPACT_CONTENT}
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
-            <ContextMenuItem
+            {/* Switch branch */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className={COMPACT_ITEM}>
+                <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={1.8} />
+                <span className="flex-1">{t("sourceControl.switchBranch")}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className={COMPACT_CONTENT}>
+                {loadingBranches ? (
+                  <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground">
+                    <Spinner className="size-3" />
+                    {t("sourceControl.loadingBranches")}
+                  </div>
+                ) : branchError ? (
+                  <div className="px-3 py-2 text-[11px] leading-snug text-destructive">
+                    {branchError}
+                  </div>
+                ) : localBranches.length > 0 ? (
+                  localBranches.map((b) => (
+                    <DropdownMenuItem
+                      key={b.name}
+                      disabled={branchBusy}
+                      onSelect={() => void handleCheckout(b.name)}
+                      className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                    >
+                      {b.isHead ? (
+                        <HugeiconsIcon
+                          icon={Tick02Icon}
+                          size={13}
+                          strokeWidth={2}
+                          className="shrink-0 text-foreground"
+                        />
+                      ) : (
+                        <span className="w-3.5 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
+                    {t("sourceControl.noBranchesFound")}
+                  </div>
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {/* Create branch */}
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              disabled={branchBusy}
+              onSelect={() => setCreateOpen(true)}
+            >
+              <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">{t("sourceControl.createBranch")}</span>
+            </DropdownMenuItem>
+
+            {/* Merge branch */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className={COMPACT_ITEM}>
+                <HugeiconsIcon icon={GitMergeIcon} size={13} strokeWidth={1.8} />
+                <span className="flex-1">{t("sourceControl.mergeBranch")}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className={COMPACT_CONTENT}>
+                {loadingBranches ? (
+                  <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground">
+                    <Spinner className="size-3" />
+                    {t("sourceControl.loadingBranches")}
+                  </div>
+                ) : branchError ? (
+                  <div className="px-3 py-2 text-[11px] leading-snug text-destructive">
+                    {branchError}
+                  </div>
+                ) : localBranches.length > 1 ? (
+                  localBranches
+                    .filter((b) => !b.isHead)
+                    .map((b) => (
+                      <DropdownMenuItem
+                        key={b.name}
+                        disabled={branchBusy}
+                        onSelect={() => void handleMerge(b.name)}
+                        className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                      </DropdownMenuItem>
+                    ))
+                ) : (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
+                    {t("sourceControl.noBranchesFound")}
+                  </div>
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuSeparator />
+
+            {/* Remote actions */}
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              disabled={busy === "fetch"}
+              onSelect={() => void handleRemote("fetch")}
+            >
+              <HugeiconsIcon icon={FolderCloudIcon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">{t("sourceControl.fetch")}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              disabled={busy === "pull"}
+              onSelect={() => void handleRemote("pull")}
+            >
+              <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">{t("sourceControl.pull")}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              disabled={busy === "push"}
+              onSelect={() => void handleRemote("push")}
+            >
+              <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">{t("sourceControl.push")}</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* Copy / reveal */}
+            <DropdownMenuItem
               className={COMPACT_ITEM}
               onSelect={() => void copyToClipboard(normalizedRoot)}
             >
-              {t("sourceControl.copyRepoPath")}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
+              <span className="flex-1">{t("sourceControl.copyRepoPath")}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
               className={COMPACT_ITEM}
               onSelect={() => void revealInFinder(normalizedRoot)}
             >
-              {t("sourceControl.revealInFinder")}
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+              <span className="flex-1">{t("sourceControl.revealInFinder")}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <AlertDialog open={createOpen} onOpenChange={setCreateOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("sourceControl.createBranchTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("sourceControl.createBranchBody", {
+                branch: repository.branch ?? "",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-1">
+            <Input
+              autoFocus
+              value={newBranchName}
+              onChange={(e) => setNewBranchName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newBranchName.trim()) {
+                  e.preventDefault();
+                  void handleCreateBranch();
+                }
+              }}
+              placeholder={t("sourceControl.createBranchPlaceholder")}
+              className="h-8 text-[12.5px]"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCreateOpen(false)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!newBranchName.trim() || busy === "create"}
+              onClick={() => void handleCreateBranch()}
+            >
+              {busy === "create" ? t("sourceControl.creating") : t("sourceControl.createBranch")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

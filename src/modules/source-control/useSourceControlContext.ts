@@ -1,12 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { native } from "@/modules/ai/lib/native";
 import type { SidebarViewId } from "@/modules/sidebar";
 import type { Tab } from "@/modules/tabs";
 import {
   activeRepositoryContextPath,
-  gitGraphRepositoryPath,
   sourceControlRepositoryPath,
   type SourceControlRepositoryTarget,
 } from "./repositoryTarget";
@@ -65,11 +63,6 @@ export function useSourceControlContext({
     hasOpenGitTab,
     target: repositoryTarget,
   });
-  const graphContextPath = gitGraphRepositoryPath({
-    contextPath: sourceControlContextPath,
-    sidebarView,
-    target: repositoryTarget,
-  });
   const sourceControl = useSourceControl(sourceControlPath, true);
   const multiSourceControl = useMultiSourceControl(sourceControlContextPath, true);
   const focusedRepository = useMemo(
@@ -85,44 +78,30 @@ export function useSourceControlContext({
     cycleSidebarView("source-control");
   }, [cycleSidebarView]);
 
-  const openGitGraphFromContext = useCallback(async () => {
-    const known = sourceControl.hasRepo ? sourceControl.repo : null;
-    const fixedTargetIsLoaded =
-      sidebarView !== "source-control" ||
-      repositoryTarget.mode !== "fixed" ||
-      known?.repoRoot === repositoryTarget.repoRoot;
-    if (known && fixedTargetIsLoaded) {
-      openCommitHistoryTab({
-        repoRoot: known.repoRoot,
-        branch: sourceControl.status?.branch ?? null,
-      });
-      return;
-    }
-    if (!graphContextPath) {
+  const openGitGraphFromContext = useCallback(() => {
+    // Open the commit graph for the currently focused repository directly,
+    // regardless of the explorer/space context. No repo resolution needed —
+    // the focused repo's root is already known.
+    const focusedRoot = multiSourceControl.focusedRoot;
+    if (!focusedRoot) {
       toast.info(t("sourceControl.noRepoInFolder"));
       return;
     }
-    try {
-      const repo = await native.gitResolveRepo(graphContextPath);
-      if (!repo) {
-        toast.info(t("sourceControl.noRepoInFolder"));
-        return;
-      }
-      openCommitHistoryTab({ repoRoot: repo.repoRoot, branch: repo.branch });
-    } catch (error) {
-      toast.error(t("sourceControl.couldNotResolveRepo"), {
-        description: String(error),
-      });
-    }
+    const focusedRepo = multiSourceControl.repositories.find(
+      (repository) => repository.repo.repoRoot === focusedRoot,
+    );
+    openCommitHistoryTab({
+      repoRoot: focusedRoot,
+      branch:
+        focusedRepo?.status?.branch ??
+        focusedRepo?.repo.branch ??
+        null,
+    });
   }, [
+    multiSourceControl.focusedRoot,
+    multiSourceControl.repositories,
     openCommitHistoryTab,
     t,
-    sourceControl.hasRepo,
-    sourceControl.repo,
-    sourceControl.status?.branch,
-    graphContextPath,
-    repositoryTarget,
-    sidebarView,
   ]);
 
   const repositories = useMemo(
@@ -141,6 +120,10 @@ export function useSourceControlContext({
           statusLabel: status?.isDetached ? "detached" : status?.branch ?? repository.repo.branch,
           loading: repository.isLoading,
           error: repository.error,
+          // Per-repo capabilities forwarded to the row's "..." menu so it can
+          // run remote actions (fetch/pull/push) and refresh after branch ops.
+          runRemoteAction: repository.summary.runRemoteAction,
+          refresh: () => repository.summary.refresh(),
         };
       }),
     [multiSourceControl.repositories],

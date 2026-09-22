@@ -386,4 +386,16 @@ export const native = {
       branch,
       workspace: currentWorkspaceEnv(),
     }),
+  gitCreateBranch: (repoRoot: string, branch: string) =>
+    invoke<void>("git_create_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitMergeBranch: (repoRoot: string, branch: string) =>
+    invoke<void>("git_merge_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
 };

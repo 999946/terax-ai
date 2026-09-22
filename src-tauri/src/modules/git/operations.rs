@@ -1186,6 +1186,49 @@ pub fn checkout_branch(
     ensure_success(&output, "git checkout failed")
 }
 
+/// Create a new local branch at HEAD. The arg is a branch name (or a
+/// `<start-point>` form), so the same `-`/empty guard as checkout applies.
+pub fn create_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch_name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if branch_name.starts_with('-') || branch_name.is_empty() {
+        return Err(GitError::InvalidPath(branch_name.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["branch", branch_name],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git branch failed")
+}
+
+/// Merge another branch into the current HEAD.
+pub fn merge_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch_name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if branch_name.starts_with('-') || branch_name.is_empty() {
+        return Err(GitError::InvalidPath(branch_name.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["merge", branch_name],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git merge failed")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
