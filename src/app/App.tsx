@@ -5,6 +5,17 @@ import {
 } from "@/components/ui/resizable";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { consumeLaunchFiles, getLaunchDir } from "@/lib/launchDir";
 import { quoteShellArg } from "@/lib/shellQuote";
 import { usePresence } from "@/lib/usePresence";
@@ -337,6 +348,8 @@ export default function App() {
   } = useSidebarPanel(explorerRef);
 
   const [newEditorOpen, setNewEditorOpen] = useState(false);
+  const [newSpaceDialogOpen, setNewSpaceDialogOpen] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [paletteInitialMode, setPaletteInitialMode] = useState<
     "commands" | "content"
@@ -1176,25 +1189,35 @@ export default function App() {
 
   const activeCwd = activeTerminalLeafCwd;
 
-  const handleNewSpace = useCallback(async () => {
+  const handleNewSpace = useCallback(() => {
     const spacesRoot = usePreferencesStore.getState().spacesRoot;
-    if (!spacesRoot) return null;
-    const name = window.prompt(t("spaces.folderName"), `Space ${useSpaces.getState().spaces.length + 1}`);
-    if (name === null) return null;
+    if (!spacesRoot) {
+      // No workspace root configured — open the settings chooser so the user
+      // can set it, rather than silently doing nothing.
+      void openSettingsWindow();
+      return;
+    }
+    setNewSpaceName(`Space ${useSpaces.getState().spaces.length + 1}`);
+    setNewSpaceDialogOpen(true);
+  }, []);
+
+  const confirmNewSpace = useCallback(async () => {
+    const spacesRoot = usePreferencesStore.getState().spacesRoot;
+    const name = newSpaceName.trim();
+    if (!spacesRoot || !name) return;
+    setNewSpaceDialogOpen(false);
     try {
       const { createSpaceFolder } = await import("@/modules/spaces/lib/filesystem");
       const root = await createSpaceFolder(spacesRoot, name);
       const { create, setActive } = useSpaces.getState();
-      const meta = create({ name: name.trim(), root, env: workspaceEnv });
+      const meta = create({ name, root, env: workspaceEnv });
       setActiveSpaceForNewTabs(meta.id);
       newTab(root);
       setActive(meta.id);
-      return meta.id;
     } catch (error) {
       console.error("create space failed", error);
-      return null;
     }
-  }, [workspaceEnv, newTab, setActiveSpaceForNewTabs, t]);
+  }, [newSpaceName, workspaceEnv, newTab, setActiveSpaceForNewTabs]);
 
   const handleDeleteSpace = useCallback(
     (id: string) => {
@@ -1659,6 +1682,43 @@ export default function App() {
             rootPath={explorerRoot ?? home}
             onCreated={(path) => openFileTab(path)}
           />
+
+          <AlertDialog open={newSpaceDialogOpen} onOpenChange={setNewSpaceDialogOpen}>
+            <AlertDialogContent className="max-w-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t("spaces.new")}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t("spaces.folderName")}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="px-1">
+                <Input
+                  autoFocus
+                  value={newSpaceName}
+                  onChange={(e) => setNewSpaceName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newSpaceName.trim()) {
+                      e.preventDefault();
+                      void confirmNewSpace();
+                    }
+                  }}
+                  placeholder={t("spaces.folderNamePlaceholder")}
+                  className="h-8 text-[12.5px]"
+                />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setNewSpaceDialogOpen(false)}>
+                  {t("common.cancel")}
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!newSpaceName.trim()}
+                  onClick={() => void confirmNewSpace()}
+                >
+                  {t("spaces.new")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <UpdaterDialog />
 
