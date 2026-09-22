@@ -15,69 +15,89 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { type JSX, useEffect, useState } from "react";
-import { AboutSection } from "./sections/AboutSection";
-import { AgentsSection } from "./sections/AgentsSection";
-import { EditorSection } from "./sections/EditorSection";
-import { GeneralSection } from "./sections/GeneralSection";
-import { PluginSettings } from "./sections/PluginSettings";
-import { ModelsSection } from "./sections/ModelsSection";
-import { ShortcutsSection } from "./sections/ShortcutsSection";
-import { ThemesSection } from "./sections/ThemesSection";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
+
+// The tab sections are lazy so the settings shell paints before the heavier
+// panels (models / agents / plugin …) are parsed. Each tab's chunk is fetched
+// only when the user opens that tab, keeping the first paint fast.
+const LazyAboutSection = lazy(() =>
+  import("./sections/AboutSection").then((m) => ({ default: m.AboutSection })),
+);
+const LazyAgentsSection = lazy(() =>
+  import("./sections/AgentsSection").then((m) => ({ default: m.AgentsSection })),
+);
+const LazyEditorSection = lazy(() =>
+  import("./sections/EditorSection").then((m) => ({ default: m.EditorSection })),
+);
+const LazyGeneralSection = lazy(() =>
+  import("./sections/GeneralSection").then((m) => ({ default: m.GeneralSection })),
+);
+const LazyPluginSettings = lazy(() =>
+  import("./sections/PluginSettings").then((m) => ({ default: m.PluginSettings })),
+);
+const LazyModelsSection = lazy(() =>
+  import("./sections/ModelsSection").then((m) => ({ default: m.ModelsSection })),
+);
+const LazyShortcutsSection = lazy(() =>
+  import("./sections/ShortcutsSection").then((m) => ({ default: m.ShortcutsSection })),
+);
+const LazyThemesSection = lazy(() =>
+  import("./sections/ThemesSection").then((m) => ({ default: m.ThemesSection })),
+);
 
 const TABS: {
   id: SettingsTab;
   labelKey: string;
   icon: typeof Settings01Icon;
-  component: () => JSX.Element;
+  component: ComponentType;
 }[] = [
   {
     id: "general",
     labelKey: "settings.tabs.general",
     icon: Settings01Icon,
-    component: GeneralSection,
+    component: LazyGeneralSection,
   },
   {
     id: "editor",
     labelKey: "settings.tabs.editor",
     icon: SourceCodeIcon,
-    component: EditorSection,
+    component: LazyEditorSection,
   },
   {
     id: "themes",
     labelKey: "settings.tabs.themes",
     icon: PaintBoardIcon,
-    component: ThemesSection,
+    component: LazyThemesSection,
   },
   {
     id: "shortcuts",
     labelKey: "settings.tabs.shortcuts",
     icon: KeyboardIcon,
-    component: ShortcutsSection,
+    component: LazyShortcutsSection,
   },
   {
     id: "models",
     labelKey: "settings.tabs.models",
     icon: AiScanIcon,
-    component: ModelsSection,
+    component: LazyModelsSection,
   },
   {
     id: "agents",
     labelKey: "settings.tabs.agents",
     icon: UserMultiple02Icon,
-    component: AgentsSection,
+    component: LazyAgentsSection,
   },
   {
     id: "plugin",
     labelKey: "settings.tabs.plugin",
     icon: SourceCodeIcon,
-    component: PluginSettings,
+    component: LazyPluginSettings,
   },
   {
     id: "about",
     labelKey: "settings.tabs.about",
     icon: InformationCircleIcon,
-    component: AboutSection,
+    component: LazyAboutSection,
   },
 ];
 
@@ -164,7 +184,15 @@ export function SettingsApp() {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-7 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="mx-auto w-full max-w-240">
-          {ActiveSection && <ActiveSection />}
+          <Suspense
+            fallback={
+              <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
+                Loading…
+              </div>
+            }
+          >
+            {ActiveSection && <ActiveSection />}
+          </Suspense>
         </div>
       </main>
     </div>
