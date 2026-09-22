@@ -444,7 +444,7 @@ function SpaceRow({
           </span>
         )}
         {!editing && (
-          <span className="shrink-0 px-1 text-[10px] tabular-nums text-muted-foreground/50 group-hover:hidden">
+          <span className="shrink-0 px-1 text-[10px] tabular-nums text-muted-foreground/50">
             {tabs.length}
           </span>
         )}
