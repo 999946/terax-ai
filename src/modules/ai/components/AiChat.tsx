@@ -529,7 +529,9 @@ const ReadGroup = memo(function ReadGroup({ parts }: { parts: AnyPart[] }) {
         />
         <span className="shrink-0 font-medium text-foreground">{t("ai.read")}</span>
         <span className="shrink-0 text-[11px] text-muted-foreground">
-          {t("ai.fileCount", { count, s: count === 1 ? "" : "s" })}
+          {count === 1
+            ? t("ai.fileCountOne", { count })
+            : t("ai.fileCountMany", { count })}
         </span>
         {paths.length > 0 ? (
           <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground/80 group-data-[state=open]/read:invisible">
