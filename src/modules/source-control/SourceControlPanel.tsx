@@ -58,6 +58,7 @@ import {
   ArrowUp01Icon,
   CheckmarkCircle01Icon,
   Download01Icon,
+  File01Icon,
   FolderCloudIcon,
   FolderGitTwoIcon,
   GitBranchIcon,
@@ -152,6 +153,12 @@ const ROW_HEIGHTS = {
   header: 30,
   entry: 30,
 } as const;
+
+// Tree indentation: a small base plus one step per nesting depth. The step is
+// kept tight so deep folder nesting stays compact while files clearly sit
+// under their containing folder.
+const TREE_INDENT_BASE = 6;
+const TREE_INDENT_STEP = 8;
 
 type RowDescriptor =
   | { kind: "banner-diverged"; key: string }
@@ -314,6 +321,32 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     () => buildChangeTree(scm.fileEntries),
     [scm.fileEntries],
   );
+
+  // Per-folder info for the tree rows: descendant file paths (to batch
+  // stage/unstage/discard), the folder's aggregate check state (checked when
+  // all its files are staged, indeterminate when some are), and whether any
+  // descendant has unstaged changes that can be discarded.
+  const dirInfo = useMemo(() => {
+    const info = new Map<string, DirInfo>();
+    for (const dir of directoryPaths(changeTree)) {
+      const prefix = `${dir}/`;
+      const files = scm.fileEntries.filter((e) => e.path.startsWith(prefix));
+      const allChecked =
+        files.length > 0 && files.every((e) => e.checkState === "checked");
+      const anyStaged = files.some((e) => e.staged);
+      const checkState: CheckState = allChecked
+        ? "checked"
+        : anyStaged
+          ? "indeterminate"
+          : "unchecked";
+      info.set(dir, {
+        paths: files.map((e) => e.path),
+        checkState,
+        hasUnstaged: files.some((e) => e.unstaged),
+      });
+    }
+    return info;
+  }, [changeTree, scm.fileEntries]);
 
   useEffect(() => {
     const paths = directoryPaths(changeTree);
@@ -794,6 +827,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             onDiscardFile={scm.requestDiscardFile}
                             onOpenFile={onOpenFile}
                             onToggleDir={toggleDir}
+                            dirInfo={dirInfo}
+                            onToggleStageDir={scm.toggleStageDir}
+                            onDiscardDir={scm.requestDiscardDir}
                           />
                         </div>
                       );
@@ -894,6 +930,15 @@ type RowRendererProps = {
   onDiscardFile: (entry: SourceControlFileEntry) => void;
   onOpenFile?: (absolutePath: string) => void;
   onToggleDir: (path: string) => void;
+  dirInfo: Map<string, DirInfo>;
+  onToggleStageDir: (dir: string, paths: string[]) => Promise<void> | void;
+  onDiscardDir: (dir: string, paths: string[]) => void;
+};
+
+type DirInfo = {
+  paths: string[];
+  checkState: CheckState;
+  hasUnstaged: boolean;
 };
 
 const RowRenderer = memo(function RowRenderer(props: RowRendererProps) {
@@ -964,38 +1009,85 @@ function ListHeader({
 function DirRow({
   row,
   focused,
+  actionBusy,
+  dirInfo,
   onFocusRow,
   onToggleDir,
+  onToggleStageDir,
+  onDiscardDir,
 }: RowRendererProps & { row: Extract<RowDescriptor, { kind: "dir" }> }) {
+  const { t } = useTranslation();
   const iconUrl = folderIconUrl(row.name, row.isExpanded);
+  const info = dirInfo.get(row.path);
+  const checkState = info?.checkState ?? "unchecked";
+  const hasUnstaged = info?.hasUnstaged ?? false;
+  const paths = info?.paths ?? [];
+  const disabled = actionBusy !== null;
+  const isDirBusy =
+    actionBusy === `stage:dir:${row.path}` ||
+    actionBusy === `unstage:dir:${row.path}`;
+  const isDiscardBusy = actionBusy === `discard:dir:${row.path}`;
   return (
-    <button
+    <div
       id={`scm-row-${row.key}`}
-      type="button"
       role="option"
       aria-selected={false}
       data-focused={focused || undefined}
       onMouseDown={() => onFocusRow(row.key)}
-      onClick={() => onToggleDir(row.path)}
       className={cn(
         "flex h-[30px] w-full items-center gap-2 rounded-md pr-2 text-left transition-colors",
         focused ? "bg-accent/60" : "hover:bg-accent/30",
       )}
-      style={{ paddingLeft: 6 + row.depth * 12 }}
+      style={{ paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP }}
     >
-      <span className="flex size-3.5 shrink-0 items-center justify-center">
-        <HugeiconsIcon
-          icon={ArrowRight01Icon}
-          size={12}
-          strokeWidth={2.25}
-          className={cn("transition-transform", row.isExpanded && "rotate-90")}
-        />
+      <span className="flex size-5 shrink-0 items-center justify-center">
+        {isDirBusy ? (
+          <Spinner className="size-3" />
+        ) : (
+          <Checkbox
+            aria-label={t("sourceControl.stagePathAria", { path: row.path })}
+            checked={checkboxValue(checkState)}
+            disabled={disabled}
+            onCheckedChange={() => void onToggleStageDir(row.path, paths)}
+            className="size-3.5"
+          />
+        )}
       </span>
-      {iconUrl ? <img src={iconUrl} alt="" className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />}
-      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/95">
-        {row.name}
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={() => onToggleDir(row.path)}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+      >
+        <span className="flex size-3.5 shrink-0 items-center justify-center">
+          <HugeiconsIcon
+            icon={ArrowRight01Icon}
+            size={12}
+            strokeWidth={2.25}
+            className={cn("transition-transform", row.isExpanded && "rotate-90")}
+          />
+        </span>
+        {iconUrl ? <img src={iconUrl} alt="" className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />}
+        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/95">
+          {row.name}
+        </span>
+      </button>
+      {hasUnstaged ? (
+        <div className="flex shrink-0 items-center">
+          <IconActionButton
+            label={t("sourceControl.discardPath", { path: row.path })}
+            disabled={disabled}
+            side="top"
+            onClick={() => onDiscardDir(row.path, paths)}
+          >
+            {isDiscardBusy ? (
+              <Spinner className="size-3" />
+            ) : (
+              <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
+            )}
+          </IconActionButton>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1046,7 +1138,7 @@ const EntryRow = memo(function EntryRow({
           onMouseDown={() => onFocusRow(row.key)}
           className={cn(
             "group relative flex h-[30px] items-center gap-2 rounded-md pr-2 transition-all duration-100",
-            { paddingLeft: 6 + row.depth * 12 },
+            { paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP },
             focused
               ? "bg-accent/60"
               : isSelected
@@ -1064,6 +1156,19 @@ const EntryRow = memo(function EntryRow({
             )}
             aria-hidden
           />
+          <span className="flex size-5 shrink-0 items-center justify-center">
+            {isStageBusy ? (
+              <Spinner className="size-3" />
+            ) : (
+              <Checkbox
+                aria-label={t("sourceControl.stagePathAria", { path: entry.path })}
+                checked={checkboxValue(entry.checkState)}
+                disabled={disabled}
+                onCheckedChange={() => void onToggleStageFile(entry)}
+                className="size-3.5"
+              />
+            )}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -1072,7 +1177,6 @@ const EntryRow = memo(function EntryRow({
             }}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
           >
-            <span className="size-3.5 shrink-0" aria-hidden />
             {iconUrl ? (
               <img src={iconUrl} alt="" className="size-4 shrink-0" />
             ) : (
@@ -1098,8 +1202,18 @@ const EntryRow = memo(function EntryRow({
             </div>
           </button>
 
-          {showDiscard ? (
-            <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 data-[focused=true]:opacity-100 data-[selected=true]:opacity-100">
+          <div className="flex shrink-0 items-center">
+            {!isDeleted && onOpenFile && absolutePath ? (
+              <IconActionButton
+                label={t("sourceControl.openFile")}
+                disabled={disabled}
+                side="top"
+                onClick={() => onOpenFile(absolutePath)}
+              >
+                <HugeiconsIcon icon={File01Icon} size={11} strokeWidth={1.9} />
+              </IconActionButton>
+            ) : null}
+            {showDiscard ? (
               <IconActionButton
                 label={t("sourceControl.discardPath", { path: entry.path })}
                 disabled={disabled}
@@ -1116,22 +1230,8 @@ const EntryRow = memo(function EntryRow({
                   />
                 )}
               </IconActionButton>
-            </div>
-          ) : null}
-
-          <span className="flex size-5 shrink-0 items-center justify-center">
-            {isStageBusy ? (
-              <Spinner className="size-3" />
-            ) : (
-              <Checkbox
-                aria-label={t("sourceControl.stagePathAria", { path: entry.path })}
-                checked={checkboxValue(entry.checkState)}
-                disabled={disabled}
-                onCheckedChange={() => void onToggleStageFile(entry)}
-                className="size-3.5"
-              />
-            )}
-          </span>
+            ) : null}
+          </div>
         </div>
       </ContextMenuTrigger>
 

@@ -99,7 +99,7 @@ export type SourceControlFileEntry = {
 };
 
 export type PendingDiscard = {
-  scope: "single" | "all";
+  scope: "single" | "dir" | "all";
   count: number;
   label: string;
 };
@@ -136,8 +136,10 @@ type SourceControlPanelState = {
   unstageEntry: (entry: SourceControlEntry) => Promise<void>;
   toggleStageFile: (entry: SourceControlFileEntry) => Promise<void>;
   toggleAll: () => Promise<void>;
+  toggleStageDir: (dir: string, paths: string[]) => Promise<void>;
   requestDiscardEntry: (entry: SourceControlEntry) => void;
   requestDiscardFile: (entry: SourceControlFileEntry) => void;
+  requestDiscardDir: (dir: string, paths: string[]) => void;
   requestDiscardAll: () => void;
   confirmPendingDiscard: () => Promise<void>;
   cancelPendingDiscard: () => void;
@@ -436,6 +438,7 @@ export function useSourceControlPanel(
   const [pendingDiscard, setPendingDiscard] = useState<
     | { scope: "single"; entry: SourceControlEntry }
     | { scope: "all"; entries: SourceControlEntry[] }
+    | { scope: "dir"; path: string; entries: SourceControlEntry[] }
     | null
   >(null);
   const selectedRef = useRef<DiffSelection | null>(null);
@@ -764,10 +767,14 @@ export function useSourceControlPanel(
       untracked: entry.untracked,
     }));
     const paths = new Set(list.map((entry) => entry.path));
-    await runMutation(
+    const busyKey =
       pendingDiscard.scope === "single"
         ? `discard:${list[0].path}`
-        : "discard:all",
+        : pendingDiscard.scope === "dir"
+          ? `discard:dir:${pendingDiscard.path}`
+          : "discard:all";
+    await runMutation(
+      busyKey,
       (s) => optimisticDiscard(s, paths),
       () => native.gitDiscard(repo.repoRoot, entries),
       [...paths],
@@ -845,6 +852,33 @@ export function useSourceControlPanel(
     else await stageAllEntries();
   }, [headerCheckState, stageAllEntries, unstageAllEntries]);
 
+  const toggleStageDir = useCallback(
+    async (pendingDir: string, paths: string[]) => {
+      if (!repo || summary.busyAction || paths.length === 0) return;
+      const dirFiles = fileEntries.filter((e) => paths.includes(e.path));
+      const allChecked =
+        dirFiles.length > 0 &&
+        dirFiles.every((e) => e.checkState === "checked");
+      const pathSet = new Set(paths);
+      if (allChecked) {
+        await runMutation(
+          `unstage:dir:${pendingDir}`,
+          (s) => optimisticUnstage(s, pathSet),
+          () => native.gitUnstage(repo.repoRoot, paths),
+          paths,
+        );
+      } else {
+        await runMutation(
+          `stage:dir:${pendingDir}`,
+          (s) => optimisticStage(s, pathSet),
+          () => native.gitStage(repo.repoRoot, paths),
+          paths,
+        );
+      }
+    },
+    [fileEntries, repo, runMutation, summary.busyAction],
+  );
+
   const requestDiscardFile = useCallback(
     (entry: SourceControlFileEntry) => {
       if (!repo || summary.busyAction) return;
@@ -864,6 +898,16 @@ export function useSourceControlPanel(
       });
     },
     [repo, summary.busyAction],
+  );
+
+  const requestDiscardDir = useCallback(
+    (pendingDir: string, paths: string[]) => {
+      if (!repo || summary.busyAction) return;
+      const entries = unstagedEntries.filter((e) => paths.includes(e.path));
+      if (entries.length === 0) return;
+      setPendingDiscard({ scope: "dir", path: pendingDir, entries });
+    },
+    [repo, summary.busyAction, unstagedEntries],
   );
 
   const generateCommitMessage = useCallback(async () => {
@@ -995,6 +1039,13 @@ export function useSourceControlPanel(
         label: pendingDiscard.entry.path,
       };
     }
+    if (pendingDiscard.scope === "dir") {
+      return {
+        scope: "dir",
+        count: pendingDiscard.entries.length,
+        label: pendingDiscard.path,
+      };
+    }
     return {
       scope: "all",
       count: pendingDiscard.entries.length,
@@ -1036,8 +1087,10 @@ export function useSourceControlPanel(
     unstageEntry,
     toggleStageFile,
     toggleAll,
+    toggleStageDir,
     requestDiscardEntry,
     requestDiscardFile,
+    requestDiscardDir,
     requestDiscardAll,
     confirmPendingDiscard,
     cancelPendingDiscard,
