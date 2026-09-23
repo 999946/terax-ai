@@ -1258,6 +1258,11 @@ function RepoRowItem({
     () => branches.filter((b) => b.kind === "local"),
     [branches],
   );
+  const remoteBranches = useMemo(
+    () => branches.filter((b) => b.kind === "remote"),
+    [branches],
+  );
+  const hasBranches = localBranches.length > 0 || remoteBranches.length > 0;
 
   const handleCheckout = useCallback(
     async (branch: string) => {
@@ -1422,27 +1427,57 @@ function RepoRowItem({
                   <div className="px-3 py-2 text-[11px] leading-snug text-destructive">
                     {branchError}
                   </div>
-                ) : localBranches.length > 0 ? (
-                  localBranches.map((b) => (
-                    <DropdownMenuItem
-                      key={b.name}
-                      disabled={branchBusy}
-                      onSelect={() => void handleCheckout(b.name)}
-                      className={cn(COMPACT_ITEM, "flex items-center gap-2")}
-                    >
-                      {b.isHead ? (
-                        <HugeiconsIcon
-                          icon={Tick02Icon}
-                          size={13}
-                          strokeWidth={2}
-                          className="shrink-0 text-foreground"
-                        />
-                      ) : (
-                        <span className="w-3.5 shrink-0" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                    </DropdownMenuItem>
-                  ))
+                ) : hasBranches ? (
+                  <>
+                    {localBranches.length > 0 && (
+                      <>
+                        <div className="px-3 pb-0.5 pt-1.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                          {t("sourceControl.localBranches")}
+                        </div>
+                        {localBranches.map((b) => (
+                          <DropdownMenuItem
+                            key={b.name}
+                            disabled={branchBusy}
+                            onSelect={() => void handleCheckout(b.name)}
+                            className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                          >
+                            {b.isHead ? (
+                              <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={13}
+                                strokeWidth={2}
+                                className="shrink-0 text-foreground"
+                              />
+                            ) : (
+                              <span className="w-3.5 shrink-0" />
+                            )}
+                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                    {localBranches.length > 0 && remoteBranches.length > 0 && (
+                      <DropdownMenuSeparator />
+                    )}
+                    {remoteBranches.length > 0 && (
+                      <>
+                        <div className="px-3 pb-0.5 pt-1.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                          {t("sourceControl.remoteBranches")}
+                        </div>
+                        {remoteBranches.map((b) => (
+                          <DropdownMenuItem
+                            key={b.name}
+                            disabled={branchBusy}
+                            onSelect={() => void handleCheckout(b.name)}
+                            className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                          >
+                            <span className="w-3.5 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </>
                 ) : (
                   <div className="px-3 py-2 text-[11px] text-muted-foreground">
                     {t("sourceControl.noBranchesFound")}
@@ -1477,19 +1512,48 @@ function RepoRowItem({
                   <div className="px-3 py-2 text-[11px] leading-snug text-destructive">
                     {branchError}
                   </div>
-                ) : localBranches.length > 1 ? (
-                  localBranches
-                    .filter((b) => !b.isHead)
-                    .map((b) => (
-                      <DropdownMenuItem
-                        key={b.name}
-                        disabled={branchBusy}
-                        onSelect={() => void handleMerge(b.name)}
-                        className={cn(COMPACT_ITEM, "flex items-center gap-2")}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                      </DropdownMenuItem>
-                    ))
+                ) : hasBranches ? (
+                  <>
+                    {localBranches.length > 1 && (
+                      <>
+                        <div className="px-3 pb-0.5 pt-1.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                          {t("sourceControl.localBranches")}
+                        </div>
+                        {localBranches
+                          .filter((b) => !b.isHead)
+                          .map((b) => (
+                            <DropdownMenuItem
+                              key={b.name}
+                              disabled={branchBusy}
+                              onSelect={() => void handleMerge(b.name)}
+                              className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                            >
+                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                            </DropdownMenuItem>
+                          ))}
+                      </>
+                    )}
+                    {localBranches.length > 1 && remoteBranches.length > 0 && (
+                      <DropdownMenuSeparator />
+                    )}
+                    {remoteBranches.length > 0 && (
+                      <>
+                        <div className="px-3 pb-0.5 pt-1.5 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                          {t("sourceControl.remoteBranches")}
+                        </div>
+                        {remoteBranches.map((b) => (
+                          <DropdownMenuItem
+                            key={b.name}
+                            disabled={branchBusy}
+                            onSelect={() => void handleMerge(b.name)}
+                            className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </>
                 ) : (
                   <div className="px-3 py-2 text-[11px] text-muted-foreground">
                     {t("sourceControl.noBranchesFound")}

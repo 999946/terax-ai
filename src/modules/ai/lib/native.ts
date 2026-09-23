@@ -126,7 +126,7 @@ export type GitDiscardEntry = {
 
 export type GitBranchEntry = {
   name: string;
-  kind: "local" | "worktree";
+  kind: "local" | "worktree" | "remote";
   worktreePath: string | null;
   isHead: boolean;
   isDetached: boolean;

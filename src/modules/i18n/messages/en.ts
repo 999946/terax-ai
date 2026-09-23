@@ -891,6 +891,7 @@ export const en: Record<string, string> = {
   "sourceControl.followActiveContext": "Follow Active Context",
   "sourceControl.loadingBranches": "Loading branches…",
   "sourceControl.localBranches": "Local Branches",
+  "sourceControl.remoteBranches": "Remote Branches",
   "sourceControl.worktrees": "Worktrees",
   "sourceControl.noBranchesFound": "No branches found.",
   "sourceControl.branchLabelFallback": "Source Control",

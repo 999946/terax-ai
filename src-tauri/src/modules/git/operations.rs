@@ -1103,6 +1103,38 @@ pub fn list_branches(
         }
     }
 
+    // Remote-tracking branches (`refs/remotes/<remote>/<branch>`). for-each-ref
+    // skips the symbolic `origin/HEAD`, so this yields clean `origin/foo` names.
+    if let Ok(lines) = git_stdout_lines(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["for-each-ref", "refs/remotes", "--format=%(refname:short)"],
+    ) {
+        for name in &lines {
+            let name = name.trim();
+            if name.is_empty() || name.ends_with("/HEAD") {
+                continue;
+            }
+            // `refname:short` for refs/remotes is already `remote/branch`; ensure
+            // there's a non-empty branch after the first '/' and the remote name
+            // looks legitimate (mirrors the remote_url guard).
+            if let Some((remote, branch)) = name.split_once('/') {
+                if !remote.is_empty()
+                    && !branch.is_empty()
+                    && remote.chars().all(is_remote_name_char)
+                {
+                    branches.push(GitBranchEntry {
+                        name: name.to_string(),
+                        kind: "remote".into(),
+                        worktree_path: None,
+                        is_head: false,
+                        is_detached: false,
+                    });
+                }
+            }
+        }
+    }
+
     // Prefer a branch's worktree entry over its local one, except for the current
     // branch: the main worktree is always listed, so !is_head keeps it local.
     let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
@@ -1129,7 +1161,11 @@ pub fn list_branches(
     }
 
     deduped.sort_by(|a, b| {
-        let kind_ord = |k: &str| if k == "local" { 0u8 } else { 1u8 };
+        let kind_ord = |k: &str| match k {
+            "local" => 0u8,
+            "worktree" => 1,
+            _ => 2,
+        };
         kind_ord(&a.kind)
             .cmp(&kind_ord(&b.kind))
             .then_with(|| a.name.cmp(&b.name))

@@ -891,6 +891,7 @@ export const zhCN: Record<string, string> = {
   "sourceControl.followActiveContext": "跟随活动上下文",
   "sourceControl.loadingBranches": "正在加载分支…",
   "sourceControl.localBranches": "本地分支",
+  "sourceControl.remoteBranches": "远程分支",
   "sourceControl.worktrees": "工作树",
   "sourceControl.noBranchesFound": "未找到分支。",
   "sourceControl.branchLabelFallback": "源代码管理",
