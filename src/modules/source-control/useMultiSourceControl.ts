@@ -4,6 +4,7 @@ import {
   type GitStatusSnapshot,
 } from "@/modules/ai/lib/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   SourceControlRemoteAction,
   SourceControlRemoteActionMode,
@@ -44,13 +45,13 @@ export type RepoState = RepoData & {
   };
 };
 
-function normalizeError(error: unknown): string {
+function normalizeError(error: unknown, fallback = "Unknown error"): string {
   if (typeof error === "string") return error;
   if (error && typeof error === "object" && "message" in error) {
     const message = (error as { message?: unknown }).message;
     if (typeof message === "string") return message;
   }
-  return "Unknown source control error";
+  return fallback;
 }
 
 function isSameRepo(a: GitRepoInfo | null, b: string | null): boolean {
@@ -70,6 +71,7 @@ export function useMultiSourceControl(
   refresh: () => Promise<void>;
 } {
   // Normalize null so the fallback path is explicit.
+  const { t } = useTranslation();
   const [repos, setRepos] = useState<GitRepoInfo[]>([]);
   const [data, setData] = useState<Record<string, RepoData>>({});
   const [loading, setLoading] = useState(false);
@@ -118,7 +120,7 @@ export function useMultiSourceControl(
         if (!listMountedRef.current || requestId !== listRequestIdRef.current)
           return;
         setLoading(false);
-        setError(normalizeError(e));
+        setError(normalizeError(e, t("sourceControl.unknownError")));
       }
     })();
 
@@ -127,7 +129,7 @@ export function useMultiSourceControl(
       listMountedRef.current = false;
       requestIds.current++;
     };
-  }, [enabled, contextPath]);
+  }, [enabled, contextPath, t]);
 
   // Load status for each repo (keyed by repoRoot). Runs when repos change.
   useEffect(() => {
@@ -180,12 +182,12 @@ export function useMultiSourceControl(
           setData((prev) => ({
             ...prev,
             [root]: prev[root]
-              ? { ...prev[root], isLoading: false, error: normalizeError(e) }
+              ? { ...prev[root], isLoading: false, error: normalizeError(e, t("sourceControl.unknownError")) }
               : {
                   repo: repos.find((r) => r.repoRoot === root)!,
                   status: null,
                   isLoading: false,
-                  error: normalizeError(e),
+                  error: normalizeError(e, t("sourceControl.unknownError")),
                 },
           }));
         }
@@ -197,7 +199,7 @@ export function useMultiSourceControl(
       statusMountedRef.current = false;
       requestIds.current++;
     };
-  }, [repos]);
+  }, [repos, t]);
 
   const applyStatusFor = useCallback(
     (root: string, updater: (s: GitStatusSnapshot) => GitStatusSnapshot) => {
@@ -229,13 +231,13 @@ export function useMultiSourceControl(
       } catch (e) {
         setData((prev) =>
           prev[root]
-            ? { ...prev, [root]: { ...prev[root], isLoading: false, error: normalizeError(e) } }
+            ? { ...prev, [root]: { ...prev[root], isLoading: false, error: normalizeError(e, t("sourceControl.unknownError")) } }
             : prev,
         );
         throw e;
       }
     },
-    [],
+    [t],
   );
 
   const refreshAll = useCallback(async () => {
@@ -254,10 +256,10 @@ export function useMultiSourceControl(
       setLoading(false);
     } catch (e) {
       setLoading(false);
-      setError(normalizeError(e));
+      setError(normalizeError(e, t("sourceControl.unknownError")));
       throw e;
     }
-  }, [contextPath, enabled, refreshRepo]);
+  }, [contextPath, enabled, refreshRepo, t]);
 
   useEffect(() => {
     const onFocus = () => void refreshAll().catch(() => {});
@@ -301,10 +303,10 @@ export function useMultiSourceControl(
         await refreshRepo(root, "never");
         return { ok: true, action };
       } catch (e) {
-        return { ok: false, action, error: normalizeError(e) };
+        return { ok: false, action, error: normalizeError(e, t("sourceControl.unknownError")) };
       }
     },
-    [data, refreshRepo],
+    [data, refreshRepo, t],
   );
 
   const focusRepo = useCallback((root: string) => {

@@ -4,7 +4,9 @@ import {
   type GitStatusSnapshot,
 } from "@/modules/ai/lib/native";
 import { useWorkspaceEnvStore, workspaceScopeKey } from "@/modules/workspace";
+import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const AUTO_FETCH_THROTTLE_MS = 5 * 60_000;
 const AUTO_FETCH_LRU_LIMIT = 16;
@@ -134,13 +136,13 @@ export function beginSourceControlRefresh<
   };
 }
 
-function normalizeError(error: unknown): string {
+function normalizeError(error: unknown, fallback = "Unknown error"): string {
   if (typeof error === "string") return error;
   if (error && typeof error === "object" && "message" in error) {
     const message = (error as { message?: unknown }).message;
     if (typeof message === "string") return message;
   }
-  return "Unknown source control error";
+  return fallback;
 }
 
 function getContextualAction(
@@ -158,6 +160,7 @@ export function getSourceControlRemoteIndicator(
     SourceControlSummary,
     "hasRepo" | "upstream" | "ahead" | "behind" | "busyAction"
   >,
+  t: TFunction,
 ): SourceControlRemoteIndicator {
   if (!summary.hasRepo || !summary.upstream) {
     return { visible: false, label: "", title: "", disabled: true, action: null };
@@ -166,8 +169,7 @@ export function getSourceControlRemoteIndicator(
     return {
       visible: true,
       label: `↑${summary.ahead} ↓${summary.behind}`,
-      title:
-        "Branch has diverged from upstream. Use Source Control or the terminal to resolve it.",
+      title: t("sourceControl.remoteDivergedTitle"),
       disabled: true,
       action: null,
     };
@@ -176,9 +178,10 @@ export function getSourceControlRemoteIndicator(
     return {
       visible: true,
       label: `↓${summary.behind}`,
-      title: `Pull ${summary.behind} remote ${
-        summary.behind === 1 ? "commit" : "commits"
-      } with fast-forward only.`,
+      title:
+        summary.behind === 1
+          ? t("sourceControl.pullCommitOne", { count: summary.behind })
+          : t("sourceControl.pullCommitMany", { count: summary.behind }),
       disabled: summary.busyAction !== null,
       action: "pull",
     };
@@ -187,17 +190,18 @@ export function getSourceControlRemoteIndicator(
     return {
       visible: true,
       label: `↑${summary.ahead}`,
-      title: `Push ${summary.ahead} local ${
-        summary.ahead === 1 ? "commit" : "commits"
-      }.`,
+      title:
+        summary.ahead === 1
+          ? t("sourceControl.pushLocalTitleOne", { count: summary.ahead })
+          : t("sourceControl.pushLocalTitleMany", { count: summary.ahead }),
       disabled: summary.busyAction !== null,
       action: "push",
     };
   }
   return {
     visible: true,
-    label: "Sync",
-    title: "Fetch remote updates.",
+    label: t("sourceControl.sync"),
+    title: t("sourceControl.fetchRemoteTitle"),
     disabled: summary.busyAction !== null,
     action: "fetch",
   };
@@ -219,6 +223,7 @@ export function useSourceControl(
 ): SourceControlSummary {
   const workspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const workspaceKey = workspaceScopeKey(workspaceEnv);
+  const { t } = useTranslation();
   const [state, setState] = useState<SourceControlSummaryState>({
     contextPath: null,
     repo: null,
@@ -398,7 +403,7 @@ export function useSourceControl(
             status = await native.gitStatus(repo.repoRoot);
             if (!isCurrentRequest()) return;
           } catch (error) {
-            nextRemoteError = normalizeError(error);
+            nextRemoteError = normalizeError(error, t("sourceControl.unknownError"));
           }
         }
 
@@ -420,7 +425,7 @@ export function useSourceControl(
           hasRepo: false,
           status: null,
           isLoading: false,
-          localError: normalizeError(error),
+          localError: normalizeError(error, t("sourceControl.unknownError")),
         }));
       } finally {
         if (isCurrentRequest()) {
@@ -428,7 +433,7 @@ export function useSourceControl(
         }
       }
     },
-    [contextKey, contextPath],
+    [contextKey, contextPath, t],
   );
 
   const refresh = useCallback(
@@ -492,7 +497,7 @@ export function useSourceControl(
         }
         return { ok: true, action };
       } catch (error) {
-        const message = normalizeError(error);
+        const message = normalizeError(error, t("sourceControl.unknownError"));
         if (isCurrentContext()) {
           setState((current) => ({ ...current, lastRemoteError: message }));
           await refresh({ remote: "never" }).catch(() => {});
@@ -502,7 +507,7 @@ export function useSourceControl(
         setState((current) => ({ ...current, busyAction: null }));
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   useEffect(() => {
