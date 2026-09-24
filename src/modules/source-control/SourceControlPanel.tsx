@@ -1138,13 +1138,13 @@ const EntryRow = memo(function EntryRow({
           onMouseDown={() => onFocusRow(row.key)}
           className={cn(
             "group relative flex h-[30px] items-center gap-2 rounded-md pr-2 transition-all duration-100",
-            { paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP },
             focused
               ? "bg-accent/60"
               : isSelected
                 ? "bg-accent/55 text-foreground"
                 : "hover:bg-accent/30",
           )}
+          style={{ paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP }}
         >
           <span
             className={cn(

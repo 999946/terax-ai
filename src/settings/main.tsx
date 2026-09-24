@@ -27,5 +27,9 @@ const showWindow = () => {
     .show()
     .catch((e) => console.error("settings show failed:", e));
 };
-// Show once after the first React paint; avoid duplicate delayed IPC calls.
-requestAnimationFrame(showWindow);
+// rAF is throttled while the webview is hidden, so a hidden settings window
+// can sit invisible for a long time before the callback fires. Use a plain
+// timeout like the main window does. A 500 ms safety net forces the show again
+// if the first attempt was swallowed while the window was still settling.
+setTimeout(showWindow, 50);
+setTimeout(showWindow, 500);
