@@ -58,7 +58,8 @@ import {
 } from "@/modules/header";
 import { setLspNavigator } from "@/modules/lsp";
 import type { PreviewPaneHandle } from "@/modules/preview";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { FloatingSettingsOverlay } from "@/modules/settings/FloatingSettingsOverlay";
+import { useFloatingSettings } from "@/modules/settings/floatingSettingsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   shouldDisablePaneSwapShortcut,
@@ -563,7 +564,7 @@ export default function App() {
 
   const togglePanelAndFocus = useCallback(() => {
     if (!hasComposer) {
-      void openSettingsWindow("models");
+      void useFloatingSettings.getState().openSettings("models");
       return;
     }
     if (panelOpen) {
@@ -579,7 +580,7 @@ export default function App() {
   const handleAttachFileToAgent = useCallback(
     (path: string) => {
       if (!hasComposer) {
-        void openSettingsWindow("models");
+        void useFloatingSettings.getState().openSettings("models");
         return;
       }
       // Dispatch a window event the composer listens for. Same pattern as
@@ -595,7 +596,7 @@ export default function App() {
 
   const askFromSelection = useCallback(() => {
     if (!hasComposer) {
-      void openSettingsWindow("models");
+      void useFloatingSettings.getState().openSettings("models");
       return;
     }
     const selection = captureActiveSelection();
@@ -953,7 +954,7 @@ export default function App() {
       "ai.toggle": togglePanelAndFocus,
       "ai.toggleMini": () => {
         if (!hasComposer) {
-          void openSettingsWindow("models");
+          void useFloatingSettings.getState().openSettings("models");
           return;
         }
         toggleMini();
@@ -963,7 +964,7 @@ export default function App() {
         const t = nextAttentionTarget();
         if (t) activateAgentTarget(t.tabId, t.leafId);
       },
-      "settings.open": () => void openSettingsWindow(),
+      "settings.open": () => useFloatingSettings.getState().openSettings(),
       "sidebar.toggle": toggleSidebar,
       "explorer.focus": toggleExplorerFocus,
       "view.zoomIn": zoomIn,
@@ -1194,7 +1195,7 @@ export default function App() {
     if (!spacesRoot) {
       // No workspace root configured — open the settings chooser so the user
       // can set it, rather than silently doing nothing.
-      void openSettingsWindow();
+      void useFloatingSettings.getState().openSettings();
       return;
     }
     setNewSpaceName(`Space ${useSpaces.getState().spaces.length + 1}`);
@@ -1349,8 +1350,9 @@ export default function App() {
             },
             toggleAi: togglePanelAndFocus,
             askAiSelection: askFromSelection,
-            openSettings: () => void openSettingsWindow(),
-            openKeyboardShortcuts: () => void openSettingsWindow("shortcuts"),
+            openSettings: () => useFloatingSettings.getState().openSettings(),
+            openKeyboardShortcuts: () =>
+              useFloatingSettings.getState().openSettings("shortcuts"),
             spaces: useSpaces.getState().spaces,
             activeSpaceId,
             openSpacesOverview: () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
@@ -1490,7 +1492,7 @@ export default function App() {
               onOpenCommandPalette={() => openCommandPalette("commands")}
               onActivateAgent={onActivateAgent}
               onActivateLocalAgent={onActivateLocalAgent}
-              onOpenSettings={() => void openSettingsWindow()}
+              onOpenSettings={() => useFloatingSettings.getState().openSettings()}
               searchTarget={searchTarget}
               searchRef={searchInlineRef}
               onOverrideLanguage={setOverrideLanguage}
@@ -1598,6 +1600,7 @@ export default function App() {
                       onGitHistorySearchHandle={setGitHistoryHandle}
                       onSetMarkdownView={setMarkdownView}
                     />
+                    <FloatingSettingsOverlay />
                   </div>
 
                   <WorkspaceInputBar
@@ -1609,7 +1612,7 @@ export default function App() {
                     hasComposer={hasComposer}
                     panelOpen={panelOpen}
                     keysLoaded={keysLoaded}
-                    onConnect={() => void openSettingsWindow("models")}
+                    onConnect={() => useFloatingSettings.getState().openSettings("models")}
                   />
                 </div>
               </ResizablePanel>

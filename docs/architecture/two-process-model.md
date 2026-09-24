@@ -116,10 +116,10 @@ Three distinct surfaces:
 
 - `history_suggest` / `history_commands` / `history_record` / `history_list` - shell history integration
 
-### Settings window
+### Settings panel
 
 - `get_launch_dir` - CLI launch directory, drained on first read
-- `open_settings_window` - open the separate settings webview (optional `tab` deep-link)
+- Settings open as an in-app floating panel (`src/modules/settings/floatingSettingsStore.ts` + `FloatingSettingsOverlay.tsx`): a space-independent overlay above the workspace surface, kept out of any Space's tab list, driven by a global zustand store (`open`/`section`) that survives Space switches. No separate Settings webview window.
 
 ### CLI control plane
 

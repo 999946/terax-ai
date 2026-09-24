@@ -7,6 +7,7 @@ export const en: Record<string, string> = {
   "settings.tabs.agents": "Agents",
   "settings.tabs.plugin": "Plugins",
   "settings.tabs.about": "About",
+  "settings.close": "Close settings",
   "settings.plugin.title": "Plugins",
   "settings.plugin.description": "Manage plugins available to your spaces.",
   "settings.plugin.addPlugin": "Add plugin",

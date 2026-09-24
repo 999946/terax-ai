@@ -10,6 +10,7 @@ export const zhCN: Record<string, string> = {
   "settings.tabs.agents": "代理",
   "settings.tabs.plugin": "插件",
   "settings.tabs.about": "关于",
+  "settings.close": "关闭设置",
   "settings.plugin.title": "插件",
   "settings.plugin.description": "管理工作空间可用的插件。",
   "settings.plugin.addPlugin": "添加插件",

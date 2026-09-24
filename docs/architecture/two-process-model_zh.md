@@ -116,10 +116,10 @@ Terax 由两个进程组成：Rust 后端（`src-tauri/`）和 webview 前端（
 
 - `history_suggest` / `history_commands` / `history_record` / `history_list` - shell 历史记录集成
 
-### 设置窗口
+### 设置面板
 
 - `get_launch_dir` - CLI 启动目录，首次读取时取出
-- `open_settings_window` - 打开独立的设置 webview（可选的 `tab` 深层链接）
+- 设置为应用内浮动面板（`src/modules/settings/floatingSettingsStore.ts` + `FloatingSettingsOverlay.tsx`）：工作区上方、独立于 Space 的覆盖层，不计入任何 Space 的 tabs，由全局 zustand store（`open`/`section`）驱动，跨 Space 切换保持。无独立设置 webview 窗口。
 
 ### CLI 控制平面
 

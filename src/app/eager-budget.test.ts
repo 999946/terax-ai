@@ -18,8 +18,4 @@ describe("startup bundle budget", () => {
   it("main window does not eagerly pull editor/AI/markdown stacks", () => {
     expect(heavyEagerHits("src/main.tsx")).toEqual([]);
   });
-
-  it("settings window does not eagerly pull editor/AI/markdown stacks", () => {
-    expect(heavyEagerHits("src/settings/main.tsx")).toEqual([]);
-  });
 });

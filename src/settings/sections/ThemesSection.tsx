@@ -23,6 +23,7 @@ import {
   setEditorTheme,
 } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
+import { useFloatingSettings } from "@/modules/settings/floatingSettingsStore";
 import {
   deleteBgImage,
   importBgImageFromFile,
@@ -37,7 +38,6 @@ import { DEFAULT_THEME_ID } from "@/modules/theme/types";
 import { validateTheme } from "@/modules/theme/validateTheme";
 import { Edit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTranslation } from "react-i18next";
 import { useMemo, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
@@ -45,6 +45,7 @@ import { SectionHeader } from "../components/SectionHeader";
 export function ThemesSection() {
   const { t } = useTranslation();
   const { themeId, setThemeId, resolvedMode, customThemes } = useTheme();
+  const closeSettings = useFloatingSettings((s) => s.closeSettings);
   const builtinThemes = listBuiltinThemes();
   const themes = useMemo(
     () => [...builtinThemes, ...customThemes],
@@ -62,12 +63,12 @@ export function ThemesSection() {
 
   const onCreateTheme = () => {
     void emitThemeEdit({ action: "create" });
-    void getCurrentWindow().hide();
+    closeSettings();
   };
 
   const onEditTheme = (id: string) => {
     void emitThemeEdit({ action: "edit", id });
-    void getCurrentWindow().hide();
+    closeSettings();
   };
 
   const editorThemePref = usePreferencesStore((s) => s.editorTheme);

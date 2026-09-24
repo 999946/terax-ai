@@ -3,9 +3,7 @@ pub mod modules;
 use modules::{agent, control, fs, git, history, lsp, net, plugin, pty, secrets, shell, workspace};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
-#[cfg(target_os = "macos")]
-use tauri::{PhysicalPosition, WindowEvent};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_window_state::StateFlags;
 
 /// Drained on first read so HMR / re-mounts can't replay the launch dir.
@@ -77,84 +75,6 @@ fn parse_launch_target() -> LaunchTarget {
     resolve_launch_target(entries)
 }
 
-#[tauri::command]
-async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
-    let url_path = match tab.as_deref() {
-        Some(t) if !t.is_empty() => format!("settings.html?tab={}", t),
-        _ => "settings.html".to_string(),
-    };
-
-    if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.set_always_on_top(true);
-        let _ = window.show();
-        let _ = window.set_focus();
-        if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
-            // emit() serializes via JSON — no string-escape footgun, unlike
-            // eval() with format!(). Frontend listens via Tauri event API.
-            let _ = window.emit("terax:settings-tab", t);
-        }
-        return Ok(());
-    }
-
-    let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
-        .title("Settings")
-        .inner_size(1100.0, 820.0)
-        .min_inner_size(960.0, 700.0)
-        .resizable(true)
-        .visible(false)
-        // Keep settings above the main app window so it doesn't get hidden
-        // when the user clicks back into the editor or terminal (#33).
-        .always_on_top(true);
-
-    // Tie lifecycle to the main window so settings minimizes/closes with it.
-    // macOS: skip parent() — child + always_on_top leaves the settings webview
-    // behind the main window except while the parent is being dragged (#33).
-    #[cfg(not(target_os = "macos"))]
-    let builder = if let Some(main) = app.get_webview_window("main") {
-        builder.parent(&main).map_err(|e| e.to_string())?
-    } else {
-        builder
-    };
-
-    #[cfg(target_os = "macos")]
-    let builder = builder
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true);
-
-    // On Linux/Windows we render our own titlebar, so drop native chrome
-    // and make the window transparent.
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    let builder = builder.decorations(false).transparent(true);
-
-    let window = builder.build().map_err(|e| e.to_string())?;
-
-    // Some Linux compositors (GNOME/Mutter with CSD-by-default) ignore the
-    // builder-time decorations flag — re-assert it after realize.
-    #[cfg(target_os = "linux")]
-    {
-        let _ = window.set_decorations(false);
-    }
-
-    #[cfg(target_os = "macos")]
-    if let Some(main) = app.get_webview_window("main") {
-        if let (Ok(main_pos), Ok(main_size), Ok(settings_size)) = (
-            main.outer_position(),
-            main.outer_size(),
-            window.outer_size(),
-        ) {
-            let x = main_pos.x
-                + ((main_size.width as i32).saturating_sub(settings_size.width as i32)) / 2;
-            let y = main_pos.y
-                + ((main_size.height as i32).saturating_sub(settings_size.height as i32)) / 2;
-            let _ = window.set_position(PhysicalPosition::new(x, y));
-        } else {
-            let _ = window.center();
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(windows)]
@@ -214,22 +134,6 @@ pub fn run() {
         .setup(move |_app| {
             if let Err(error) = control::start(_app.handle().clone(), control_for_setup.clone()) {
                 log::warn!("could not start Terax control server: {error}");
-            }
-            // macOS skips parent() for the settings window, so tie its lifecycle
-            // to the main window here instead. Other platforms keep parent().
-            #[cfg(target_os = "macos")]
-            if let Some(main) = _app.get_webview_window("main") {
-                let handle = _app.handle().clone();
-                main.on_window_event(move |event| {
-                    if matches!(
-                        event,
-                        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed
-                    ) {
-                        if let Some(settings) = handle.get_webview_window("settings") {
-                            let _ = settings.close();
-                        }
-                    }
-                });
             }
             Ok(())
         })
@@ -334,7 +238,6 @@ pub fn run() {
             plugin::plugin_reset_builtin,
             get_launch_dir,
             get_launch_files,
-            open_settings_window,
             agent::agent_enable_hooks,
             agent::agent_hooks_status,
             secrets::secrets_get,
