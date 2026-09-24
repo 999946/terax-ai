@@ -398,4 +398,22 @@ export const native = {
       branch,
       workspace: currentWorkspaceEnv(),
     }),
+  gitUpdateBranch: (repoRoot: string, branch: string) =>
+    invoke<void>("git_update_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitPushBranch: (repoRoot: string, branch: string) =>
+    invoke<GitPushResult>("git_push_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitDeleteBranch: (repoRoot: string, branch: string) =>
+    invoke<void>("git_delete_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
 };

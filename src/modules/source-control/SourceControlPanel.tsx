@@ -65,7 +65,7 @@ import {
   GitMergeIcon,
   MoreHorizontalIcon,
   PlusSignIcon,
-  RemoveSquareIcon,
+  UndoIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -1082,7 +1082,7 @@ function DirRow({
             {isDiscardBusy ? (
               <Spinner className="size-3" />
             ) : (
-              <HugeiconsIcon icon={RemoveSquareIcon} size={11} strokeWidth={1.9} />
+              <HugeiconsIcon icon={UndoIcon} size={11} strokeWidth={1.9} />
             )}
           </IconActionButton>
         </div>
@@ -1224,7 +1224,7 @@ const EntryRow = memo(function EntryRow({
                   <Spinner className="size-3" />
                 ) : (
                   <HugeiconsIcon
-                    icon={RemoveSquareIcon}
+                    icon={UndoIcon}
                     size={11}
                     strokeWidth={1.9}
                   />
@@ -1331,6 +1331,7 @@ function RepoRowItem({
   const [busy, setBusy] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const loadRef = useRef(0);
 
   const loadBranches = useCallback(async () => {
@@ -1409,6 +1410,51 @@ function RepoRowItem({
     },
     [repository],
   );
+
+  const handleUpdateBranch = useCallback(
+    async (branch: string) => {
+      setBusy("update");
+      try {
+        await native.gitUpdateBranch(repository.repoRoot, branch);
+        await repository.refresh();
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository],
+  );
+
+  const handlePushBranch = useCallback(
+    async (branch: string) => {
+      setBusy("push");
+      try {
+        await native.gitPushBranch(repository.repoRoot, branch);
+        await repository.refresh();
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository],
+  );
+
+  const handleDeleteBranch = useCallback(async () => {
+    const branch = deleteTarget;
+    if (!branch) return;
+    setBusy("delete");
+    try {
+      await native.gitDeleteBranch(repository.repoRoot, branch);
+      await repository.refresh();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, repository]);
 
   const handleRemote = useCallback(
     async (mode: SourceControlRemoteActionMode) => {
@@ -1535,24 +1581,68 @@ function RepoRowItem({
                           {t("sourceControl.localBranches")}
                         </div>
                         {localBranches.map((b) => (
-                          <DropdownMenuItem
-                            key={b.name}
-                            disabled={branchBusy}
-                            onSelect={() => void handleCheckout(b.name)}
-                            className={cn(COMPACT_ITEM, "flex items-center gap-2")}
-                          >
-                            {b.isHead ? (
-                              <HugeiconsIcon
-                                icon={Tick02Icon}
-                                size={13}
-                                strokeWidth={2}
-                                className="shrink-0 text-foreground"
-                              />
-                            ) : (
-                              <span className="w-3.5 shrink-0" />
-                            )}
-                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                          </DropdownMenuItem>
+                          <DropdownMenuSub key={b.name}>
+                            <DropdownMenuSubTrigger
+                              className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                            >
+                              {b.isHead ? (
+                                <HugeiconsIcon
+                                  icon={Tick02Icon}
+                                  size={13}
+                                  strokeWidth={2}
+                                  className="shrink-0 text-foreground"
+                                />
+                              ) : (
+                                <span className="w-3.5 shrink-0" />
+                              )}
+                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className={COMPACT_CONTENT}>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => void handleCheckout(b.name)}
+                              >
+                                <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.switchBranch")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy || b.isHead}
+                                onSelect={() => void handleMerge(b.name)}
+                              >
+                                <HugeiconsIcon icon={GitMergeIcon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.mergeBranch")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => void handleUpdateBranch(b.name)}
+                              >
+                                <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.updateBranch")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => void handlePushBranch(b.name)}
+                              >
+                                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.push")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy || b.isHead}
+                                onSelect={() => setDeleteTarget(b.name)}
+                              >
+                                <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1 text-destructive">
+                                  {t("sourceControl.deleteBranch")}
+                                </span>
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                         ))}
                       </>
                     )}
@@ -1565,15 +1655,58 @@ function RepoRowItem({
                           {t("sourceControl.remoteBranches")}
                         </div>
                         {remoteBranches.map((b) => (
-                          <DropdownMenuItem
-                            key={b.name}
-                            disabled={branchBusy}
-                            onSelect={() => void handleCheckout(b.name)}
-                            className={cn(COMPACT_ITEM, "flex items-center gap-2")}
-                          >
-                            <span className="w-3.5 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                          </DropdownMenuItem>
+                          <DropdownMenuSub key={b.name}>
+                            <DropdownMenuSubTrigger
+                              className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                            >
+                              <span className="w-3.5 shrink-0" />
+                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className={COMPACT_CONTENT}>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => void handleCheckout(b.name)}
+                              >
+                                <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.switchBranch")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => void handleMerge(b.name)}
+                              >
+                                <HugeiconsIcon icon={GitMergeIcon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.mergeBranch")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => void handleUpdateBranch(b.name)}
+                              >
+                                <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.updateBranch")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled
+                              >
+                                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1">{t("sourceControl.push")}</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy}
+                                onSelect={() => setDeleteTarget(b.name)}
+                              >
+                                <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+                                <span className="flex-1 text-destructive">
+                                  {t("sourceControl.deleteBranch")}
+                                </span>
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                         ))}
                       </>
                     )}
@@ -1745,6 +1878,39 @@ function RepoRowItem({
               onClick={() => void handleCreateBranch()}
             >
               {busy === "create" ? t("sourceControl.creating") : t("sourceControl.createBranch")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("sourceControl.deleteBranchConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? t("sourceControl.deleteBranchConfirmBody", { branch: deleteTarget })
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy === "delete"}
+              onClick={() => void handleDeleteBranch()}
+            >
+              {busy === "delete"
+                ? t("sourceControl.deleting")
+                : t("sourceControl.deleteBranch")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

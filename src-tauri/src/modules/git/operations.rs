@@ -1265,6 +1265,107 @@ pub fn merge_branch(
     ensure_success(&output, "git merge failed")
 }
 
+/// Whether a branch name is a remote-tracking ref (`origin/foo`).
+fn is_remote_branch(name: &str) -> bool {
+    let Some((remote, short)) = name.split_once('/') else {
+        return false;
+    };
+    !remote.is_empty() && !short.is_empty()
+}
+
+/// Fast-forward an arbitrary branch to its remote counterpart without
+/// switching to it. Local refs use an explicit `refspec` fetch (origin/foo ->
+/// refs/heads/foo); remote-tracking refs (`origin/foo`) just refresh that ref.
+pub fn update_branch_ff_only(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch_name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if branch_name.starts_with('-') || branch_name.is_empty() {
+        return Err(GitError::InvalidPath(branch_name.into()));
+    }
+    let output = if is_remote_branch(branch_name) {
+        run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["fetch", "origin", branch_name],
+            NETWORK_TIMEOUT_SECS,
+        )?
+    } else {
+        // Fast-forward the local ref to the matching remote-tracking ref.
+        let refspec = format!("origin/{branch_name}:{branch_name}");
+        run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["fetch", "origin", &refspec],
+            NETWORK_TIMEOUT_SECS,
+        )?
+    };
+    ensure_success(&output, "git fetch update failed")
+}
+
+/// Push a named local branch to origin (used from the branch action menu).
+pub fn push_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch_name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitPushResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if branch_name.starts_with('-') || branch_name.is_empty() || is_remote_branch(branch_name) {
+        return Err(GitError::InvalidPath(branch_name.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["push", "origin", branch_name],
+        NETWORK_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git push failed")?;
+    Ok(GitPushResult {
+        remote: Some("origin".into()),
+        branch: Some(branch_name.into()),
+        pushed: true,
+    })
+}
+
+/// Soft-delete a branch. Local refs use `git branch -d` (refuses unmerged
+/// commits); remote-tracking refs (`origin/foo`) drop that remote ref with
+/// `git push origin --delete <short>`.
+pub fn delete_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch_name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if branch_name.starts_with('-') || branch_name.is_empty() {
+        return Err(GitError::InvalidPath(branch_name.into()));
+    }
+    let output = if is_remote_branch(branch_name) {
+        let (remote, short) = branch_name.split_once('/').expect("remote branch prefix");
+        run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["push", remote, "--delete", short],
+            NETWORK_TIMEOUT_SECS,
+        )?
+    } else {
+        run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["branch", "-d", branch_name],
+            DEFAULT_TIMEOUT_SECS,
+        )?
+    };
+    ensure_success(&output, "git branch delete failed")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1293,6 +1394,15 @@ mod tests {
         for c in " /:\\?\"'".chars() {
             assert!(!is_remote_name_char(c));
         }
+    }
+
+    #[test]
+    fn is_remote_branch_recognizes_remote_tracking_names() {
+        assert!(is_remote_branch("origin/main"));
+        assert!(is_remote_branch("upstream/feature/x"));
+        assert!(!is_remote_branch("main"));
+        assert!(!is_remote_branch("/main"));
+        assert!(!is_remote_branch("origin/"));
     }
 
     #[test]
