@@ -130,10 +130,21 @@ export type GitBranchEntry = {
   worktreePath: string | null;
   isHead: boolean;
   isDetached: boolean;
+  ahead: number;
+  behind: number;
 };
 
 export type GitBranchListResult = {
   branches: GitBranchEntry[];
+};
+
+export type GitStashEntry = {
+  index: string;
+  message: string;
+};
+
+export type GitStashListResult = {
+  stashes: GitStashEntry[];
 };
 
 export const native = {
@@ -414,6 +425,36 @@ export const native = {
     invoke<void>("git_delete_branch", {
       repoRoot,
       branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitStashList: (repoRoot: string) =>
+    invoke<GitStashListResult>("git_stash_list", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitStashPush: (repoRoot: string, message: string, includeUntracked: boolean) =>
+    invoke<void>("git_stash_push", {
+      repoRoot,
+      message,
+      includeUntracked,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitStashApply: (repoRoot: string, index: string) =>
+    invoke<void>("git_stash_apply", {
+      repoRoot,
+      index,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitStashPop: (repoRoot: string, index: string) =>
+    invoke<void>("git_stash_pop", {
+      repoRoot,
+      index,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitStashDrop: (repoRoot: string, index: string) =>
+    invoke<void>("git_stash_drop", {
+      repoRoot,
+      index,
       workspace: currentWorkspaceEnv(),
     }),
 };

@@ -10,7 +10,8 @@ use crate::modules::git::process::{
 use crate::modules::git::types::{
     DiscardEntry, GitBranchEntry, GitBranchListResult, GitCommitFileChange, GitCommitResult,
     GitDiffContentResult, GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult,
-    GitRepoInfo, GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    GitRepoInfo, GitStashEntry, GitStashListResult, GitStatusSnapshot, TextSource,
+    DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
@@ -1038,20 +1039,27 @@ pub fn list_branches(
     if let Ok(lines) = git_stdout_lines(
         &repo_root.workspace,
         &repo_root.git_path,
-        ["branch", "--format=%(refname:short)%00%(HEAD)"],
+        [
+            "branch",
+            "--format=%(refname:short)%00%(HEAD)%00%(upstream:track,nobracket)",
+        ],
     ) {
         for line in &lines {
             let mut parts = line.split('\0');
             let name = parts.next().unwrap_or("").to_string();
             let head_marker = parts.next().unwrap_or("");
+            let track = parts.next().unwrap_or("");
             let is_head = head_marker == "*";
             if !name.is_empty() {
+                let (ahead, behind) = parse_upstream_track(track);
                 branches.push(GitBranchEntry {
                     name,
                     kind: "local".into(),
                     worktree_path: None,
                     is_head,
                     is_detached: is_head && is_detached_head,
+                    ahead,
+                    behind,
                 });
             }
         }
@@ -1129,6 +1137,8 @@ pub fn list_branches(
                         worktree_path: None,
                         is_head: false,
                         is_detached: false,
+                        ahead: 0,
+                        behind: 0,
                     });
                 }
             }
@@ -1199,7 +1209,28 @@ fn push_worktree(
         worktree_path: Some(path),
         is_head: false,
         is_detached: branch.is_none(),
+        ahead: 0,
+        behind: 0,
     });
+}
+
+/// Parse the `%(upstream:track,nobracket)` field: `""`, `"ahead 2"`,
+/// `"behind 3"`, `"ahead 2, behind 1"`, or `"gone"`. Returns `(ahead, behind)`.
+fn parse_upstream_track(track: &str) -> (u32, u32) {
+    if track.is_empty() || track == "gone" {
+        return (0, 0);
+    }
+    let mut ahead = 0u32;
+    let mut behind = 0u32;
+    for part in track.split(',') {
+        let part = part.trim();
+        if let Some(rest) = part.strip_prefix("ahead") {
+            ahead = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = part.strip_prefix("behind") {
+            behind = rest.trim().parse().unwrap_or(0);
+        }
+    }
+    (ahead, behind)
 }
 
 pub fn checkout_branch(
@@ -1308,6 +1339,8 @@ pub fn update_branch_ff_only(
 }
 
 /// Push a named local branch to origin (used from the branch action menu).
+/// `-u` sets the upstream so the branch tracks `origin/<name>` for later
+/// ahead/behind tracking and plain `git push`.
 pub fn push_branch(
     registry: &WorkspaceRegistry,
     repo_root: &str,
@@ -1322,7 +1355,7 @@ pub fn push_branch(
     let output = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        ["push", "origin", branch_name],
+        ["push", "-u", "origin", branch_name],
         NETWORK_TIMEOUT_SECS,
     )?;
     ensure_success(&output, "git push failed")?;
@@ -1366,6 +1399,132 @@ pub fn delete_branch(
     ensure_success(&output, "git branch delete failed")
 }
 
+/// List saved stashes as `stash@{N}: <message>` pairs (newest first).
+pub fn list_stashes(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitStashListResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let mut stashes: Vec<GitStashEntry> = Vec::new();
+    if let Ok(lines) = git_stdout_lines(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["stash", "list", "--format=%gd%00%gs"],
+    ) {
+        for line in &lines {
+            let mut parts = line.split('\0');
+            let index = parts.next().unwrap_or("").trim().to_string();
+            let message = parts.next().unwrap_or("").trim().to_string();
+            if !index.is_empty() {
+                stashes.push(GitStashEntry { index, message });
+            }
+        }
+    }
+    Ok(GitStashListResult { stashes })
+}
+
+/// Push the working tree onto the stash. `message` is optional (git supplies a
+/// default `WIP on <branch>`); `include_untracked` adds `-u`.
+pub fn stash_push(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    message: Option<&str>,
+    include_untracked: bool,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let mut args: Vec<&str> = vec!["stash", "push"];
+    if include_untracked {
+        args.push("-u");
+    }
+    if let Some(msg) = message {
+        let msg = msg.trim();
+        if !msg.is_empty() {
+            args.push("-m");
+            args.push(msg);
+        }
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        args,
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git stash push failed")
+}
+
+/// A stash index (`stash@{N}`) must never start with `-` or be empty, mirroring
+/// the branch-name guard.
+fn valid_stash_index(index: &str) -> bool {
+    !index.starts_with('-') && !index.is_empty()
+}
+
+/// Apply a stash to the working tree without removing it from the list.
+pub fn stash_apply(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    index: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if !valid_stash_index(index) {
+        return Err(GitError::InvalidPath(index.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["stash", "apply", index],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git stash apply failed")
+}
+
+/// Apply a stash and drop it from the list.
+pub fn stash_pop(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    index: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if !valid_stash_index(index) {
+        return Err(GitError::InvalidPath(index.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["stash", "pop", index],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git stash pop failed")
+}
+
+/// Drop a stash from the list.
+pub fn stash_drop(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    index: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if !valid_stash_index(index) {
+        return Err(GitError::InvalidPath(index.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["stash", "drop", index],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git stash drop failed")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1403,6 +1562,15 @@ mod tests {
         assert!(!is_remote_branch("main"));
         assert!(!is_remote_branch("/main"));
         assert!(!is_remote_branch("origin/"));
+    }
+
+    #[test]
+    fn parse_upstream_track_handles_forms() {
+        assert_eq!(parse_upstream_track(""), (0, 0));
+        assert_eq!(parse_upstream_track("gone"), (0, 0));
+        assert_eq!(parse_upstream_track("ahead 2"), (2, 0));
+        assert_eq!(parse_upstream_track("behind 3"), (0, 3));
+        assert_eq!(parse_upstream_track("ahead 2, behind 1"), (2, 1));
     }
 
     #[test]

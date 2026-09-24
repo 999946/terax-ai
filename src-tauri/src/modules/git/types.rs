@@ -119,16 +119,34 @@ pub struct GitPushResult {
 #[serde(rename_all = "camelCase")]
 pub struct GitBranchEntry {
     pub name: String,
-    pub kind: String, // "local" | "worktree"
+    pub kind: String, // "local" | "worktree" | "remote"
     pub worktree_path: Option<String>,
     pub is_head: bool,
     pub is_detached: bool,
+    /// Commits ahead of the configured upstream (local branches only).
+    pub ahead: u32,
+    /// Commits behind the configured upstream (local branches only).
+    pub behind: u32,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitBranchListResult {
     pub branches: Vec<GitBranchEntry>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStashEntry {
+    /// e.g. "stash@{0}"
+    pub index: String,
+    pub message: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStashListResult {
+    pub stashes: Vec<GitStashEntry>,
 }
 
 pub(crate) struct GitOutput {
@@ -338,6 +356,8 @@ mod serde_shape_tests {
             worktree_path: None,
             is_head: false,
             is_detached: false,
+            ahead: 0,
+            behind: 0,
         };
         let list = GitBranchListResult {
             branches: vec![branch],
@@ -351,6 +371,25 @@ mod serde_shape_tests {
                     "worktreePath": null,
                     "isHead": false,
                     "isDetached": false,
+                    "ahead": 0,
+                    "behind": 0,
+                }],
+            })
+        );
+
+        let stash = GitStashEntry {
+            index: "stash@{0}".into(),
+            message: "WIP: in-progress".into(),
+        };
+        let stash_list = GitStashListResult {
+            stashes: vec![stash],
+        };
+        assert_eq!(
+            serde_json::to_value(&stash_list).unwrap(),
+            serde_json::json!({
+                "stashes": [{
+                    "index": "stash@{0}",
+                    "message": "WIP: in-progress",
                 }],
             })
         );

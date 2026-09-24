@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/tooltip";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { type GitBranchEntry, native } from "@/modules/ai/lib/native";
+import { type GitBranchEntry, type GitStashEntry, native } from "@/modules/ai/lib/native";
 import {
   copyToClipboard,
   revealInFinder,
@@ -53,6 +53,7 @@ import { joinPath } from "@/modules/explorer/lib/useFileTree";
 import {
   AiContentGenerator02Icon,
   Alert02Icon,
+  ArchiveIcon,
   ArrowDown01Icon,
   ArrowRight01Icon,
   ArrowUp01Icon,
@@ -1332,6 +1333,12 @@ function RepoRowItem({
   const [createOpen, setCreateOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [stashes, setStashes] = useState<GitStashEntry[]>([]);
+  const [stashMessageOpen, setStashMessageOpen] = useState(false);
+  const [stashMessage, setStashMessage] = useState("");
+  const [stashIncludeUntracked, setStashIncludeUntracked] = useState(false);
+  const [stashDropTarget, setStashDropTarget] = useState<string | null>(null);
+  const [pushAfterCreate, setPushAfterCreate] = useState(false);
   const loadRef = useRef(0);
 
   const loadBranches = useCallback(async () => {
@@ -1351,9 +1358,21 @@ function RepoRowItem({
     }
   }, [repository.repoRoot]);
 
+  const loadStashes = useCallback(async () => {
+    try {
+      const result = await native.gitStashList(repository.repoRoot);
+      setStashes(result.stashes);
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }, [repository.repoRoot]);
+
   useEffect(() => {
-    if (menuOpen) void loadBranches();
-  }, [menuOpen, loadBranches]);
+    if (menuOpen) {
+      void loadBranches();
+      void loadStashes();
+    }
+  }, [menuOpen, loadBranches, loadStashes]);
 
   const localBranches = useMemo(
     () => branches.filter((b) => b.kind === "local"),
@@ -1386,15 +1405,89 @@ function RepoRowItem({
     setBusy("create");
     try {
       await native.gitCreateBranch(repository.repoRoot, name);
+      if (pushAfterCreate) {
+        await native.gitPushBranch(repository.repoRoot, name);
+      }
       await repository.refresh();
       setCreateOpen(false);
       setNewBranchName("");
+      setPushAfterCreate(false);
     } catch (e) {
       toast.error(String(e));
     } finally {
       setBusy(null);
     }
-  }, [newBranchName, repository]);
+  }, [newBranchName, pushAfterCreate, repository]);
+
+  const handleStashCreate = useCallback(async () => {
+    setBusy("stash-create");
+    try {
+      await native.gitStashPush(
+        repository.repoRoot,
+        stashMessage.trim(),
+        stashIncludeUntracked,
+      );
+      await repository.refresh();
+      setStashMessageOpen(false);
+      setStashMessage("");
+      setStashIncludeUntracked(false);
+      toast.success(t("sourceControl.stashCreated"));
+      void loadStashes();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [stashMessage, stashIncludeUntracked, repository, t, loadStashes]);
+
+  const handleStashApply = useCallback(
+    async (index: string) => {
+      setBusy("stash-apply");
+      try {
+        await native.gitStashApply(repository.repoRoot, index);
+        await repository.refresh();
+        toast.success(t("sourceControl.stashApplied"));
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository, t],
+  );
+
+  const handleStashPop = useCallback(
+    async (index: string) => {
+      setBusy("stash-pop");
+      try {
+        await native.gitStashPop(repository.repoRoot, index);
+        await repository.refresh();
+        toast.success(t("sourceControl.stashPopped"));
+        void loadStashes();
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository, t, loadStashes],
+  );
+
+  const handleStashDrop = useCallback(async () => {
+    if (!stashDropTarget) return;
+    setBusy("stash-drop");
+    try {
+      await native.gitStashDrop(repository.repoRoot, stashDropTarget);
+      await repository.refresh();
+      setStashDropTarget(null);
+      toast.success(t("sourceControl.stashDropped"));
+      void loadStashes();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [stashDropTarget, repository, t, loadStashes]);
 
   const handleMerge = useCallback(
     async (branch: string) => {
@@ -1596,6 +1689,30 @@ function RepoRowItem({
                                 <span className="w-3.5 shrink-0" />
                               )}
                               <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                              {b.ahead > 0 || b.behind > 0 ? (
+                                <span className="flex shrink-0 items-center gap-1 pl-1 text-[10px] font-medium tabular-nums text-muted-foreground/70">
+                                  {b.ahead > 0 ? (
+                                    <span className="flex items-center gap-0.5">
+                                      <HugeiconsIcon
+                                        icon={ArrowUp01Icon}
+                                        size={10}
+                                        strokeWidth={2}
+                                      />
+                                      {b.ahead}
+                                    </span>
+                                  ) : null}
+                                  {b.behind > 0 ? (
+                                    <span className="flex items-center gap-0.5">
+                                      <HugeiconsIcon
+                                        icon={ArrowDown01Icon}
+                                        size={10}
+                                        strokeWidth={2}
+                                      />
+                                      {b.behind}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : null}
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent className={COMPACT_CONTENT}>
                               <DropdownMenuItem
@@ -1728,6 +1845,72 @@ function RepoRowItem({
               <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={1.8} />
               <span className="flex-1">{t("sourceControl.createBranch")}</span>
             </DropdownMenuItem>
+
+            {/* Stash */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className={COMPACT_ITEM}>
+                <HugeiconsIcon icon={ArchiveIcon} size={13} strokeWidth={1.8} />
+                <span className="flex-1">{t("sourceControl.stash")}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className={COMPACT_CONTENT}>
+                <DropdownMenuItem
+                  className={COMPACT_ITEM}
+                  disabled={branchBusy}
+                  onSelect={() => setStashMessageOpen(true)}
+                >
+                  <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={1.8} />
+                  <span className="flex-1">{t("sourceControl.newStash")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {stashes.length === 0 ? (
+                  <DropdownMenuItem
+                    className={cn(COMPACT_ITEM, "opacity-60")}
+                    disabled
+                  >
+                    <span className="flex-1">{t("sourceControl.noStashes")}</span>
+                  </DropdownMenuItem>
+                ) : (
+                  stashes.map((s) => (
+                    <DropdownMenuSub key={s.index}>
+                      <DropdownMenuSubTrigger className={COMPACT_ITEM}>
+                        <span className="min-w-0 flex-1 truncate">
+                          {s.message || s.index}
+                        </span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className={COMPACT_CONTENT}>
+                        <DropdownMenuItem
+                          className={COMPACT_ITEM}
+                          disabled={branchBusy}
+                          onSelect={() => void handleStashApply(s.index)}
+                        >
+                          <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
+                          <span className="flex-1">{t("sourceControl.applyStash")}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className={COMPACT_ITEM}
+                          disabled={branchBusy}
+                          onSelect={() => void handleStashPop(s.index)}
+                        >
+                          <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={1.8} />
+                          <span className="flex-1">{t("sourceControl.popStash")}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className={COMPACT_ITEM}
+                          disabled={branchBusy}
+                          onSelect={() => setStashDropTarget(s.index)}
+                        >
+                          <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+                          <span className="flex-1 text-destructive">
+                            {t("sourceControl.dropStash")}
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ))
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
 
             {/* Merge branch */}
             <DropdownMenuSub>
@@ -1868,6 +2051,14 @@ function RepoRowItem({
               placeholder={t("sourceControl.createBranchPlaceholder")}
               className="h-8 text-[12.5px]"
             />
+            <label className="mt-2 flex cursor-pointer select-none items-center gap-2 px-0.5 text-[12px] text-muted-foreground">
+              <Checkbox
+                checked={pushAfterCreate}
+                onCheckedChange={(c) => setPushAfterCreate(c === true)}
+                className="size-3.5"
+              />
+              {t("sourceControl.pushAfterCreate")}
+            </label>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setCreateOpen(false)}>
@@ -1911,6 +2102,94 @@ function RepoRowItem({
               {busy === "delete"
                 ? t("sourceControl.deleting")
                 : t("sourceControl.deleteBranch")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={stashMessageOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setStashMessageOpen(false);
+            setStashMessage("");
+            setStashIncludeUntracked(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("sourceControl.newStash")}</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="px-1">
+            <Input
+              autoFocus
+              value={stashMessage}
+              onChange={(e) => setStashMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleStashCreate();
+                }
+              }}
+              placeholder={t("sourceControl.stashMessagePlaceholder")}
+              className="h-8 text-[12.5px]"
+            />
+            <label className="mt-2 flex cursor-pointer select-none items-center gap-2 px-0.5 text-[12px] text-muted-foreground">
+              <Checkbox
+                checked={stashIncludeUntracked}
+                onCheckedChange={(c) => setStashIncludeUntracked(c === true)}
+                className="size-3.5"
+              />
+              {t("sourceControl.stashIncludeUntracked")}
+            </label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setStashMessageOpen(false)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy === "stash-create"}
+              onClick={() => void handleStashCreate()}
+            >
+              {busy === "stash-create"
+                ? t("sourceControl.stashing")
+                : t("sourceControl.stash")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={stashDropTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setStashDropTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("sourceControl.dropStashConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {stashDropTarget
+                ? t("sourceControl.dropStashConfirmBody", {
+                    stash: stashDropTarget,
+                  })
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setStashDropTarget(null)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy === "stash-drop"}
+              onClick={() => void handleStashDrop()}
+            >
+              {busy === "stash-drop"
+                ? t("sourceControl.droppingStash")
+                : t("sourceControl.dropStash")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
