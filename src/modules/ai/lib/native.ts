@@ -104,6 +104,21 @@ export type GitLogEntry = {
   deletions: number;
 };
 
+export type GitBlameEntry = {
+  line: number;
+  sha: string;
+  shortSha: string;
+  author: string;
+  authorEmail: string;
+  timestampSecs: number;
+  subject: string;
+};
+
+export type GitBlameResult = {
+  entries: GitBlameEntry[];
+  truncated: boolean;
+};
+
 export type GitCommitFileChange = {
   path: string;
   originalPath: string | null;
@@ -353,6 +368,12 @@ export const native = {
       repoRoot,
       limit: options?.limit ?? null,
       beforeSha: options?.beforeSha ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitBlame: (repoRoot: string, path: string) =>
+    invoke<GitBlameResult>("git_blame", {
+      repoRoot,
+      path,
       workspace: currentWorkspaceEnv(),
     }),
   gitShowCommit: (repoRoot: string, sha: string) =>

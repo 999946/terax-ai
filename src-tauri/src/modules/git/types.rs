@@ -107,6 +107,26 @@ pub struct GitLogEntry {
     pub deletions: u32,
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBlameEntry {
+    /// 1-based final line number this entry applies to.
+    pub line: u32,
+    pub sha: String,
+    pub short_sha: String,
+    pub author: String,
+    pub author_email: String,
+    pub timestamp_secs: i64,
+    pub subject: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBlameResult {
+    pub entries: Vec<GitBlameEntry>,
+    pub truncated: bool,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushResult {

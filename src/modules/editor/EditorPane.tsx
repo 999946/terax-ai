@@ -1,5 +1,6 @@
 import { endpointIdFromCompatModel } from "@/modules/ai/config";
 import { getCustomEndpointKey, getKey } from "@/modules/ai/lib/keyring";
+import { native } from "@/modules/ai/lib/native";
 import { lspFormatDocument, useLspExtension } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
@@ -44,6 +45,8 @@ import {
 } from "./lib/autocomplete/inlineExtension";
 import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
+import { setBlameEffect } from "./lib/blameBadge";
+import { fetchBlame } from "./lib/blameCache";
 import {
   buildSharedExtensions,
   DEFAULT_INDENT,
@@ -476,6 +479,33 @@ export const EditorPane = memo(
         ),
       });
     }, [doc]);
+
+    // Git blame: show the active line's commit badge at the line end (GitLens
+    // style). Resolve the repo root for the current file, fetch its blame map,
+    // and feed it into the editor via the blame StateField effect. Non-git
+    // files or repo-less paths dispatch an empty map so any stale badge clears.
+    useEffect(() => {
+      const filePath = pathRef.current;
+      let cancelled = false;
+      (async () => {
+        const repo = await native.gitResolveRepo(filePath);
+        if (cancelled) return;
+        const view = cmRef.current?.view;
+        if (!view) return;
+        if (!repo?.repoRoot) {
+          view.dispatch({ effects: setBlameEffect.of(new Map()) });
+          return;
+        }
+        const map = await fetchBlame(repo.repoRoot, filePath);
+        if (cancelled) return;
+        const live = cmRef.current?.view;
+        if (!live) return;
+        live.dispatch({ effects: setBlameEffect.of(map) });
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [path]);
 
     const lspExt = useLspExtension(path, langId, doc.status === "ready");
     useEffect(() => {

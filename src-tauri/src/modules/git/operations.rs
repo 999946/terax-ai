@@ -8,10 +8,10 @@ use crate::modules::git::process::{
     read_text_file, run_git,
 };
 use crate::modules::git::types::{
-    DiscardEntry, GitBranchEntry, GitBranchListResult, GitCommitFileChange, GitCommitResult,
-    GitDiffContentResult, GitDiffResult, GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult,
-    GitRepoInfo, GitStashEntry, GitStashListResult, GitStatusSnapshot, TextSource,
-    DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    DiscardEntry, GitBlameEntry, GitBlameResult, GitBranchEntry, GitBranchListResult,
+    GitCommitFileChange, GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry,
+    GitOutput, GitPanelSnapshot, GitPushResult, GitRepoInfo, GitStashEntry, GitStashListResult,
+    GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
@@ -830,6 +830,120 @@ pub fn commit_file_diff(
     })
 }
 
+/// Git blame per line for a single file. Returns entries sorted by line number
+/// (the porcelain output is naturally final-line ascending). Lines that are
+/// uncommitted (all-zero sha) are skipped — they have no commit info.
+pub fn blame(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    path: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitBlameResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let resolved = resolve_within_repo(&repo_root.local_path, path)?;
+    let rel = resolved
+        .strip_prefix(&repo_root.local_path)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| path.replace('\\', "/"));
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["blame", "--line-porcelain", "--", &rel],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if output.timed_out {
+        return Err(GitError::TimedOut("git blame"));
+    }
+    if output.exit_code != Some(0) {
+        return ensure_success(&output, "git blame failed").map(|_| GitBlameResult {
+            entries: Vec::new(),
+            truncated: false,
+        });
+    }
+    let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
+    Ok(GitBlameResult {
+        entries: parse_blame_porcelain(stdout),
+        truncated: output.truncated,
+    })
+}
+
+/// Parse `git blame --line-porcelain` output into per-line entries.
+///
+/// Each group starts with `<40-hex> <orig> <final> <size>` (all-zero sha = an
+/// uncommitted line, skipped), followed by `key value` header lines we care
+/// about (`author`, `author-mail`, `author-time`, `summary`) and then the
+/// source content line (tab-prefixed) plus `filename`/`previous`. The next
+/// group header or EOF terminates the current group.
+fn parse_blame_porcelain(stdout: &str) -> Vec<GitBlameEntry> {
+    const ALL_ZERO: &str = "0000000000000000000000000000000000000000";
+    let mut entries: Vec<GitBlameEntry> = Vec::new();
+    let mut current: Option<GitBlameEntry> = None;
+    for raw_line in stdout.lines() {
+        let line = raw_line.trim_end_matches('\r');
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(group) = parse_blame_group_header(line) {
+            // A new group: finalize the previous one, then start a fresh one.
+            if let Some(e) = current.take() {
+                entries.push(e);
+            }
+            if group.sha != ALL_ZERO {
+                let short_sha = group.sha.chars().take(7).collect::<String>();
+                current = Some(GitBlameEntry {
+                    line: group.final_line,
+                    sha: group.sha,
+                    short_sha,
+                    author: String::new(),
+                    author_email: String::new(),
+                    timestamp_secs: 0,
+                    subject: String::new(),
+                });
+            }
+            continue;
+        }
+        if let Some(entry) = current.as_mut() {
+            if let Some(rest) = line.strip_prefix("author ") {
+                entry.author = rest.trim().to_string();
+            } else if let Some(rest) = line.strip_prefix("author-mail <") {
+                entry.author_email = rest.trim_end_matches('>').to_string();
+            } else if let Some(rest) = line.strip_prefix("author-time ") {
+                entry.timestamp_secs = rest.trim().parse().unwrap_or(0);
+            } else if let Some(rest) = line.strip_prefix("summary ") {
+                entry.subject = rest.trim().to_string();
+            }
+        }
+    }
+    if let Some(e) = current.take() {
+        entries.push(e);
+    }
+    entries
+}
+
+struct BlameGroupHeader {
+    sha: String,
+    final_line: u32,
+}
+
+fn parse_blame_group_header(line: &str) -> Option<BlameGroupHeader> {
+    let mut parts = line.split_ascii_whitespace();
+    let sha = parts.next()?;
+    if sha.len() != 40 || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    parts.next()?; // orig line
+    let final_line = parts.next()?.parse().ok()?;
+    parts.next()?; // num lines
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(BlameGroupHeader {
+        sha: sha.to_string(),
+        final_line,
+    })
+}
+
 pub fn remote_url(
     registry: &WorkspaceRegistry,
     repo_root: &str,
@@ -1571,6 +1685,28 @@ mod tests {
         assert_eq!(parse_upstream_track("ahead 2"), (2, 0));
         assert_eq!(parse_upstream_track("behind 3"), (0, 3));
         assert_eq!(parse_upstream_track("ahead 2, behind 1"), (2, 1));
+    }
+
+    #[test]
+    fn parse_blame_porcelain_builds_entries_and_skips_uncommitted() {
+        let sha_a = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let sha_b = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        let out = format!(
+            "{sha_a} 1 1 3\nauthor Alice\nauthor-mail <alice@x.io>\nauthor-time 1700000000\nsummary first commit\n\tline one\nfilename src/main.rs\n{sha_b} 2 2 2\nauthor Bob\nauthor-mail <bob@y.io>\nauthor-time 1700001000\nsummary second commit\n\tline two\n{zero} 1 3 1\nsummary uncommitted\n\tline three\n",
+            zero = "0000000000000000000000000000000000000000",
+        );
+        let entries = parse_blame_porcelain(&out);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].line, 1);
+        assert_eq!(entries[0].short_sha, "aaaaaaa");
+        assert_eq!(entries[0].author, "Alice");
+        assert_eq!(entries[0].author_email, "alice@x.io");
+        assert_eq!(entries[0].timestamp_secs, 1700000000);
+        assert_eq!(entries[0].subject, "first commit");
+        assert_eq!(entries[1].line, 2);
+        assert_eq!(entries[1].author, "Bob");
+        assert_eq!(entries[1].subject, "second commit");
+        // The all-zero-sha (uncommitted) line 3 was skipped entirely.
     }
 
     #[test]
