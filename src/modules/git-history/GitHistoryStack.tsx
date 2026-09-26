@@ -31,6 +31,7 @@ export function GitHistoryStack({
     <GitHistoryPane
       key={active.id}
       repoRoot={active.repoRoot}
+      path={active.path}
       onOpenCommitFile={onOpenCommitFile}
       onSearchHandle={onSearchHandle}
     />

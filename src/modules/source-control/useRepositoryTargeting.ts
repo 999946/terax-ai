@@ -19,6 +19,7 @@ type Params = {
   openCommitHistoryTab: (input: {
     repoRoot: string;
     branch: string | null;
+    path?: string | null;
   }) => void;
 };
 
@@ -98,7 +99,13 @@ export function useRepositoryTargeting({
     async (path: string) => {
       const repo = await resolveRepository(path, historyRequestRef);
       if (!repo) return;
-      openCommitHistoryTab({ repoRoot: repo.repoRoot, branch: repo.branch });
+      // Path-scoped history: a file or directory target scopes the log to that
+      // path; the repo root itself still yields whole-repo history.
+      openCommitHistoryTab({
+        repoRoot: repo.repoRoot,
+        branch: repo.branch,
+        path,
+      });
     },
     [openCommitHistoryTab, resolveRepository],
   );

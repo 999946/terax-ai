@@ -73,6 +73,8 @@ export type GitHistorySearchHandle = {
 
 type Props = {
   repoRoot: string;
+  /** Optional path (file or dir) to scope history to; null = whole repo. */
+  path?: string | null;
   onOpenCommitFile: (input: CommitFileDiffOpenInput) => void;
   /** Lets the header search bar drive commit filtering for the active pane. */
   onSearchHandle?: (handle: GitHistorySearchHandle | null) => void;
@@ -192,6 +194,7 @@ function highlight(text: string, query: string): ReactNode {
 
 export function GitHistoryPane({
   repoRoot,
+  path = null,
   onOpenCommitFile,
   onSearchHandle,
 }: Props) {
@@ -322,7 +325,10 @@ export function GitHistoryPane({
     setError(null);
     setEndReached(false);
     try {
-      const entries = await native.gitLog(repoRoot, { limit: PAGE_SIZE });
+      const entries = await native.gitLog(repoRoot, {
+        limit: PAGE_SIZE,
+        ...(path ? { path } : {}),
+      });
       if (requestId !== requestIdRef.current) return;
       setCommits(entries);
       setLoadStatus("idle");
@@ -332,7 +338,7 @@ export function GitHistoryPane({
       setError(normalizeError(err, t("gitHistory.unknownError")));
       setLoadStatus("error");
     }
-  }, [repoRoot, t]);
+  }, [repoRoot, path, t]);
 
   const loadMore = useCallback(async () => {
     if (inflightMoreRef.current || endReached) return;
@@ -345,6 +351,7 @@ export function GitHistoryPane({
       const entries = await native.gitLog(repoRoot, {
         limit: PAGE_SIZE,
         beforeSha: last.sha,
+        ...(path ? { path } : {}),
       });
       setCommits((prev) => {
         const seen = new Set(prev.map((c) => c.sha));
@@ -360,7 +367,7 @@ export function GitHistoryPane({
     } finally {
       inflightMoreRef.current = false;
     }
-  }, [commits, endReached, loadStatus, repoRoot, t]);
+  }, [commits, endReached, loadStatus, path, repoRoot, t]);
 
   useEffect(() => {
     filesInflightRef.current.clear();

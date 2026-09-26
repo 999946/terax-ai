@@ -706,12 +706,16 @@ export const FileExplorer = memo(
                       {t("explorer.openInSourceControl")}
                     </ContextMenuItem>
                   )}
-                  {menuTarget.isDir && onOpenGitHistory && (
+                  {onOpenGitHistory && (
                     <ContextMenuItem
                       className={COMPACT_ITEM}
                       onSelect={() => onOpenGitHistory(menuTarget.path)}
                     >
-                      {t("explorer.openGitHistory")}
+                      {t(
+                        menuTarget.isDir
+                          ? "explorer.openGitHistory"
+                          : "explorer.viewFileHistory",
+                      )}
                     </ContextMenuItem>
                   )}
                   <ContextMenuItem

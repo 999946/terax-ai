@@ -111,6 +111,8 @@ export type GitHistoryTab = TabBase & {
   kind: "git-history";
   title: string;
   repoRoot: string;
+  /** Optional path (file or dir) to scope the history to; null = whole repo. */
+  path: string | null;
 };
 
 export type GitCommitFileDiffTab = TabBase & {
@@ -511,17 +513,23 @@ export function planGitDiffOpen(
 
 export function planCommitHistoryOpen(
   tabs: Tab[],
-  input: { repoRoot: string; branch?: string | null },
+  input: { repoRoot: string; branch?: string | null; path?: string | null },
   spaceId: string,
   allocId: () => number,
 ): { tabs: Tab[]; targetId: number } {
+  const path = input.path ?? null;
   const existing = tabs.find(
     (tab) =>
       tab.kind === "git-history" &&
       tab.spaceId === spaceId &&
-      tab.repoRoot === input.repoRoot,
+      tab.repoRoot === input.repoRoot &&
+      tab.path === path,
   );
-  const title = input.branch ? `History · ${input.branch}` : "Git History";
+  const title = path
+    ? `History · ${basename(path)}`
+    : input.branch
+      ? `History · ${input.branch}`
+      : "Git History";
   if (existing) {
     if (existing.title === title) return { tabs, targetId: existing.id };
     return {
@@ -542,6 +550,7 @@ export function planCommitHistoryOpen(
         spaceId,
         title,
         repoRoot: input.repoRoot,
+        path,
       } satisfies GitHistoryTab,
     ],
     targetId: id,
@@ -1082,7 +1091,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const openCommitHistoryTab = useCallback(
-    (input: { repoRoot: string; branch?: string | null }) => {
+    (input: { repoRoot: string; branch?: string | null; path?: string | null }) => {
       const curr = tabsRef.current;
       const plan = planCommitHistoryOpen(
         curr,

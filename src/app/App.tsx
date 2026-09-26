@@ -1599,6 +1599,7 @@ export default function App() {
                       onOpenCommitFile={openCommitFileDiffTab}
                       onGitHistorySearchHandle={setGitHistoryHandle}
                       onSetMarkdownView={setMarkdownView}
+                      onOpenFileHistory={handleOpenGitHistoryForPath}
                     />
                     <FloatingSettingsOverlay />
                   </div>

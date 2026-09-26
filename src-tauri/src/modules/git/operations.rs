@@ -517,6 +517,7 @@ pub fn log(
     repo_root: &str,
     limit: u32,
     before_sha: Option<&str>,
+    path: Option<&str>,
     workspace: &WorkspaceEnv,
 ) -> Result<Vec<GitLogEntry>> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
@@ -533,6 +534,19 @@ pub fn log(
         }
         _ => None,
     };
+    let path_filter = match path {
+        Some(p) if !p.is_empty() => {
+            let spec = pathspec_from_input(&repo_root.local_path, p)?;
+            // A path that resolves to the repo root yields an empty rel path;
+            // treat that as whole-repo (no pathspec filter).
+            if spec.is_empty() {
+                None
+            } else {
+                Some(spec)
+            }
+        }
+        _ => None,
+    };
     let mut args: Vec<&OsStr> = vec![
         OsStr::new("log"),
         OsStr::new("--no-color"),
@@ -541,6 +555,10 @@ pub fn log(
         OsStr::new(&format_arg),
     ];
     if let Some(spec) = cursor.as_deref() {
+        args.push(OsStr::new(spec));
+    }
+    if let Some(spec) = path_filter.as_deref() {
+        args.push(OsStr::new("--"));
         args.push(OsStr::new(spec));
     }
     let output = run_git(

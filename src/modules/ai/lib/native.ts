@@ -363,11 +363,15 @@ export const native = {
       repoRoot,
       workspace: currentWorkspaceEnv(),
     }),
-  gitLog: (repoRoot: string, options?: { limit?: number; beforeSha?: string }) =>
+  gitLog: (
+    repoRoot: string,
+    options?: { limit?: number; beforeSha?: string; path?: string },
+  ) =>
     invoke<GitLogEntry[]>("git_log", {
       repoRoot,
       limit: options?.limit ?? null,
       beforeSha: options?.beforeSha ?? null,
+      path: options?.path ?? null,
       workspace: currentWorkspaceEnv(),
     }),
   gitBlame: (repoRoot: string, path: string) =>

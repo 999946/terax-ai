@@ -212,6 +212,7 @@ pub async fn git_log(
     repo_root: String,
     limit: Option<u32>,
     before_sha: Option<String>,
+    path: Option<String>,
     workspace: Option<WorkspaceEnv>,
     app: AppHandle,
 ) -> Result<Vec<GitLogEntry>, String> {
@@ -222,6 +223,7 @@ pub async fn git_log(
             &repo_root,
             limit.unwrap_or(30),
             before_sha.as_deref(),
+            path.as_deref(),
             &workspace,
         )
         .map_err(Into::into)

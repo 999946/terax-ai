@@ -12,6 +12,7 @@ type Props = {
   registerHandle: (id: number, handle: EditorPaneHandle | null) => void;
   onCloseTab: (id: number) => void;
   onSetMarkdownView: (id: number, mode: "rendered" | "raw") => void;
+  onOpenFileHistory: (path: string) => void;
 };
 
 export function EditorStack({
@@ -21,6 +22,7 @@ export function EditorStack({
   registerHandle,
   onCloseTab,
   onSetMarkdownView,
+  onOpenFileHistory,
 }: Props) {
   const { t } = useTranslation();
   const editors = tabs.filter(
@@ -119,6 +121,7 @@ export function EditorStack({
                 overrideLanguage={tab.overrideLanguage}
                 onDirtyChange={getDirtyCallback(tab.id)}
                 onClose={getCloseCallback(tab.id)}
+                onOpenFileHistory={onOpenFileHistory}
               />
             </div>
           </div>

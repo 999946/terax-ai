@@ -101,6 +101,8 @@ type Props = {
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onClose?: () => void;
+  /** Open the current file's git history (path-scoped) in a new tab. */
+  onOpenFileHistory?: (path: string) => void;
 };
 
 // Above this, syntax highlighting and LSP are disabled: a multi-MB lezer
@@ -117,7 +119,8 @@ function formatBytes(n: number): string {
 // skip re-rendering entirely when App re-renders (terminal events, tab churn).
 export const EditorPane = memo(
   forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
-    const { path, overrideLanguage, onDirtyChange, onSaved, onClose } = props;
+    const { path, overrideLanguage, onDirtyChange, onSaved, onClose, onOpenFileHistory } =
+      props;
     const { t } = useTranslation();
 
     const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
@@ -793,6 +796,14 @@ export const EditorPane = memo(
             <span className="flex-1">{t("editor.paste")}</span>
           </ContextMenuItem>
           <ContextMenuSeparator />
+          {onOpenFileHistory && (
+            <ContextMenuItem
+              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+              onSelect={() => onOpenFileHistory(pathRef.current)}
+            >
+              <span className="flex-1">{t("editor.viewFileHistory")}</span>
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
             className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
             onSelect={() => selectAllContent()}
