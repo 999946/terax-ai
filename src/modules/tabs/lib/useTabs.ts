@@ -113,6 +113,8 @@ export type GitHistoryTab = TabBase & {
   repoRoot: string;
   /** Optional path (file or dir) to scope the history to; null = whole repo. */
   path: string | null;
+  /** Commit to focus/scroll to (e.g. from a blame badge click). Cleared after consumed. */
+  focusSha?: string | null;
 };
 
 export type GitCommitFileDiffTab = TabBase & {
@@ -513,13 +515,18 @@ export function planGitDiffOpen(
 
 export function planCommitHistoryOpen(
   tabs: Tab[],
-  input: { repoRoot: string; branch?: string | null; path?: string | null },
+  input: {
+    repoRoot: string;
+    branch?: string | null;
+    path?: string | null;
+    focusSha?: string | null;
+  },
   spaceId: string,
   allocId: () => number,
 ): { tabs: Tab[]; targetId: number } {
   const path = input.path ?? null;
   const existing = tabs.find(
-    (tab) =>
+    (tab): tab is GitHistoryTab =>
       tab.kind === "git-history" &&
       tab.spaceId === spaceId &&
       tab.repoRoot === input.repoRoot &&
@@ -531,10 +538,17 @@ export function planCommitHistoryOpen(
       ? `History · ${input.branch}`
       : "Git History";
   if (existing) {
-    if (existing.title === title) return { tabs, targetId: existing.id };
+    if (
+      existing.title === title &&
+      (existing.focusSha ?? null) === (input.focusSha ?? null)
+    ) {
+      return { tabs, targetId: existing.id };
+    }
     return {
       tabs: tabs.map((tab) =>
-        tab.id === existing.id ? { ...existing, title } : tab,
+        tab.id === existing.id
+          ? { ...existing, title, focusSha: input.focusSha ?? null }
+          : tab,
       ),
       targetId: existing.id,
     };
@@ -551,6 +565,7 @@ export function planCommitHistoryOpen(
         title,
         repoRoot: input.repoRoot,
         path,
+        focusSha: input.focusSha ?? null,
       } satisfies GitHistoryTab,
     ],
     targetId: id,
@@ -1091,7 +1106,12 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const openCommitHistoryTab = useCallback(
-    (input: { repoRoot: string; branch?: string | null; path?: string | null }) => {
+    (input: {
+      repoRoot: string;
+      branch?: string | null;
+      path?: string | null;
+      focusSha?: string | null;
+    }) => {
       const curr = tabsRef.current;
       const plan = planCommitHistoryOpen(
         curr,

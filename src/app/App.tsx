@@ -808,6 +808,18 @@ export default function App() {
   const openSourceControl = useCallback(() => {
     openSidebarView("source-control");
   }, [openSidebarView]);
+  const handleOpenBlameCommitHistory = useCallback(
+    (input: { repoRoot: string; path: string; sha: string }) => {
+      openCommitHistoryTab({
+        repoRoot: input.repoRoot,
+        branch: null,
+        path: input.path,
+        focusSha: input.sha,
+      });
+    },
+    [openCommitHistoryTab],
+  );
+
   const {
     repositoryTarget: sourceControlRepositoryTarget,
     openInSourceControl: handleOpenRepositoryInSourceControl,
@@ -1600,6 +1612,7 @@ export default function App() {
                       onGitHistorySearchHandle={setGitHistoryHandle}
                       onSetMarkdownView={setMarkdownView}
                       onOpenFileHistory={handleOpenGitHistoryForPath}
+                      onOpenCommitHistory={handleOpenBlameCommitHistory}
                     />
                     <FloatingSettingsOverlay />
                   </div>

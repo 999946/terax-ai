@@ -45,7 +45,7 @@ import {
 } from "./lib/autocomplete/inlineExtension";
 import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
-import { setBlameEffect } from "./lib/blameBadge";
+import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
 import { fetchBlame } from "./lib/blameCache";
 import {
   buildSharedExtensions,
@@ -103,6 +103,12 @@ type Props = {
   onClose?: () => void;
   /** Open the current file's git history (path-scoped) in a new tab. */
   onOpenFileHistory?: (path: string) => void;
+  /** Open the repo's history scoped to `path`, focusing `sha` (from a blame click). */
+  onOpenCommitHistory?: (input: {
+    repoRoot: string;
+    path: string;
+    sha: string;
+  }) => void;
 };
 
 // Above this, syntax highlighting and LSP are disabled: a multi-MB lezer
@@ -119,7 +125,7 @@ function formatBytes(n: number): string {
 // skip re-rendering entirely when App re-renders (terminal events, tab churn).
 export const EditorPane = memo(
   forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
-    const { path, overrideLanguage, onDirtyChange, onSaved, onClose, onOpenFileHistory } =
+    const { path, overrideLanguage, onDirtyChange, onSaved, onClose, onOpenFileHistory, onOpenCommitHistory } =
       props;
     const { t } = useTranslation();
 
@@ -485,30 +491,54 @@ export const EditorPane = memo(
 
     // Git blame: show the active line's commit badge at the line end (GitLens
     // style). Resolve the repo root for the current file, fetch its blame map,
-    // and feed it into the editor via the blame StateField effect. Non-git
-    // files or repo-less paths dispatch an empty map so any stale badge clears.
+    // and feed it into the editor via the blame StateField effect. Also set the
+    // blame context (repoRoot + click handler) so the badge can open history.
+    // Non-git files dispatch a null context (no badge at all). The blame map's
+    // line numbers are anchored to the committed file and kept aligned with the
+    // live doc by the field itself as the user edits — no per-keystroke refetch.
     useEffect(() => {
       const filePath = pathRef.current;
       let cancelled = false;
-      (async () => {
+      void (async () => {
         const repo = await native.gitResolveRepo(filePath);
         if (cancelled) return;
         const view = cmRef.current?.view;
         if (!view) return;
+        const clickHandler = onOpenCommitHistory
+          ? (sha: string) =>
+              onOpenCommitHistory({
+                repoRoot: repo?.repoRoot ?? filePath,
+                path: filePath,
+                sha,
+              })
+          : undefined;
         if (!repo?.repoRoot) {
-          view.dispatch({ effects: setBlameEffect.of(new Map()) });
+          view.dispatch({
+            effects: [
+              setBlameEffect.of(new Map()),
+              setBlameContextEffect.of({ repoRoot: null, onClick: undefined }),
+            ],
+          });
           return;
         }
         const map = await fetchBlame(repo.repoRoot, filePath);
         if (cancelled) return;
         const live = cmRef.current?.view;
         if (!live) return;
-        live.dispatch({ effects: setBlameEffect.of(map) });
+        live.dispatch({
+          effects: [
+            setBlameEffect.of(map),
+            setBlameContextEffect.of({
+              repoRoot: repo.repoRoot,
+              onClick: clickHandler,
+            }),
+          ],
+        });
       })();
       return () => {
         cancelled = true;
       };
-    }, [path]);
+    }, [path, onOpenCommitHistory]);
 
     const lspExt = useLspExtension(path, langId, doc.status === "ready");
     useEffect(() => {

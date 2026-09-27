@@ -32,6 +32,7 @@ export function GitHistoryStack({
       key={active.id}
       repoRoot={active.repoRoot}
       path={active.path}
+      focusSha={active.focusSha ?? null}
       onOpenCommitFile={onOpenCommitFile}
       onSearchHandle={onSearchHandle}
     />

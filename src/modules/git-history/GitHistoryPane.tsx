@@ -75,6 +75,8 @@ type Props = {
   repoRoot: string;
   /** Optional path (file or dir) to scope history to; null = whole repo. */
   path?: string | null;
+  /** Commit to scroll to and highlight once loaded (e.g. from a blame click). */
+  focusSha?: string | null;
   onOpenCommitFile: (input: CommitFileDiffOpenInput) => void;
   /** Lets the header search bar drive commit filtering for the active pane. */
   onSearchHandle?: (handle: GitHistorySearchHandle | null) => void;
@@ -197,6 +199,7 @@ export function GitHistoryPane({
   path = null,
   onOpenCommitFile,
   onSearchHandle,
+  focusSha = null,
 }: Props) {
   const { t } = useTranslation();
   const [commits, setCommits] = useState<GitLogEntry[]>([]);
@@ -204,6 +207,7 @@ export function GitHistoryPane({
   const [error, setError] = useState<string | null>(null);
   const [endReached, setEndReached] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [selectedSha, setSelectedSha] = useState<string | null>(focusSha);
   const deferredSearch = useDeferredValue(searchInput.trim());
   // Require at least 2 characters before filtering to avoid noisy single-char
   // matches and pointless full-list scans on every keystroke.
@@ -424,6 +428,23 @@ export function GitHistoryPane({
     return () => window.clearTimeout(id);
   }, [commits.length, activeSearch, endReached, loadMore, loadStatus]);
 
+  // Focus-to-commit (from a blame click): once the target sha is loaded, scroll
+  // to it and highlight it. If it isn't in the first page, keep paging forward
+  // until found or the history end is reached, then give up.
+  useEffect(() => {
+    if (!focusSha) return;
+    if (activeSearch) return;
+    const index = commits.findIndex((c) => c.sha === focusSha);
+    if (index === -1) {
+      if (!endReached && loadStatus === "idle") {
+        void loadMore();
+      }
+      return;
+    }
+    setSelectedSha(focusSha);
+    virtualizer.scrollToIndex(index, { align: "center" });
+  }, [focusSha, commits, endReached, loadStatus, activeSearch, loadMore, virtualizer]);
+
   const handleRefresh = useCallback(() => {
     filesInflightRef.current.clear();
     filesCacheRef.current.clear();
@@ -592,6 +613,7 @@ export function GitHistoryPane({
                         commit={commit}
                         query={activeSearch}
                         active={openAnchor?.sha === commit.sha}
+                        selected={selectedSha === commit.sha}
                         graphRow={graphByCommit.get(commit.sha) ?? null}
                         maxLaneCount={maxLaneCount}
                         gridTemplate={gridTemplate}
@@ -699,6 +721,8 @@ type CommitRowProps = {
   commit: GitLogEntry;
   query: string;
   active: boolean;
+  /** Highlighted because a focusSha pointed here (e.g. blame click). */
+  selected: boolean;
   graphRow: GraphRow | null;
   maxLaneCount: number;
   gridTemplate: string;
@@ -709,6 +733,7 @@ const CommitRow = memo(function CommitRow({
   commit,
   query,
   active,
+  selected,
   graphRow,
   maxLaneCount,
   gridTemplate,
@@ -723,8 +748,11 @@ const CommitRow = memo(function CommitRow({
       type="button"
       onClick={(event) => onClick(commit.sha, event)}
       className={cn(
-        "group relative grid h-full w-full cursor-pointer items-center gap-3 border-l-2 border-transparent pr-3 text-left transition-colors",
-        active ? "border-l-primary/70 bg-accent/45" : "hover:bg-accent/25",
+        "group relative grid h-full w-full cursor-pointer items-center gap-3 border-l-2 pr-3 text-left transition-colors",
+        selected
+          ? "border-l-primary bg-primary/10"
+          : "border-l-transparent",
+        !selected && (active ? "bg-accent/45 border-l-primary/70" : "hover:bg-accent/25"),
       )}
       style={{ gridTemplateColumns: gridTemplate }}
     >

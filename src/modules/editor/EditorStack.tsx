@@ -13,6 +13,11 @@ type Props = {
   onCloseTab: (id: number) => void;
   onSetMarkdownView: (id: number, mode: "rendered" | "raw") => void;
   onOpenFileHistory: (path: string) => void;
+  onOpenCommitHistory: (input: {
+    repoRoot: string;
+    path: string;
+    sha: string;
+  }) => void;
 };
 
 export function EditorStack({
@@ -23,6 +28,7 @@ export function EditorStack({
   onCloseTab,
   onSetMarkdownView,
   onOpenFileHistory,
+  onOpenCommitHistory,
 }: Props) {
   const { t } = useTranslation();
   const editors = tabs.filter(
@@ -122,6 +128,7 @@ export function EditorStack({
                 onDirtyChange={getDirtyCallback(tab.id)}
                 onClose={getCloseCallback(tab.id)}
                 onOpenFileHistory={onOpenFileHistory}
+                onOpenCommitHistory={onOpenCommitHistory}
               />
             </div>
           </div>
