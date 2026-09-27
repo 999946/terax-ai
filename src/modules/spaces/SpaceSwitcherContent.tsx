@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { labelFor, type Tab, TabIcon } from "@/modules/tabs";
-import { Add01Icon, ArrowDown01Icon, ArrowRight01Icon, Cancel01Icon, Delete02Icon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, ArrowDown01Icon, ArrowRight01Icon, Cancel01Icon, Delete02Icon, GitBranchIcon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AlertDialog,
@@ -74,6 +74,12 @@ function subtitleFor(tab: Tab): string | null {
     return segs.slice(-2, -1)[0] ?? null;
   }
   return null;
+}
+
+/** Last path segment (repo name from a repoRoot) with trailing slashes removed. */
+function basename(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : path;
 }
 
 /**
@@ -468,6 +474,22 @@ function SpaceRow({
                 {info.onlineAt ? (
                   <span className="text-muted-foreground"> {info.onlineAt}</span>
                 ) : null}
+              </span>
+            ) : null}
+            {resolvedRepo ? (
+              <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  size={9}
+                  strokeWidth={2}
+                  className="shrink-0"
+                />
+                <span className="min-w-0 truncate font-medium text-foreground/75">
+                  {basename(resolvedRepo.repoRoot)}
+                </span>
+                <span className="shrink-0">
+                  {resolvedRepo.branch ?? "—"}
+                </span>
               </span>
             ) : null}
             <MergeStatusIcons
