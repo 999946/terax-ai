@@ -50,6 +50,24 @@ pub fn canonical_dir(
     })
 }
 
+/// Walk up to the nearest existing directory. A file target (per-file history,
+/// blame) resolves to its containing directory before git repo discovery. The
+/// raw path string is walked by separator so WSL-form paths keep their form
+/// (no double resolve-path conversion).
+pub fn nearest_existing_dir(path: &str, workspace: &WorkspaceEnv) -> String {
+    let mut p = path;
+    loop {
+        if resolve_path(p, workspace).is_dir() {
+            return p.to_string();
+        }
+        match p.rfind(['/', '\\']) {
+            Some(0) => return "/".to_string(), // filesystem root
+            Some(i) => p = &p[..i],
+            None => return path.to_string(), // give up; canonical_dir errors
+        }
+    }
+}
+
 pub fn authorized_repo_root(
     registry: &WorkspaceRegistry,
     path: &str,
@@ -203,6 +221,25 @@ mod tests {
         assert!(!is_safe_pathspec("./a"));
         assert!(!is_safe_pathspec("a/."));
         assert!(!is_safe_pathspec(".."));
+    }
+
+    #[test]
+    fn nearest_existing_dir_walks_up_from_a_file() {
+        let base = std::env::temp_dir().join("terax_nearest_dir_test");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("src")).unwrap();
+        let file = base.join("src/main.rs");
+        std::fs::write(&file, "fn main() {}").unwrap();
+        let ws = WorkspaceEnv::Local;
+        assert_eq!(
+            nearest_existing_dir(file.to_str().unwrap(), &ws),
+            base.join("src").to_string_lossy().to_string()
+        );
+        assert_eq!(
+            nearest_existing_dir(base.join("src").to_str().unwrap(), &ws),
+            base.join("src").to_string_lossy().to_string()
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

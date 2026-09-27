@@ -15,7 +15,8 @@ use crate::modules::git::types::{
     DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
-    authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
+    authorized_repo_root, canonical_dir, nearest_existing_dir, resolve_within_repo, split_upstream,
+    ResolvedGitDirectory,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -69,7 +70,10 @@ pub fn resolve_repo(
     cwd: &str,
     workspace: &WorkspaceEnv,
 ) -> Result<Option<GitRepoInfo>> {
-    let cwd = canonical_dir(registry, cwd, workspace)?;
+    // The target may be a file (per-file history / blame); walk up to its
+    // containing directory so both resolve to the enclosing repository.
+    let cwd = nearest_existing_dir(cwd, workspace);
+    let cwd = canonical_dir(registry, &cwd, workspace)?;
     if !registry.is_authorized(&cwd.local_path) {
         return Err(GitError::PathOutsideWorkspace(cwd.local_path));
     }
