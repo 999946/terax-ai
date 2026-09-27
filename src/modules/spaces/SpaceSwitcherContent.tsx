@@ -22,7 +22,9 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { native, type GitRepoInfo } from "@/modules/ai/lib/native";
 import { InlineRename } from "./components/InlineRename";
+import { MergeStatusIcons } from "@/modules/source-control/MergeStatusIcons";
 import type { SpaceMeta } from "./lib/store";
 import { useSpaces } from "./lib/useSpaces";
 import { usePluginStore } from "@/modules/plugin";
@@ -72,6 +74,32 @@ function subtitleFor(tab: Tab): string | null {
     return segs.slice(-2, -1)[0] ?? null;
   }
   return null;
+}
+
+/**
+ * Resolve the git repo that contains a space's bound folder. Used to show
+ * per-space merge-status icons below the plugin info. A folder outside any
+ * repo (or a workspace folder spanning several repos) yields null → no icons.
+ */
+function useSpaceRepo(root: string | null) {
+  const [resolvedRepo, setResolvedRepo] = useState<GitRepoInfo | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setResolvedRepo(null);
+    if (!root) return;
+    native
+      .gitResolveRepo(root)
+      .then((repo) => {
+        if (alive) setResolvedRepo(repo);
+      })
+      .catch(() => {
+        if (alive) setResolvedRepo(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [root]);
+  return { resolvedRepo };
 }
 
 export function SpaceSwitcherContent({
@@ -370,6 +398,7 @@ function SpaceRow({
   const { t } = useTranslation();
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
   const info = space.info;
+  const { resolvedRepo } = useSpaceRepo(space.root);
 
   return (
     <div className="relative">
@@ -441,6 +470,11 @@ function SpaceRow({
                 ) : null}
               </span>
             ) : null}
+            <MergeStatusIcons
+              repoRoot={resolvedRepo?.repoRoot ?? null}
+              branch={resolvedRepo?.branch ?? null}
+              className="mt-0.5"
+            />
           </span>
         )}
         {!editing && (

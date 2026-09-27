@@ -98,9 +98,7 @@ import {
   type CheckState,
   type SourceControlFileEntry,
 } from "./useSourceControlPanel";
-import { getMergeStatus } from "./mergeStatusCache";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { type GitMergeStatusResult } from "@/modules/ai/lib/native";
+import { MergeStatusIcons } from "./MergeStatusIcons";
 
 type Props = {
   open: boolean;
@@ -1344,66 +1342,6 @@ function RepoRowItem({
   const [pushAfterCreate, setPushAfterCreate] = useState(false);
   const loadRef = useRef(0);
 
-  // Per-repo merge status against configured target branches (shown in the
-  // strip so every repo reflects it). The row remounts with the panel, so the
-  // load effect below is the refresh-on-show hook.
-  const gitTargetBranches = usePreferencesStore(
-    (s) => s.gitTargetBranches ?? [],
-  );
-  const [mergeStatus, setMergeStatus] = useState<GitMergeStatusResult | null>(
-    null,
-  );
-  const [mergeStatusLoading, setMergeStatusLoading] = useState(false);
-  const [mergeIntoBusy, setMergeIntoBusy] = useState<string | null>(null);
-
-  const loadMergeStatus = useCallback(
-    (force: boolean) => {
-      if (gitTargetBranches.length === 0) {
-        setMergeStatus(null);
-        return;
-      }
-      setMergeStatusLoading(true);
-      void getMergeStatus(
-        repository.repoRoot,
-        gitTargetBranches,
-        { force },
-      ).then((res) => {
-        setMergeStatus(res);
-        setMergeStatusLoading(false);
-      });
-    },
-    [gitTargetBranches, repository.repoRoot],
-  );
-
-  useEffect(() => {
-    loadMergeStatus(false);
-  }, [loadMergeStatus]);
-
-  const handleMergeInto = useCallback(
-    async (target: string) => {
-      if (mergeIntoBusy) return;
-      setMergeIntoBusy(target);
-      try {
-        await native.gitMergeIntoBranch(repository.repoRoot, target);
-        toast.success(
-          t("sourceControl.mergedIntoTarget", {
-            branch: mergeStatus?.branch ?? repository.branch ?? "",
-            target,
-          }),
-        );
-      } catch (e) {
-        toast.error(String(e));
-      } finally {
-        // Refresh regardless (success or failure) so the icon reflects the real
-        // state, and refresh the row's branch status too.
-        loadMergeStatus(true);
-        void repository.refresh();
-        setMergeIntoBusy(null);
-      }
-    },
-    [mergeIntoBusy, mergeStatus, repository, t, loadMergeStatus],
-  );
-
   const loadBranches = useCallback(async () => {
     const id = ++loadRef.current;
     setLoadingBranches(true);
@@ -1679,82 +1617,11 @@ function RepoRowItem({
         ) : null}
       </span>
 
-      {gitTargetBranches.length > 0 && (
-        <span className="inline-flex shrink-0 items-center gap-0.5 text-muted-foreground/70">
-          {mergeStatusLoading && !mergeStatus ? (
-            <Spinner className="size-2.5" />
-          ) : (
-            mergeStatus?.entries.map((entry) => {
-              const busy = mergeIntoBusy === entry.name;
-              const tooltip = (
-                <TooltipContent
-                  side="top"
-                  className={cn(SOURCE_CONTROL_TOOLTIP_CLASS, "text-[10.5px]")}
-                >
-                  <span className="font-mono">{entry.name}</span>
-                  {!entry.error && (
-                    <span className="text-muted-foreground">
-                      {entry.merged
-                        ? t("sourceControl.merged")
-                        : t("sourceControl.notMerged")}
-                    </span>
-                  )}
-                </TooltipContent>
-              );
-              return (
-                <Tooltip key={entry.name}>
-                  <TooltipTrigger asChild>
-                    {entry.error ? (
-                      <span className="inline-flex cursor-default items-center">
-                        <HugeiconsIcon
-                          icon={Alert02Icon}
-                          size={9}
-                          strokeWidth={2}
-                          className="text-muted-foreground/40"
-                        />
-                      </span>
-                    ) : entry.merged || busy ? (
-                      <span className="inline-flex cursor-default items-center">
-                        {busy ? (
-                          <Spinner className="size-2.5" />
-                        ) : (
-                          <HugeiconsIcon
-                            icon={CheckmarkCircle01Icon}
-                            size={10}
-                            strokeWidth={1.8}
-                            className="text-muted-foreground/60"
-                          />
-                        )}
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={t("sourceControl.mergedIntoTarget", {
-                          branch: mergeStatus?.branch ?? repository.branch ?? "",
-                          target: entry.name,
-                        })}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleMergeInto(entry.name);
-                        }}
-                        className="inline-flex cursor-pointer items-center rounded-sm transition-colors hover:text-foreground"
-                      >
-                        <HugeiconsIcon
-                          icon={GitMergeIcon}
-                          size={10}
-                          strokeWidth={1.8}
-                          className="text-muted-foreground/85"
-                        />
-                      </button>
-                    )}
-                  </TooltipTrigger>
-                  {tooltip}
-                </Tooltip>
-              );
-            })
-          )}
-        </span>
-      )}
+      <MergeStatusIcons
+        repoRoot={repository.repoRoot}
+        branch={repository.branch}
+        onMergeDone={() => void repository.refresh()}
+      />
 
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
         {repository.changedCount > 0 ? repository.changedCount : ""}
