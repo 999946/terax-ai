@@ -10,8 +10,9 @@ use crate::modules::git::process::{
 use crate::modules::git::types::{
     DiscardEntry, GitBlameEntry, GitBlameResult, GitBranchEntry, GitBranchListResult,
     GitCommitFileChange, GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry,
-    GitOutput, GitPanelSnapshot, GitPushResult, GitRepoInfo, GitStashEntry, GitStashListResult,
-    GitStatusSnapshot, TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    GitMergeStatusEntry, GitMergeStatusResult, GitOutput, GitPanelSnapshot, GitPushResult,
+    GitRepoInfo, GitStashEntry, GitStashListResult, GitStatusSnapshot, TextSource,
+    DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
@@ -1428,6 +1429,131 @@ pub fn merge_branch(
     ensure_success(&output, "git merge failed")
 }
 
+/// Atomically merge the current branch *into* `target`: check out the target,
+/// merge the current branch into it, then switch back to the current branch.
+///
+/// If the merge itself fails (e.g. conflicts or a dirty target working tree),
+/// it best-effort aborts the merge and checks back out to the current branch,
+/// surfacing the original error. The target-then-current round trip means the
+/// user's checkout is never left behind on the target branch.
+pub fn merge_into_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    target: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if target.starts_with('-') || target.is_empty() {
+        return Err(GitError::InvalidPath(target.into()));
+    }
+
+    let current = git_stdout_line_opt(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["rev-parse", "--abbrev-ref", "HEAD"],
+    )
+    .ok()
+    .flatten()
+    .filter(|b| !b.is_empty() && b != "HEAD")
+    .unwrap_or_default();
+    if current.is_empty() {
+        return Err(GitError::command(
+            "git merge-into",
+            "cannot merge from a detached HEAD",
+        ));
+    }
+    if current == target {
+        return Err(GitError::command(
+            "git merge-into",
+            format!("cannot merge branch {target} into itself"),
+        ));
+    }
+
+    // 1. Move onto the target branch.
+    let checkout_out = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["checkout", target],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if checkout_out.exit_code != Some(0) {
+        return Err(GitError::command(
+            "git checkout",
+            format!(
+                "git checkout {target} failed: {}",
+                output_stderr(&checkout_out)
+            ),
+        ));
+    }
+
+    // 2. Merge the current branch into the target.
+    let merge_out = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["merge", &current],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if merge_out.exit_code != Some(0) {
+        // Best-effort rollback: abort any in-progress merge, then get back to
+        // the current branch. Failures here are swallowed — the original merge
+        // error is what we report.
+        let _ = run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["merge", "--abort"],
+            DEFAULT_TIMEOUT_SECS,
+        );
+        let _ = run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["checkout", &current],
+            DEFAULT_TIMEOUT_SECS,
+        );
+        return Err(GitError::command(
+            "git merge",
+            format!(
+                "git merge {current} into {target} failed: {}",
+                output_stderr(&merge_out)
+            ),
+        ));
+    }
+
+    // 3. Switch back to the current branch.
+    let back_out = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["checkout", &current],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if back_out.exit_code != Some(0) {
+        return Err(GitError::command(
+            "git checkout",
+            format!(
+                "merged {current} into {target}, but failed to switch back: {}",
+                output_stderr(&back_out)
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// Best-effort single-line stderr summary for an error message.
+fn output_stderr(out: &GitOutput) -> String {
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let first = stderr.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
+    if !first.is_empty() {
+        first.trim().to_string()
+    } else {
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("unknown error")
+            .trim()
+            .to_string()
+    }
+}
+
 /// Whether a branch name is a remote-tracking ref (`origin/foo`).
 fn is_remote_branch(name: &str) -> bool {
     let Some((remote, short)) = name.split_once('/') else {
@@ -1529,6 +1655,79 @@ pub fn delete_branch(
         )?
     };
     ensure_success(&output, "git branch delete failed")
+}
+
+/// For each target branch, report whether the current branch is already merged
+/// into it (i.e. the current HEAD is an ancestor of the target).
+///
+/// Uses `git merge-base --is-ancestor <current> <target>`, whose exit code is
+/// the signal: 0 = merged, 1 = not merged. Any other exit (missing branch,
+/// timeout) is surfaced as a per-entry `error` rather than failing the whole
+/// request, so one bad target doesn't hide the rest.
+pub fn merge_status(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branches: &[String],
+    workspace: &WorkspaceEnv,
+) -> Result<GitMergeStatusResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+
+    let current = git_stdout_line_opt(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["rev-parse", "--abbrev-ref", "HEAD"],
+    )
+    .ok()
+    .flatten()
+    .filter(|b| !b.is_empty() && b != "HEAD")
+    .unwrap_or_else(|| "HEAD".into());
+
+    let mut entries: Vec<GitMergeStatusEntry> = Vec::with_capacity(branches.len());
+    for raw in branches {
+        let name = raw.trim();
+        if name.is_empty() {
+            continue;
+        }
+        if name.starts_with('-') {
+            entries.push(GitMergeStatusEntry {
+                name: name.into(),
+                merged: false,
+                error: Some("invalid branch name".into()),
+            });
+            continue;
+        }
+        let output = run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["merge-base", "--is-ancestor", &current, name],
+            DEFAULT_TIMEOUT_SECS,
+        );
+        match output {
+            Ok(out) if out.exit_code == Some(0) => entries.push(GitMergeStatusEntry {
+                name: name.into(),
+                merged: true,
+                error: None,
+            }),
+            Ok(out) if out.exit_code == Some(1) => entries.push(GitMergeStatusEntry {
+                name: name.into(),
+                merged: false,
+                error: None,
+            }),
+            Ok(out) => entries.push(GitMergeStatusEntry {
+                name: name.into(),
+                merged: false,
+                error: Some(output_stderr(&out)),
+            }),
+            Err(e) => entries.push(GitMergeStatusEntry {
+                name: name.into(),
+                merged: false,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+
+    Ok(GitMergeStatusResult { branch: current, entries })
 }
 
 /// List saved stashes as `stash@{N}: <message>` pairs (newest first).

@@ -216,6 +216,8 @@ pub fn run() {
             git::commands::git_update_branch,
             git::commands::git_push_branch,
             git::commands::git_delete_branch,
+            git::commands::git_merge_status,
+            git::commands::git_merge_into_branch,
             git::commands::git_stash_list,
             git::commands::git_stash_push,
             git::commands::git_stash_apply,

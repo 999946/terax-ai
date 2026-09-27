@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ import {
   setDefaultWorkspaceEnv,
   setSpacesRoot,
   setExplorerGitDecorations,
+  setGitTargetBranches,
   setLocale,
   setRestoreWindowState,
   setShowHidden,
@@ -108,6 +110,13 @@ export function GeneralSection() {
   const explorerGitDecorations = usePreferencesStore(
     (s) => s.explorerGitDecorations,
   );
+  const gitTargetBranches = usePreferencesStore((s) => s.gitTargetBranches);
+  const [gitTargetBranchesDraft, setGitTargetBranchesDraft] = useState(
+    (gitTargetBranches ?? []).join(", "),
+  );
+  useEffect(() => {
+    setGitTargetBranchesDraft((gitTargetBranches ?? []).join(", "));
+  }, [gitTargetBranches]);
   const terminalWebglEnabled = usePreferencesStore(
     (s) => s.terminalWebglEnabled,
   );
@@ -330,6 +339,29 @@ export function GeneralSection() {
           <Switch
             checked={explorerGitDecorations}
             onCheckedChange={(v) => void setExplorerGitDecorations(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.general.gitTargetBranches")}
+          description={t("settings.general.gitTargetBranchesDescription")}
+        >
+          <Input
+            value={gitTargetBranchesDraft}
+            placeholder={t("settings.general.gitTargetBranchesPlaceholder")}
+            onChange={(e) => setGitTargetBranchesDraft(e.target.value)}
+            onBlur={() => {
+              const parsed = gitTargetBranchesDraft
+                .split(",")
+                .map((b) => b.trim())
+                .filter(Boolean);
+              if (parsed.join(",") !== (gitTargetBranches ?? []).join(",")) {
+                void setGitTargetBranches(parsed);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className="h-8 w-64 font-mono text-[12px]"
           />
         </SettingRow>
       </div>

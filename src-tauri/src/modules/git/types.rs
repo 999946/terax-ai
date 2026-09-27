@@ -157,6 +157,22 @@ pub struct GitBranchListResult {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct GitMergeStatusEntry {
+    pub name: String,
+    pub merged: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitMergeStatusResult {
+    /// The current branch that merge status is computed for.
+    pub branch: String,
+    pub entries: Vec<GitMergeStatusEntry>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GitStashEntry {
     /// e.g. "stash@{0}"
     pub index: String,

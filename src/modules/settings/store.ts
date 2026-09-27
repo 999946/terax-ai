@@ -159,6 +159,7 @@ export type Preferences = {
   editorWordWrapColumn: number;
   showHidden: boolean;
   explorerGitDecorations: boolean;
+  gitTargetBranches: string[];
   terminalWebglEnabled: boolean;
   terminalCursorBlink: boolean;
   terminalCursorStyle: TerminalCursorStyle;
@@ -257,6 +258,7 @@ const KEY_EDITOR_WORD_WRAP_COLUMN = "editorWordWrapColumn";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_EXPLORER_GIT_DECORATIONS = "explorerGitDecorations";
+const KEY_GIT_TARGET_BRANCHES = "gitTargetBranches";
 const KEY_TERMINAL_WEBGL_ENABLED = "terminalWebglEnabled";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
@@ -351,6 +353,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorWordWrapColumn: EDITOR_WORD_WRAP_COLUMN_DEFAULT,
   showHidden: false,
   explorerGitDecorations: true,
+  gitTargetBranches: [],
   terminalWebglEnabled: true,
   terminalCursorBlink: false,
   terminalCursorStyle: "bar",
@@ -510,6 +513,8 @@ export async function loadPreferences(): Promise<Preferences> {
     explorerGitDecorations:
       get<boolean>(KEY_EXPLORER_GIT_DECORATIONS) ??
       DEFAULT_PREFERENCES.explorerGitDecorations,
+    gitTargetBranches:
+      get<string[]>(KEY_GIT_TARGET_BRANCHES) ?? DEFAULT_PREFERENCES.gitTargetBranches,
     terminalWebglEnabled:
       get<boolean>(KEY_TERMINAL_WEBGL_ENABLED) ??
       DEFAULT_PREFERENCES.terminalWebglEnabled,
@@ -814,6 +819,10 @@ export async function setExplorerGitDecorations(value: boolean): Promise<void> {
   await writePref(KEY_EXPLORER_GIT_DECORATIONS, value);
 }
 
+export async function setGitTargetBranches(value: string[]): Promise<void> {
+  await writePref(KEY_GIT_TARGET_BRANCHES, value);
+}
+
 export async function setTerminalWebglEnabled(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_WEBGL_ENABLED, value);
 }
@@ -1019,6 +1028,7 @@ export async function onPreferencesChange(
     [KEY_EDITOR_WORD_WRAP_COLUMN]: "editorWordWrapColumn",
     [KEY_SHOW_HIDDEN]: "showHidden",
     [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",
+    [KEY_GIT_TARGET_BRANCHES]: "gitTargetBranches",
     [KEY_TERMINAL_WEBGL_ENABLED]: "terminalWebglEnabled",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",

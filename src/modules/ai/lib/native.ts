@@ -153,6 +153,17 @@ export type GitBranchListResult = {
   branches: GitBranchEntry[];
 };
 
+export type GitMergeStatusEntry = {
+  name: string;
+  merged: boolean;
+  error: string | null;
+};
+
+export type GitMergeStatusResult = {
+  branch: string;
+  entries: GitMergeStatusEntry[];
+};
+
 export type GitStashEntry = {
   index: string;
   message: string;
@@ -413,6 +424,18 @@ export const native = {
     }),
   gitListBranches: (repoRoot: string) =>
     invoke<GitBranchListResult>("git_list_branches", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitMergeStatus: (repoRoot: string, branches: string[]) =>
+    invoke<GitMergeStatusResult>("git_merge_status", {
+      branches,
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitMergeIntoBranch: (repoRoot: string, target: string) =>
+    invoke<void>("git_merge_into_branch", {
+      target,
       repoRoot,
       workspace: currentWorkspaceEnv(),
     }),

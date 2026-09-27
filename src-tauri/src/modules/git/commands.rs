@@ -3,8 +3,8 @@ use tauri::{AppHandle, Manager};
 use crate::modules::git::operations;
 use crate::modules::git::types::{
     DiscardEntry, GitBlameResult, GitBranchListResult, GitCommitFileChange, GitCommitResult,
-    GitDiffContentResult, GitDiffResult, GitLogEntry, GitPanelSnapshot, GitPushResult, GitRepoInfo,
-    GitStashListResult, GitStatusSnapshot,
+    GitDiffContentResult, GitDiffResult, GitLogEntry, GitMergeStatusResult, GitPanelSnapshot,
+    GitPushResult, GitRepoInfo, GitStashListResult, GitStatusSnapshot,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -405,6 +405,34 @@ pub async fn git_delete_branch(
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
         operations::delete_branch(r, &repo_root, &branch, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_merge_status(
+    branches: Vec<String>,
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<GitMergeStatusResult, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::merge_status(r, &repo_root, &branches, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_merge_into_branch(
+    target: String,
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::merge_into_branch(r, &repo_root, &target, &workspace).map_err(Into::into)
     })
     .await
 }

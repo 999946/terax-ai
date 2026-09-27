@@ -66,6 +66,7 @@ import {
   GitMergeIcon,
   MoreHorizontalIcon,
   PlusSignIcon,
+  Refresh04Icon,
   UndoIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -98,6 +99,9 @@ import {
   type CheckState,
   type SourceControlFileEntry,
 } from "./useSourceControlPanel";
+import { getMergeStatus } from "./mergeStatusCache";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { type GitMergeStatusResult } from "@/modules/ai/lib/native";
 
 type Props = {
   open: boolean;
@@ -249,6 +253,71 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       ? t("sourceControl.detached")
       : scm.status.branch;
   }, [scm.status, t]);
+
+  // --- Merge status ---------------------------------------------------------
+  // Target branches configured in settings. Empty means the whole feature is
+  // hidden (and nothing is fetched). `scm.repo.repoRoot` identifies the focused
+  // repo the panel body reflects.
+  const gitTargetBranches = usePreferencesStore(
+    (s) => s.gitTargetBranches ?? [],
+  );
+  const mergeTargets = useMemo(
+    () => gitTargetBranches,
+    [gitTargetBranches],
+  );
+  const mergeRepoRoot = scm.repo?.repoRoot ?? null;
+  const [mergeStatus, setMergeStatus] = useState<GitMergeStatusResult | null>(
+    null,
+  );
+  const [mergeStatusLoading, setMergeStatusLoading] = useState(false);
+  const [mergeIntoBusy, setMergeIntoBusy] = useState<string | null>(null);
+
+  const loadMergeStatus = useCallback(
+    (force: boolean) => {
+      if (!mergeRepoRoot || mergeTargets.length === 0) return;
+      setMergeStatusLoading(true);
+      void getMergeStatus(mergeRepoRoot, mergeTargets, { force }).then((res) => {
+        setMergeStatus(res);
+        setMergeStatusLoading(false);
+      });
+    },
+    [mergeRepoRoot, mergeTargets],
+  );
+
+  const handleMergeInto = useCallback(
+    async (target: string) => {
+      if (!mergeRepoRoot || mergeIntoBusy) return;
+      setMergeIntoBusy(target);
+      try {
+        await native.gitMergeIntoBranch(mergeRepoRoot, target);
+        toast.success(
+          t("sourceControl.mergedIntoTarget", {
+            branch: mergeStatus?.branch ?? scm.status?.branch ?? "",
+            target,
+          }),
+        );
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        // Refresh regardless (success or failure) so the badge reflects the
+        // real state, then clear the busy flag.
+        loadMergeStatus(true);
+        setMergeIntoBusy(null);
+      }
+    },
+    [mergeIntoBusy, mergeRepoRoot, mergeStatus, scm.status, t, loadMergeStatus],
+  );
+
+  // The panel remounts on every switch to source-control (`key={sidebarView}`),
+  // so a mount-scoped effect is the "refresh on show" hook. Also refreshes when
+  // the focused repo or configured targets change.
+  useEffect(() => {
+    if (!mergeRepoRoot || mergeTargets.length === 0) {
+      setMergeStatus(null);
+      return;
+    }
+    loadMergeStatus(false);
+  }, [mergeRepoRoot, mergeTargets, loadMergeStatus]);
 
   const commitShortcut = IS_MAC ? "⌘↩" : "Ctrl+Enter";
   const generateShortcut = IS_MAC ? "⌘G" : "Ctrl+G";
@@ -722,6 +791,92 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   {pushStatusLabel}
                 </span>
               </div>
+
+              {mergeTargets.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1 text-[10.5px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+                    <HugeiconsIcon
+                      icon={GitMergeIcon}
+                      size={13}
+                      strokeWidth={1.75}
+                    />
+                    {t("sourceControl.mergeStatusTitle")}
+                  </span>
+                  {mergeStatusLoading && !mergeStatus ? (
+                    <Spinner className="size-3" />
+                  ) : (
+                    mergeStatus?.entries.map((entry) => {
+                      const clickable =
+                        !entry.error &&
+                        !entry.merged &&
+                        !mergeIntoBusy;
+                      return (
+                        <span
+                          key={entry.name}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] tabular-nums",
+                            entry.error
+                              ? "bg-muted/50 text-muted-foreground/70"
+                              : entry.merged
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                          )}
+                        >
+                          <span className="font-mono">{entry.name}</span>
+                          {mergeIntoBusy === entry.name ? (
+                            <Spinner className="size-2.5" />
+                          ) : clickable ? (
+                            <button
+                              type="button"
+                              aria-label={t("sourceControl.mergedIntoTarget", {
+                                branch: mergeStatus?.branch ?? "",
+                                target: entry.name,
+                              })}
+                              onClick={() => void handleMergeInto(entry.name)}
+                              className="cursor-pointer font-medium underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                            >
+                              {t("sourceControl.notMerged")}
+                            </button>
+                          ) : (
+                            <span className="font-medium">
+                              {entry.error
+                                ? "·"
+                                : t("sourceControl.merged")}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={t("sourceControl.mergeStatusRefresh")}
+                        onClick={() => loadMergeStatus(true)}
+                        disabled={mergeIntoBusy !== null}
+                        className="ml-auto inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/65 transition-colors hover:bg-foreground/[0.06] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                      >
+                        <HugeiconsIcon
+                          icon={Refresh04Icon}
+                          size={12}
+                          strokeWidth={1.75}
+                          className={cn(mergeStatusLoading && "animate-spin")}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      className={cn(
+                        SOURCE_CONTROL_TOOLTIP_CLASS,
+                        "text-[10.5px]",
+                      )}
+                    >
+                      {t("sourceControl.mergeStatusRefresh")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
 
               <div className="grid w-full grid-cols-2 gap-1.5">
                 <Tooltip>
