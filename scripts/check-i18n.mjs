@@ -84,6 +84,10 @@ const TERNARY_RE = new RegExp(
 const LABELKEY_RE = /labelKey:\s*["']([^"']+)["']/g;
 // 禁止模板字符串 key：t(`prefix.${x}`) 无法被静态校验，统一改为 labelKey 字面量。
 const TEMPLATE_T_RE = /(?<![A-Za-z_$])t\(\s*`/g;
+// 统一 t 红线：禁止别名解构 const { t: xxx } = useTranslation()。
+const ALIAS_DECL_RE = /const\s*\{\s*t\s*:\s*[A-Za-z_$][\w$]*\s*\}\s*=\s*useTranslation\(\)/g;
+// 统一 t 红线：禁止全局实例 i18n.t(...)（配置模块自身的 i18n.init 不受影响）。
+const GLOBAL_T_RE = /(?<![A-Za-z_$])i18n\.t\(/g;
 const VAR_RE = new RegExp(`(?<![A-Za-z_$])${T_FN}\\(\\s*([^,)]+)`, "g");
 
 /** 读取 en.ts 的扁平 key 集合。 */
@@ -125,6 +129,12 @@ const missingLabelKeys = new Map();
 const uncoveredVars = new Map();
 /** 违规的模板字符串 key 调用 → 位置。 */
 const badTemplates = [];
+/** 违规的别名解构 → 位置。 */
+const badAliases = [];
+/** 违规的全局 i18n.t 调用 → 位置。 */
+const badGlobals = [];
+/** 违规的动态/拼接 key（t(…非字面量非常量…)）→ 位置。 */
+const badDynamic = [];
 
 const distinctLiterals = new Set();
 /** 所有被引用到的 key（字面量 + 三元 + labelKey + DYNAMIC_KEYS），反向死键用。 */
@@ -140,6 +150,14 @@ for (const file of files) {
   // 模板字符串 key 是红线：统一到 labelKey 字面量后不再允许。
   for (const m of src.matchAll(TEMPLATE_T_RE)) {
     badTemplates.push(`${rel}:${lineAt(src, m.index)}`);
+  }
+  // 别名解构是红线：统一用纯 t。
+  for (const m of src.matchAll(ALIAS_DECL_RE)) {
+    badAliases.push(`${rel}:${lineAt(src, m.index)}`);
+  }
+  // 全局 i18n.t 是红线：统一由 useTranslation 的 t 提供。
+  for (const m of src.matchAll(GLOBAL_T_RE)) {
+    badGlobals.push(`${rel}:${lineAt(src, m.index)}`);
   }
 
   for (const m of src.matchAll(LITERAL_RE)) {
@@ -177,11 +195,21 @@ for (const file of files) {
 
   for (const m of src.matchAll(VAR_RE)) {
     const arg = m[1].trim();
-    // 只有「简单 key 表达式」才算变量键调用：裸标识符 / a.b / IDENT[key]。
-    // 三元/比较/对象等非 key 首参（如 t(cond ? "a" : "b")、t(count === 1 ? …)）
-    // 的真 key 是字面量，已被 LITERAL_RE/TERNARY_RE 抓到，这里直接跳过。
+    // 首参分类，确保 key 恒为常量：
+    //  - 字面量 / 三元 由 LITERAL_RE/TERNARY_RE 校验，这里跳过；
+    //  - 简单 key 表达式（裸标识符 / a.b / IDENT[key]）须在 EXPECTED_VARIABLE_CALLS；
+    //  - 其余（拼接、计算、函数调用首参等）即「动态 key」，报错。
+    // 反引号(模板字符串 key)由 TEMPLATE_T_RE 专管报错，这里不重复报告。
+    if (arg.includes("`")) continue;
+    // 纯字面量要求整个首参就是一个引号字符串（如 "key"），"pre." + x 之类不算。
+    const LITERAL = /^['"][^'"]*['"]$/.test(arg);
+    const TERNARY = /\?/.test(arg);
     const SIMPLE = /^[A-Za-z_$][\w$]*(?:\.[\w$]+)*(?:\[[^\]]+\])?$/;
-    if (!SIMPLE.test(arg)) continue;
+    if (LITERAL || TERNARY) continue;
+    if (!SIMPLE.test(arg)) {
+      badDynamic.push(`${rel}:${lineAt(src, m.index)}  t(${arg.slice(0, 60)})`);
+      continue;
+    }
     const sig = `${rel}:${arg}`;
     if (!EXPECTED_VARIABLE_CALLS.has(sig)) {
       if (!uncoveredVars.has(sig)) uncoveredVars.set(sig, []);
@@ -204,7 +232,8 @@ const missingDynamic = DYNAMIC_KEYS.filter((k) => !enKeys.has(k));
 
 const bad =
   missingLiterals.size + missingLabelKeys.size + uncoveredVars.size +
-  missingDynamic.length + badTemplates.length;
+  missingDynamic.length + badTemplates.length + badAliases.length +
+  badGlobals.length + badDynamic.length;
 
 // 反向死键报告（--dead）在任何 exit 之前打印，便于清理残留词条。
 if (wantDead) {
@@ -224,7 +253,8 @@ if (bad === 0) {
   }
   console.log(
     `✓ check-i18n: ${distinctLiterals.size} 个字面量 key、${labelKeySet.size} 个 labelKey 字段、` +
-      `${DYNAMIC_KEYS.length} 个手动登记动态 key 全部存在于 en.ts，无缺失、无模板字符串 key。`,
+      `${DYNAMIC_KEYS.length} 个手动登记动态 key 全部存在于 en.ts，无缺失。` +
+      `写法合规：无模板字符串 key、无别名解构、无全局 i18n.t、无动态拼接 key。`,
   );
   process.exit(0);
 }
@@ -247,6 +277,15 @@ for (const sig of uncoveredVars) {
 }
 for (const loc of badTemplates) {
   console.error(`  禁止的模板字符串 key t(\`…\`)  →  ${loc}  （请改为数据上的 labelKey 字面量）`);
+}
+for (const loc of badAliases) {
+  console.error(`  禁止的别名解构 const { t: xxx } = useTranslation()  →  ${loc}  （请统一为 const { t }）`);
+}
+for (const loc of badGlobals) {
+  console.error(`  禁止的全局 i18n.t(…)  →  ${loc}  （请由 useTranslation 的 t 提供）`);
+}
+for (const loc of badDynamic) {
+  console.error(`  禁止的动态/拼接 key  →  ${loc}  （key 须为字符串常量，动态请挂到数据的 labelKey）`);
 }
 console.error(
   "\n  修复：缺的 key 补到 src/modules/i18n/messages/{en,zh-CN}.ts；" +
