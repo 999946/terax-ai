@@ -156,7 +156,7 @@ BYOK. Cloud providers via `@ai-sdk/*`: **OpenAI, Anthropic, Google, xAI, Cerebra
   - **macOS**: `minimumSystemVersion: 10.15`.
   - **Linux**: deb depends `libwebkit2gtk-4.1-0`, `libgtk-3-0`; rpm `webkit2gtk4.1`, `gtk3`; AppImage bundles its media framework.
   - **Windows**: NSIS installer in `currentUser` mode (no admin required), WebView2 via `embedBootstrapper` (offline install).
-- Auto-updater configured with a public minisign key; release artifacts at `https://github.com/crynta/terax-ai/releases/latest/download/latest.json`.
+- Auto-updater configured with a public minisign key; release artifacts at `https://github.com/999946/terax-ai/releases/latest/download/latest.json`. On macOS the built-in updater installs the signed `.app.tar.gz` (not the `.dmg`, which is only for manual installs), so each release must host both the per-arch DMGs and the signed `.app.tar.gz` + merged `latest.json` (`build-dmg.yml` produces and uploads these). The minisign signing private key lives in the fork's GitHub secrets.
 
 ### Known gotchas
 

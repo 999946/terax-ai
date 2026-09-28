@@ -5,8 +5,8 @@
   <p><a href="https://terax.app">웹사이트</a> · <a href="https://terax.app/docs">문서</a> · <a href="https://github.com/crynta/Terax-website">웹사이트 소스 코드</a></p>
 
   <p>
-    <img src="https://img.shields.io/github/v/release/crynta/terax-ai?label=version&color=blue" alt="버전" />
-    <img src="https://img.shields.io/github/downloads/crynta/terax-ai/total?label=downloads&color=blue" alt="다운로드" />
+    <img src="https://img.shields.io/github/v/release/999946/terax-ai?label=version&color=blue" alt="버전" />
+    <img src="https://img.shields.io/github/downloads/999946/terax-ai/total?label=downloads&color=blue" alt="다운로드" />
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="플랫폼" />
     <a href="https://discord.gg/tyveTUyEp7"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
     <a href="https://www.youtube.com/@crynta"><img src="https://img.shields.io/badge/Youtube-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
@@ -90,7 +90,7 @@ Terax는 Tauri 2 + Rust와 React 19로 만든 가볍고 오픈 소스이며 터�
 
 ## 설치
 
-최신 설치 프로그램은 [Releases](https://github.com/crynta/terax-ai/releases/latest) 페이지에 있습니다. Terax는 이 페이지에서 자동 업데이트됩니다.
+최신 설치 프로그램은 [Releases](https://github.com/999946/terax-ai/releases/latest) 페이지에 있습니다. Terax는 이 페이지에서 자동 업데이트됩니다.
 
 ### Windows 참고 사항
 
@@ -100,7 +100,7 @@ Terax는 Tauri 2 + Rust와 React 19로 만든 가볍고 오픈 소스이며 터�
 ### Linux 참고 사항
 
 - **Arch / AUR:** `yay -S terax-bin` 또는 `paru`. 최신 릴리스를 추적합니다.
-- **NixOS / Nix:** 공식 flake를 사용하세요. NixOS 외부에서는 `nix profile install github:crynta/terax-ai`를 실행합니다. NixOS에서는 flake를 가져오고 `inputs.terax.packages.${pkgs.system}.terax`를 `environment.systemPackages`에 추가합니다. 더 간단한 설정에는 `nixosModules.terax`도 있습니다.
+- **NixOS / Nix:** 공식 flake를 사용하세요. NixOS 외부에서는 `nix profile install github:999946/terax-ai`를 실행합니다. NixOS에서는 flake를 가져오고 `inputs.terax.packages.${pkgs.system}.terax`를 `environment.systemPackages`에 추가합니다. 더 간단한 설정에는 `nixosModules.terax`도 있습니다.
 - **AppImage:** FUSE가 필요합니다. 없다면 `./Terax_*.AppImage --appimage-extract-and-run`을 실행하세요. Wayland 렌더링 문제가 있으면 `WEBKIT_DISABLE_DMABUF_RENDERER=1`을 시도하세요. `.deb` / `.rpm` 패키지는 시스템 GTK 스택을 사용해 보통 더 부드럽습니다.
 
 ## AI 설정

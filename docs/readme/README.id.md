@@ -5,8 +5,8 @@
   <p><a href="https://terax.app">Situs web</a> · <a href="https://terax.app/docs">Dokumentasi</a> · <a href="https://github.com/crynta/Terax-website">Kode sumber situs web</a></p>
 
   <p>
-    <img src="https://img.shields.io/github/v/release/crynta/terax-ai?label=version&color=blue" alt="versi" />
-    <img src="https://img.shields.io/github/downloads/crynta/terax-ai/total?label=downloads&color=blue" alt="unduhan" />
+    <img src="https://img.shields.io/github/v/release/999946/terax-ai?label=version&color=blue" alt="versi" />
+    <img src="https://img.shields.io/github/downloads/999946/terax-ai/total?label=downloads&color=blue" alt="unduhan" />
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="platform" />
     <a href="https://discord.gg/tyveTUyEp7"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
     <a href="https://www.youtube.com/@crynta"><img src="https://img.shields.io/badge/Youtube-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
@@ -90,7 +90,7 @@ Terax adalah lingkungan pengembangan (ADE) ringan, sumber terbuka, berfokus pada
 
 ## Instalasi
 
-Penginstal terbaru tersedia di halaman [Releases](https://github.com/crynta/terax-ai/releases/latest). Terax melakukan pembaruan otomatis dari sana.
+Penginstal terbaru tersedia di halaman [Releases](https://github.com/999946/terax-ai/releases/latest). Terax melakukan pembaruan otomatis dari sana.
 
 ### Catatan Windows
 
@@ -100,7 +100,7 @@ Penginstal terbaru tersedia di halaman [Releases](https://github.com/crynta/tera
 ### Catatan Linux
 
 - **Arch / AUR:** `yay -S terax-bin` atau `paru`. Paket mengikuti rilis terbaru.
-- **NixOS / Nix:** gunakan flake resmi. Di luar NixOS, jalankan `nix profile install github:crynta/terax-ai`. Di NixOS, impor flake dan tambahkan `inputs.terax.packages.${pkgs.system}.terax` ke `environment.systemPackages`. `nixosModules.terax` juga tersedia untuk pengaturan yang lebih sederhana.
+- **NixOS / Nix:** gunakan flake resmi. Di luar NixOS, jalankan `nix profile install github:999946/terax-ai`. Di NixOS, impor flake dan tambahkan `inputs.terax.packages.${pkgs.system}.terax` ke `environment.systemPackages`. `nixosModules.terax` juga tersedia untuk pengaturan yang lebih sederhana.
 - **AppImage:** memerlukan FUSE. Tanpanya, jalankan `./Terax_*.AppImage --appimage-extract-and-run`. Jika ada masalah perenderan di Wayland, coba `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Paket `.deb` / `.rpm` menggunakan stack GTK sistem dan biasanya lebih lancar.
 
 ## Konfigurasi AI

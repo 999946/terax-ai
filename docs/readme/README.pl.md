@@ -5,8 +5,8 @@
   <p><a href="https://terax.app">Strona</a> · <a href="https://terax.app/docs">Dokumentacja</a> · <a href="https://github.com/crynta/Terax-website">Kod źródłowy strony</a></p>
 
   <p>
-    <img src="https://img.shields.io/github/v/release/crynta/terax-ai?label=version&color=blue" alt="wersja" />
-    <img src="https://img.shields.io/github/downloads/crynta/terax-ai/total?label=downloads&color=blue" alt="pobrania" />
+    <img src="https://img.shields.io/github/v/release/999946/terax-ai?label=version&color=blue" alt="wersja" />
+    <img src="https://img.shields.io/github/downloads/999946/terax-ai/total?label=downloads&color=blue" alt="pobrania" />
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="platforma" />
     <a href="https://discord.gg/tyveTUyEp7"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
     <a href="https://www.youtube.com/@crynta"><img src="https://img.shields.io/badge/Youtube-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
@@ -90,7 +90,7 @@ Terax to lekkie, otwartoźródłowe, terminalowe środowisko programistyczne (AD
 
 ## Instalacja
 
-Najnowsze instalatory znajdują się na stronie [Releases](https://github.com/crynta/terax-ai/releases/latest). Terax aktualizuje się stamtąd automatycznie.
+Najnowsze instalatory znajdują się na stronie [Releases](https://github.com/999946/terax-ai/releases/latest). Terax aktualizuje się stamtąd automatycznie.
 
 ### Uwagi dla Windows
 
@@ -100,7 +100,7 @@ Najnowsze instalatory znajdują się na stronie [Releases](https://github.com/cr
 ### Uwagi dla Linux
 
 - **Arch / AUR:** `yay -S terax-bin` lub `paru`. Pakiet śledzi najnowsze wydanie.
-- **NixOS / Nix:** użyj oficjalnego flake. Poza NixOS uruchom `nix profile install github:crynta/terax-ai`. W NixOS zaimportuj flake i dodaj `inputs.terax.packages.${pkgs.system}.terax` do `environment.systemPackages`. Dostępny jest też prostszy moduł `nixosModules.terax`.
+- **NixOS / Nix:** użyj oficjalnego flake. Poza NixOS uruchom `nix profile install github:999946/terax-ai`. W NixOS zaimportuj flake i dodaj `inputs.terax.packages.${pkgs.system}.terax` do `environment.systemPackages`. Dostępny jest też prostszy moduł `nixosModules.terax`.
 - **AppImage:** wymaga FUSE. Bez niego uruchom `./Terax_*.AppImage --appimage-extract-and-run`. Przy błędach renderowania w Wayland spróbuj `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Pakiety `.deb` / `.rpm` korzystają z systemowego GTK i zwykle działają płynniej.
 
 ## Konfiguracja AI

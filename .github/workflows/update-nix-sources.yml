@@ -42,7 +42,7 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
           gh release download "$TAG" \
-            --repo crynta/terax-ai \
+            --repo 999946/terax-ai \
             --pattern "Terax_${VERSION}_amd64.deb" \
             --pattern "Terax_x64.app.tar.gz" \
             --pattern "Terax_aarch64.app.tar.gz"
