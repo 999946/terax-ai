@@ -316,6 +316,29 @@ export const FileExplorer = memo(
       [entryIndexByPath, virtualizer],
     );
 
+    // Auto-reveal: when the focused editor tab is a file inside this tree,
+    // expand every collapsed ancestor directory (shallowest first) so the file's
+    // row becomes visible, then let the sync effect below select/scroll to it.
+    // `tree.expand` fetches children itself (it doesn't need the parent row
+    // rendered), so the whole chain can be expanded in one pass.
+    useEffect(() => {
+      if (!activeFilePath || !rootPath) return;
+      if (!activeFilePath.startsWith(`${rootPath}/`)) return;
+      if (entryIndexByPath.has(activeFilePath)) return;
+
+      let parent = activeFilePath.slice(0, activeFilePath.lastIndexOf("/"));
+      const chain: string[] = [];
+      while (parent.length > rootPath.length && parent.startsWith(rootPath)) {
+        chain.push(parent);
+        parent = parent.slice(0, parent.lastIndexOf("/"));
+      }
+      chain.reverse(); // shallowest → deepest
+
+      for (const dir of chain) {
+        if (!tree.expanded.has(dir)) tree.expand(dir);
+      }
+    }, [activeFilePath, rootPath, entryIndexByPath, tree.expanded, tree.expand]);
+
     const lastSyncedActivePathRef = useRef<string | null>(null);
     useEffect(() => {
       if (!activeFilePath || activeFilePath === lastSyncedActivePathRef.current) {
