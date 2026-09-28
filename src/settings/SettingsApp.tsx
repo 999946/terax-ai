@@ -103,7 +103,7 @@ const TABS: {
 ];
 
 export function SettingsApp() {
-  const { t: translate } = useTranslation();
+  const { t } = useTranslation();
   const section = useFloatingSettings((s) => s.section);
   const setSection = useFloatingSettings((s) => s.setSection);
   const closeSettings = useFloatingSettings((s) => s.closeSettings);
@@ -119,22 +119,22 @@ export function SettingsApp() {
           className="flex-1 items-center"
         >
           <TabsList className="mx-auto h-7 bg-muted/40 px-2">
-            {TABS.map((t) => (
+            {TABS.map((tab) => (
               <TabsTrigger
-                key={t.id}
-                value={t.id}
+                key={tab.id}
+                value={tab.id}
                 className="h-6 gap-1.5 px-2.5 text-[11.5px]"
               >
-                <HugeiconsIcon icon={t.icon} size={12} strokeWidth={1.75} />
-                <span>{translate(t.labelKey)}</span>
+                <HugeiconsIcon icon={tab.icon} size={12} strokeWidth={1.75} />
+                <span>{t(tab.labelKey)}</span>
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
         <button
           type="button"
-          aria-label={translate("settings.close")}
-          title={translate("settings.close")}
+          aria-label={t("settings.close")}
+          title={t("settings.close")}
           onClick={closeSettings}
           className={cn(
             "grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",

@@ -17,7 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import i18n from "i18next";
+import type { TFunction } from "i18next";
 import { AgentIcon } from "../lib/agentIcon";
 import { displayAgent } from "../lib/format";
 import type { AgentNotification, AgentStatus } from "../lib/types";
@@ -28,14 +28,14 @@ type Props = {
   onActivateLocal: () => void;
 };
 
-function relativeTime(ts: number): string {
+function relativeTime(ts: number, t: TFunction): string {
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return i18n.t("agents.notif.justNow");
+  if (s < 60) return t("agents.notif.justNow");
   const m = Math.floor(s / 60);
-  if (m < 60) return i18n.t("agents.notif.minutesAgo", { count: m });
+  if (m < 60) return t("agents.notif.minutesAgo", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return i18n.t("agents.notif.hoursAgo", { count: h });
-  return i18n.t("agents.notif.daysAgo", { count: Math.floor(h / 24) });
+  if (h < 24) return t("agents.notif.hoursAgo", { count: h });
+  return t("agents.notif.daysAgo", { count: Math.floor(h / 24) });
 }
 
 function StatusRow({
@@ -171,7 +171,7 @@ function NotificationRow({
         <span className="text-muted-foreground">{t(NOTIF_LABEL_KEY[n.kind])}</span>
       </span>
       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-        {relativeTime(n.at)}
+        {relativeTime(n.at, t)}
       </span>
     </button>
   );

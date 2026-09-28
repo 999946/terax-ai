@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TFunction } from "i18next";
+
+// routeAgentNotification 的 t 仅在 toast 分支交给已被 mock 的 showAgentToast，
+// 测试里从不真正调用，故用一个恒返回 key 的存根即可。
+const stubT = (() => "") as unknown as TFunction;
 
 const preferences = vi.hoisted(() => ({
   agentNotifications: true,
@@ -47,6 +52,7 @@ describe("routeAgentNotification sound preference", () => {
       allowToast: true,
       tabId: 101,
       leafId: 201,
+      t: stubT,
       onActivate: vi.fn(),
     });
     await vi.waitFor(() => expect(notifications.osNotify).toHaveBeenCalledOnce());
@@ -68,6 +74,7 @@ describe("routeAgentNotification sound preference", () => {
       allowToast: true,
       tabId: 102,
       leafId: 202,
+      t: stubT,
       onActivate: vi.fn(),
     });
     await vi.waitFor(() => expect(notifications.osNotify).toHaveBeenCalledOnce());
@@ -90,6 +97,7 @@ describe("routeAgentNotification sound preference", () => {
       allowToast: true,
       tabId: 103,
       leafId: 203,
+      t: stubT,
       onActivate: vi.fn(),
     });
 

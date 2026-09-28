@@ -73,6 +73,7 @@ export type KeyBinding = {
 export type Shortcut = {
   id: ShortcutId;
   label: string;
+  labelKey: string;
   group: ShortcutGroup;
   defaultBindings: KeyBinding[];
   allowRepeat?: boolean;
@@ -81,42 +82,49 @@ export type Shortcut = {
 export const SHORTCUTS: Shortcut[] = [
   {
     id: "commandPalette.open",
+    labelKey: "settings.shortcuts.items.commandPalette.open",
     label: "Open command palette",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
   },
   {
     id: "commandPalette.content",
+    labelKey: "settings.shortcuts.items.commandPalette.content",
     label: "Find in files",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
   },
   {
     id: "settings.open",
+    labelKey: "settings.shortcuts.items.settings.open",
     label: "Open settings",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "," }],
   },
   {
     id: "tab.new",
+    labelKey: "settings.shortcuts.items.tab.new",
     label: "New tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "t" }],
   },
   {
     id: "tab.newBlock",
+    labelKey: "settings.shortcuts.items.tab.newBlock",
     label: "New Blocks terminal",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "t" }],
   },
   {
     id: "tab.newPrivate",
+    labelKey: "settings.shortcuts.items.tab.newPrivate",
     label: "New private terminal",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "r" }],
   },
   {
     id: "tab.newPreview",
+    labelKey: "settings.shortcuts.items.tab.newPreview",
     label: "New web preview",
     group: "Tabs",
     // Cmd/Ctrl+P now opens the command palette, so web preview moves here.
@@ -124,72 +132,84 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.newEditor",
+    labelKey: "settings.shortcuts.items.tab.newEditor",
     label: "New editor tab",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "e" }],
   },
   {
     id: "tab.close",
+    labelKey: "settings.shortcuts.items.tab.close",
     label: "Close tab or pane",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "w" }],
   },
   {
     id: "pane.splitRight",
+    labelKey: "settings.shortcuts.items.pane.splitRight",
     label: "Split pane right",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "d" }],
   },
   {
     id: "pane.splitDown",
+    labelKey: "settings.shortcuts.items.pane.splitDown",
     label: "Split pane down",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "d" }],
   },
   {
     id: "pane.focusNext",
+    labelKey: "settings.shortcuts.items.pane.focusNext",
     label: "Focus next pane",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "]" }],
   },
   {
     id: "pane.focusPrev",
+    labelKey: "settings.shortcuts.items.pane.focusPrev",
     label: "Focus previous pane",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "[" }],
   },
   {
     id: "pane.swapLeft",
+    labelKey: "settings.shortcuts.items.pane.swapLeft",
     label: "Swap pane left",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowLeft" }],
   },
   {
     id: "pane.swapRight",
+    labelKey: "settings.shortcuts.items.pane.swapRight",
     label: "Swap pane right",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowRight" }],
   },
   {
     id: "pane.swapUp",
+    labelKey: "settings.shortcuts.items.pane.swapUp",
     label: "Swap pane up",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowUp" }],
   },
   {
     id: "pane.swapDown",
+    labelKey: "settings.shortcuts.items.pane.swapDown",
     label: "Swap pane down",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, alt: true, key: "ArrowDown" }],
   },
   {
     id: "pane.source",
+    labelKey: "settings.shortcuts.items.pane.source",
     label: "Toggle source panel",
     group: "Panes",
     defaultBindings: [{ [MOD_PROP]: true, key: "g" }],
   },
   {
     id: "terminal.clear",
+    labelKey: "settings.shortcuts.items.terminal.clear",
     label: "Clear terminal",
     group: "Terminal",
     // macOS Terminal's ⌘K (clear scrollback, keep the prompt). Default only on
@@ -199,12 +219,14 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "terminal.toggleInput",
+    labelKey: "settings.shortcuts.items.terminal.toggleInput",
     label: "Toggle Shell / AI input",
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "u" }],
   },
   {
     id: "blocks.prev",
+    labelKey: "settings.shortcuts.items.blocks.prev",
     label: "Previous command block",
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "ArrowUp" }],
@@ -212,6 +234,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "blocks.next",
+    labelKey: "settings.shortcuts.items.blocks.next",
     label: "Next command block",
     group: "Terminal",
     defaultBindings: [{ [MOD_PROP]: true, key: "ArrowDown" }],
@@ -219,6 +242,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.next",
+    labelKey: "settings.shortcuts.items.tab.next",
     label: "Next tab",
     group: "Tabs",
     defaultBindings: [{ ctrl: true, key: "Tab" }],
@@ -226,6 +250,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.prev",
+    labelKey: "settings.shortcuts.items.tab.prev",
     label: "Previous tab",
     group: "Tabs",
     defaultBindings: [{ ctrl: true, shift: true, key: "Tab" }],
@@ -233,54 +258,63 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "tab.selectByIndex",
+    labelKey: "settings.shortcuts.items.tab.selectByIndex",
     label: "Jump to tab 1–9",
     group: "Tabs",
     defaultBindings: [{ [MOD_PROP]: true, key: "1" }],
   },
   {
     id: "space.next",
+    labelKey: "settings.shortcuts.items.space.next",
     label: "Next space",
     group: "Spaces",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "]" }],
   },
   {
     id: "space.prev",
+    labelKey: "settings.shortcuts.items.space.prev",
     label: "Previous space",
     group: "Spaces",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "[" }],
   },
   {
     id: "space.overview",
+    labelKey: "settings.shortcuts.items.space.overview",
     label: "Open spaces",
     group: "Spaces",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "s" }],
   },
   {
     id: "explorer.search",
+    labelKey: "settings.shortcuts.items.explorer.search",
     label: "Search files",
     group: "Search",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
   },
   {
     id: "search.focus",
+    labelKey: "settings.shortcuts.items.search.focus",
     label: "Find in tab",
     group: "Search",
     defaultBindings: [{ [MOD_PROP]: true, key: "f" }],
   },
   {
     id: "ai.toggle",
+    labelKey: "settings.shortcuts.items.ai.toggle",
     label: "Toggle AI agent",
     group: "AI",
     defaultBindings: [{ [MOD_PROP]: true, key: "i" }],
   },
   {
     id: "ai.toggleMini",
+    labelKey: "settings.shortcuts.items.ai.toggleMini",
     label: "Toggle AI chat window",
     group: "AI",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "i" }],
   },
   {
     id: "ai.askSelection",
+    labelKey: "settings.shortcuts.items.ai.askSelection",
     label: "Ask AI about selection",
     group: "AI",
     // Keep Mod+L available to the shell for clear-screen, including when
@@ -289,12 +323,14 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "agent.focusAttention",
+    labelKey: "settings.shortcuts.items.agent.focusAttention",
     label: "Jump to agent needing attention",
     group: "AI",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "a" }],
   },
   {
     id: "sidebar.toggle",
+    labelKey: "settings.shortcuts.items.sidebar.toggle",
     label: "Toggle file explorer",
     group: "View",
     // Plain Mod+B toggles the sidebar everywhere EXCEPT a focused terminal,
@@ -307,12 +343,14 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "explorer.focus",
+    labelKey: "settings.shortcuts.items.explorer.focus",
     label: "Toggle file explorer focus",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "e" }],
   },
   {
     id: "explorer.toggleHidden",
+    labelKey: "settings.shortcuts.items.explorer.toggleHidden",
     label: "Toggle hidden files",
     group: "View",
     // Finder's toggle. The binding is on the physical Period key, so it holds
@@ -321,6 +359,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomIn",
+    labelKey: "settings.shortcuts.items.view.zoomIn",
     label: "Zoom in",
     group: "View",
     defaultBindings: [
@@ -331,6 +370,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomOut",
+    labelKey: "settings.shortcuts.items.view.zoomOut",
     label: "Zoom out",
     group: "View",
     defaultBindings: [
@@ -341,12 +381,14 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "view.zoomReset",
+    labelKey: "settings.shortcuts.items.view.zoomReset",
     label: "Reset zoom",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, key: "0" }],
   },
   {
     id: "view.zenMode",
+    labelKey: "settings.shortcuts.items.view.zenMode",
     label: "Toggle zen mode",
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "'" }],
@@ -358,39 +400,43 @@ export const SHORTCUTS: Shortcut[] = [
   // Also excluded from the customization UI in ShortcutsSection.
   {
     id: "editor.undo",
+    labelKey: "settings.shortcuts.items.editor.undo",
     label: "Undo",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, key: "z" }],
   },
   {
     id: "editor.redo",
+    labelKey: "settings.shortcuts.items.editor.redo",
     label: "Redo",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, key: "y" }],
   },
   {
     id: "editor.aiComplete",
+    labelKey: "settings.shortcuts.items.editor.aiComplete",
     label: "Trigger AI completion",
     group: "Editor",
     defaultBindings: [{ alt: true, key: "\\" }],
   },
   {
     id: "editor.codeComplete",
+    labelKey: "settings.shortcuts.items.editor.codeComplete",
     label: "Trigger code completion",
     group: "Editor",
     defaultBindings: [{ ctrl: true, key: " " }],
   },
 ];
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = [
-  "General",
-  "Tabs",
-  "Panes",
-  "Terminal",
-  "View",
-  "Search",
-  "AI",
-  "Editor",
+export const SHORTCUT_GROUPS: { id: ShortcutGroup; labelKey: string }[] = [
+  { id: "General", labelKey: "settings.shortcuts.groups.General" },
+  { id: "Tabs", labelKey: "settings.shortcuts.groups.Tabs" },
+  { id: "Panes", labelKey: "settings.shortcuts.groups.Panes" },
+  { id: "Terminal", labelKey: "settings.shortcuts.groups.Terminal" },
+  { id: "View", labelKey: "settings.shortcuts.groups.View" },
+  { id: "Search", labelKey: "settings.shortcuts.groups.Search" },
+  { id: "AI", labelKey: "settings.shortcuts.groups.AI" },
+  { id: "Editor", labelKey: "settings.shortcuts.groups.Editor" },
 ];
 
 /**

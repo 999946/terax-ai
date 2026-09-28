@@ -45,10 +45,9 @@ export function ShortcutsSection() {
     const lower = search.toLowerCase();
     return base.filter(
       (s) =>
-        `${t(`settings.shortcuts.items.${s.id}`)} ${s.label}`
-          .toLowerCase()
-          .includes(lower) ||
-        `${t(`settings.shortcuts.groups.${s.group}`)} ${s.group}`
+        `${t(s.labelKey)} ${s.label} ${
+          SHORTCUT_GROUPS.find((g) => g.id === s.group)?.labelKey ?? s.group
+        }`
           .toLowerCase()
           .includes(lower),
     );
@@ -115,20 +114,20 @@ export function ShortcutsSection() {
 
       <div className="flex flex-col gap-8">
         {SHORTCUT_GROUPS.map((group) => {
-          const items = filteredShortcuts.filter((s) => s.group === group);
+          const items = filteredShortcuts.filter((s) => s.group === group.id);
           if (items.length === 0) return null;
 
           return (
-            <div key={group} className="flex flex-col gap-3">
+            <div key={group.id} className="flex flex-col gap-3">
               <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                {t(`settings.shortcuts.groups.${group}`)}
+                {t(group.labelKey)}
               </h3>
               <div className="flex flex-col divide-y divide-border/40 rounded-lg border border-border/60 bg-card/40 overflow-hidden">
                 {items.map((s) => (
                   <ShortcutRow
                     key={s.id}
                     shortcut={s}
-                    label={t(`settings.shortcuts.items.${s.id}`)}
+                    label={t(s.labelKey)}
                     isRecording={recordingId === s.id}
                     onStartRecording={() => setRecordingId(s.id)}
                     onStopRecording={() => setRecordingId(null)}

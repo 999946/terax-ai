@@ -6,6 +6,7 @@ export type PaletteIcon = typeof TerminalIcon;
 export type PaletteItem = {
   id: string;
   title: string;
+  labelKey?: string;
   group: string;
   keywords?: string[];
   icon?: PaletteIcon;

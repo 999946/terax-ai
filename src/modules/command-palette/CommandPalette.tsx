@@ -277,10 +277,10 @@ export function CommandPalette({
                 <EmptyHint />
               ) : (
                 COMMAND_GROUPS.map((group) => {
-                  const rows = rankedCommands.filter((a) => a.group === group);
+                  const rows = rankedCommands.filter((a) => a.group === group.id);
                   if (rows.length === 0) return null;
                   return (
-                    <CommandGroup key={group} heading={t(`commandPalette.group.${group}`)}>
+                    <CommandGroup key={group.id} heading={t(group.labelKey)}>
                       {rows.map((item) => (
                         <ActionItem
                           key={item.id}
@@ -435,7 +435,9 @@ function ActionItem({
           className="text-muted-foreground"
         />
       ) : null}
-      <span className="truncate">{t(`commandPalette.cmd.${item.id}`)}</span>
+      <span className="truncate">
+        {item.labelKey ? t(item.labelKey) : item.title}
+      </span>
       {rightLabel ? (
         <CommandShortcut
           className={item.disabledReason ? "normal-case tracking-normal" : ""}

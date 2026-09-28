@@ -1,4 +1,5 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { TFunction } from "i18next";
 import { showAgentToast } from "../components/AgentToast";
 import { useAgentStore } from "../store/agentStore";
 import { resolveAgentNotificationDelivery } from "./delivery";
@@ -20,6 +21,7 @@ type RouteArgs = {
   visible: boolean;
   /** Allow an in-app toast when focused but not looking at the agent. */
   allowToast: boolean;
+  t: TFunction;
   tabId?: number;
   leafId?: number;
   onActivate: () => void;
@@ -34,6 +36,7 @@ export function routeAgentNotification({
   focused,
   visible,
   allowToast,
+  t,
   tabId = 0,
   leafId = 0,
   onActivate,
@@ -63,6 +66,6 @@ export function routeAgentNotification({
   }
   if (delivery === "toast") {
     if (preferences.agentNotificationSound) playAgentNotificationSound();
-    showAgentToast({ agent, title, body, onActivate });
+    showAgentToast({ agent, title, body, t, onActivate });
   }
 }

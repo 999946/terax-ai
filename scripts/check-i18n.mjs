@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-i18n.mjs — 校验 src/ 里 t()/tr()/translate() 用到的 i18n key 都存在于 en 语言包（唯一真源）。
+// check-i18n.mjs — 校验 src/ 里 t() 用到的 i18n key 都存在于 en 语言包（唯一真源）。
 // en↔zh 键集 parity 由 src/modules/i18n/locale.test.ts 保证，这里只管「代码用到的 key 不能缺」。
 // 纯 Node + 正则，零依赖；有缺失则 exit(1)。已接入 pnpm lint。
 // 附带反向死键报告：`pnpm check:i18n --dead` 会列出 en 里定义了、但 src 从未引用的 key，
@@ -12,7 +12,7 @@ const SRC = join(ROOT, "src");
 const EN = join(SRC, "modules", "i18n", "messages", "en.ts");
 const wantDead = process.argv.includes("--dead");
 
-// ---- 变量键 t(someVar)：从各常量 map 解析出的实际 key，全部校验 ∈ en。----
+// ---- 变量键 t(expr)：表达式解析出的实际 key 全部校验 ∈ en。----
 // 新增变量键调用时，把解析出的 key 加到这里，并把调用点签名加到 EXPECTED_VARIABLE_CALLS。
 const DYNAMIC_KEYS = [
   // src/components/ai-elements/tool.tsx TOOL_META[].labelKey
@@ -39,12 +39,12 @@ const DYNAMIC_KEYS = [
   // src/settings/sections/ModelsSection.tsx meta.modelHintKey
   "settings.models.local.lmstudio.hint", "settings.models.local.mlx.hint",
   "settings.models.local.ollama.hint", "settings.models.local.openrouter.hint",
+  // src/modules/markdown/MarkdownViewToggle.tsx MODES[].i18nKey
+  "markdown.viewRendered", "markdown.viewSplit", "markdown.viewRaw",
   // src/settings/SettingsApp.tsx TABS[].labelKey
   "settings.tabs.general", "settings.tabs.editor", "settings.tabs.themes",
   "settings.tabs.shortcuts", "settings.tabs.models", "settings.tabs.agents",
   "settings.tabs.plugin", "settings.tabs.about",
-  // src/modules/markdown/MarkdownViewToggle.tsx MODES[].i18nKey
-  "markdown.viewRendered", "markdown.viewSplit", "markdown.viewRaw",
 ];
 
 // 已知变量键调用点签名（相对 src 的路径 + 首参表达式）。若扫描到未登记的新变量键调用，
@@ -57,27 +57,33 @@ const EXPECTED_VARIABLE_CALLS = new Set([
   "modules/editor/AiDiffPane.tsx:STATUS_KEY[status]",
   "settings/sections/GeneralSection.tsx:o.label",
   "settings/sections/ModelsSection.tsx:meta.modelHintKey",
-  "settings/SettingsApp.tsx:t.labelKey",
   "modules/markdown/MarkdownViewToggle.tsx:i18nKey",
+  // labelKey 字段驱动的变量键调用（统一 t 后，key 一律以 labelKey 字面量挂载在数据上）
+  "settings/SettingsApp.tsx:tab.labelKey",
+  "modules/ai/components/ChipsRow.tsx:cmd.labelKey",
+  "modules/ai/components/SnippetPicker.tsx:c.labelKey",
+  "modules/command-palette/CommandPalette.tsx:group.labelKey",
+  "modules/command-palette/CommandPalette.tsx:item.labelKey",
+  "settings/sections/ShortcutsSection.tsx:s.labelKey",
+  "settings/sections/ShortcutsSection.tsx:group.labelKey",
 ]);
 
-// 只匹配「独立 t(/tr(/translate( 函数调用」，避免误中 fetchWithTimeout 等里的 "t("。
-// 别名 tr/translate 来自 `const { t: tr } = useTranslation()`。
-const T_FN = "(?:t|tr|translate)";
+// 只匹配「独立 t( 函数调用」，避免误中 fetchWithTimeout 等里的 "t("。
+const T_FN = "t";
 // 字面量：直接 t("key", …) / t('key') ；也覆盖三元 t(a ? "k1" : "k2") 里的两侧。
 const LITERAL_RE = new RegExp(
   `(?<![A-Za-z_$])${T_FN}\\(\\s*['"]([^'"]+)['"]\\s*(?:,|\\))`,
   "g",
 );
-// 三元：t(cond ? "k1" : "k2") / t(cond ? "a" : (b ? "k" : "k2")) 里的字面量分支。
+// 三元：t(cond ? "k1" : "k2") 里的字面量分支。
 const TERNARY_RE = new RegExp(
   `(?<![A-Za-z_$])${T_FN}\\([^)]+?\\?\\s*['"]([^'"]+)['"]\\s*:\\s*['"]([^'"]+)['"]`,
   "g",
 );
-const PREFIX_RE = new RegExp(
-  `(?<![A-Za-z_$])${T_FN}\\(\\s*\`([\\w.]+)\\$\{`,
-  "g",
-);
+// labelKey 字面量字段：数据对象里 `labelKey: "…"` 的字面量 key（统一 t 的落点）。
+const LABELKEY_RE = /labelKey:\s*["']([^"']+)["']/g;
+// 禁止模板字符串 key：t(`prefix.${x}`) 无法被静态校验，统一改为 labelKey 字面量。
+const TEMPLATE_T_RE = /(?<![A-Za-z_$])t\(\s*`/g;
 const VAR_RE = new RegExp(`(?<![A-Za-z_$])${T_FN}\\(\\s*([^,)]+)`, "g");
 
 /** 读取 en.ts 的扁平 key 集合。 */
@@ -113,19 +119,28 @@ const enKeys = readEnKeys(EN);
 
 /** 缺失的字面量 key → 出现位置列表。 */
 const missingLiterals = new Map();
-/** 缺失前缀 → 位置。 */
-const missingPrefixes = new Map();
+/** 缺失的 labelKey 字面量 → 位置。 */
+const missingLabelKeys = new Map();
 /** 未登记的新变量键调用 → 位置。 */
 const uncoveredVars = new Map();
+/** 违规的模板字符串 key 调用 → 位置。 */
+const badTemplates = [];
 
 const distinctLiterals = new Set();
-const seenPrefixes = new Set();
-/** 所有被引用到的 key（字面量 + 三元 + 动态前缀覆盖 + DYNAMIC_KEYS），反向死键用。 */
+/** 所有被引用到的 key（字面量 + 三元 + labelKey + DYNAMIC_KEYS），反向死键用。 */
 const usedKeys = new Set(DYNAMIC_KEYS);
 
-for (const file of walkFiles(SRC)) {
+const files = walkFiles(SRC);
+const referentialText = files.map((p) => readFileSync(p, "utf8")).join("\n");
+
+for (const file of files) {
   const src = readFileSync(file, "utf8");
   const rel = file.replace(SRC + "/", "");
+
+  // 模板字符串 key 是红线：统一到 labelKey 字面量后不再允许。
+  for (const m of src.matchAll(TEMPLATE_T_RE)) {
+    badTemplates.push(`${rel}:${lineAt(src, m.index)}`);
+  }
 
   for (const m of src.matchAll(LITERAL_RE)) {
     const key = m[1];
@@ -150,15 +165,13 @@ for (const file of walkFiles(SRC)) {
     }
   }
 
-  for (const m of src.matchAll(PREFIX_RE)) {
-    const prefix = m[1];
-    if (seenPrefixes.has(prefix)) continue;
-    seenPrefixes.add(prefix);
-    let any = false;
-    for (const k of enKeys) if (k.startsWith(prefix)) { usedKeys.add(k); any = true; }
-    if (!any) {
-      if (!missingPrefixes.has(prefix)) missingPrefixes.set(prefix, []);
-      missingPrefixes.get(prefix).push(`${rel}:${lineAt(src, m.index)}`);
+  // labelKey 字段：数据对象里挂着的字面量 i18n key，必须 ∈ en。
+  for (const m of src.matchAll(LABELKEY_RE)) {
+    const key = m[1];
+    usedKeys.add(key);
+    if (!enKeys.has(key)) {
+      if (!missingLabelKeys.has(key)) missingLabelKeys.set(key, []);
+      missingLabelKeys.get(key).push(`${rel}:${lineAt(src, m.index)}`);
     }
   }
 
@@ -177,14 +190,9 @@ for (const file of walkFiles(SRC)) {
   }
 }
 
-// 反向死键：en.ts 定义了、但 src 里从未被工具函数以外的任何方式以该字面量引用。
-// 这里的判定对「三元/别名/变量 map 在用的 key」不会误报，因为 usedKeys 已含它们。
-const referentialText = walkFiles(SRC)
-  .map((p) => readFileSync(p, "utf8"))
-  .join("\n");
+// 反向死键：en.ts 定义了、但 src 里从未以该字面量引用。
 function isTrulyDead(key) {
   if (usedKeys.has(key)) return false;
-  // 双保险：即使 usedKeys 漏算，只要源码里出现过该字面量字符串就视为在用。
   return !referentialText.includes(`"${key}"`) &&
     !referentialText.includes(`'${key}'`) &&
     !referentialText.includes("`" + key + "`");
@@ -195,8 +203,8 @@ const deadKeys = [...enKeys].filter(isTrulyDead).sort();
 const missingDynamic = DYNAMIC_KEYS.filter((k) => !enKeys.has(k));
 
 const bad =
-  missingLiterals.size + missingPrefixes.size + uncoveredVars.size + missingDynamic.length;
-const distinctPrefixes = seenPrefixes.size;
+  missingLiterals.size + missingLabelKeys.size + uncoveredVars.size +
+  missingDynamic.length + badTemplates.length;
 
 // 反向死键报告（--dead）在任何 exit 之前打印，便于清理残留词条。
 if (wantDead) {
@@ -209,9 +217,14 @@ if (wantDead) {
 }
 
 if (bad === 0) {
+  const labelKeySet = new Set();
+  for (const file of files) {
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(LABELKEY_RE)) labelKeySet.add(m[1]);
+  }
   console.log(
-    `✓ check-i18n: ${distinctLiterals.size} 个字面量 key、${distinctPrefixes} 个动态前缀、` +
-      `${DYNAMIC_KEYS.length} 个动态 key 全部存在于 en.ts，无缺失。`,
+    `✓ check-i18n: ${distinctLiterals.size} 个字面量 key、${labelKeySet.size} 个 labelKey 字段、` +
+      `${DYNAMIC_KEYS.length} 个手动登记动态 key 全部存在于 en.ts，无缺失、无模板字符串 key。`,
   );
   process.exit(0);
 }
@@ -221,16 +234,19 @@ for (const [key, locs] of missingLiterals) {
   console.error(`  缺字面量 key  "${key}"`);
   for (const l of locs) console.error(`      └ 用在 ${l}`);
 }
-for (const [prefix, locs] of missingPrefixes) {
-  console.error(`  动态前缀无任何 en key 以它开头  "` + prefix + `…"`);
+for (const [key, locs] of missingLabelKeys) {
+  console.error(`  缺 labelKey 字面量  "${key}"`);
   for (const l of locs) console.error(`      └ 用在 ${l}`);
 }
 for (const k of missingDynamic) {
   console.error(`  缺动态 key  "${k}"（DYNAMIC_KEYS 里登记，但 en.ts 没有）`);
 }
-for (const [sig, locs] of uncoveredVars) {
+for (const sig of uncoveredVars) {
   console.error(`  未登记的变量键调用 ${sig}`);
-  for (const l of locs) console.error(`      └ 用在 ${l}`);
+  for (const l of uncoveredVars.get(sig)) console.error(`      └ 用在 ${l}`);
+}
+for (const loc of badTemplates) {
+  console.error(`  禁止的模板字符串 key t(\`…\`)  →  ${loc}  （请改为数据上的 labelKey 字面量）`);
 }
 console.error(
   "\n  修复：缺的 key 补到 src/modules/i18n/messages/{en,zh-CN}.ts；" +

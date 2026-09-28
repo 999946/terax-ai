@@ -61,6 +61,7 @@ export function LocalAgentNotificationsBridge() {
         focused: focusedRef.current,
         visible: visibleRef.current,
         allowToast: true,
+        t,
         onActivate: () => useChatStore.getState().openPanel(),
       });
 

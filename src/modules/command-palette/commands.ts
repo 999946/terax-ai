@@ -23,14 +23,14 @@ import {
 import type { PaletteItem } from "./types";
 
 export const COMMAND_GROUPS = [
-  "General",
-  "Spaces",
-  "Tabs",
-  "Panes",
-  "Git",
-  "Search",
-  "View",
-  "AI",
+  { id: "General", labelKey: "commandPalette.group.General" },
+  { id: "Spaces", labelKey: "commandPalette.group.Spaces" },
+  { id: "Tabs", labelKey: "commandPalette.group.Tabs" },
+  { id: "Panes", labelKey: "commandPalette.group.Panes" },
+  { id: "Git", labelKey: "commandPalette.group.Git" },
+  { id: "Search", labelKey: "commandPalette.group.Search" },
+  { id: "View", labelKey: "commandPalette.group.View" },
+  { id: "AI", labelKey: "commandPalette.group.AI" },
 ] as const;
 
 export type CommandPaletteActionContext = {
@@ -87,6 +87,7 @@ export function createCommandItems(
   return [
     {
       id: "settings.open",
+      labelKey: "commandPalette.cmd.settings.open",
       title: "Open settings",
       group: "General",
       keywords: ["preferences", "config"],
@@ -96,6 +97,7 @@ export function createCommandItems(
     },
     {
       id: "theme.pick",
+      labelKey: "commandPalette.cmd.theme.pick",
       title: "Change theme...",
       group: "General",
       keywords: ["theme", "appearance", "color", "dark", "light"],
@@ -104,6 +106,7 @@ export function createCommandItems(
     },
     {
       id: "shortcuts.open",
+      labelKey: "commandPalette.cmd.shortcuts.open",
       title: "Keyboard shortcuts",
       group: "General",
       keywords: ["keys", "keybindings", "settings"],
@@ -112,6 +115,7 @@ export function createCommandItems(
     },
     {
       id: "spaces.overview",
+      labelKey: "commandPalette.cmd.spaces.overview",
       title: "Spaces: Overview",
       group: "Spaces",
       keywords: ["spaces", "sessions", "overview", "organize", "manage", "move"],
@@ -120,6 +124,7 @@ export function createCommandItems(
     },
     {
       id: "spaces.new",
+      labelKey: "commandPalette.cmd.spaces.new",
       title: "New Space",
       group: "Spaces",
       keywords: ["space", "session", "workspace", "group", "create"],
@@ -138,6 +143,7 @@ export function createCommandItems(
     })),
     {
       id: "tab.new",
+      labelKey: "commandPalette.cmd.tab.new",
       title: "New terminal",
       group: "Tabs",
       keywords: ["shell", "terminal", "new tab"],
@@ -147,6 +153,7 @@ export function createCommandItems(
     },
     {
       id: "tab.newBlock",
+      labelKey: "commandPalette.cmd.tab.newBlock",
       title: "New block terminal",
       group: "Tabs",
       keywords: ["blocks", "warp", "command blocks", "terminal"],
@@ -155,6 +162,7 @@ export function createCommandItems(
     },
     {
       id: "tab.newPrivate",
+      labelKey: "commandPalette.cmd.tab.newPrivate",
       title: "New private terminal",
       group: "Tabs",
       keywords: ["privacy", "private", "incognito", "hidden from ai"],
@@ -164,6 +172,7 @@ export function createCommandItems(
     },
     {
       id: "tab.newEditor",
+      labelKey: "commandPalette.cmd.tab.newEditor",
       title: "New editor tab",
       group: "Tabs",
       keywords: ["file", "editor", "create"],
@@ -174,6 +183,7 @@ export function createCommandItems(
     },
     {
       id: "tab.newPreview",
+      labelKey: "commandPalette.cmd.tab.newPreview",
       title: "New web preview",
       group: "Tabs",
       keywords: ["browser", "web", "localhost", "preview"],
@@ -183,6 +193,7 @@ export function createCommandItems(
     },
     {
       id: "tab.close",
+      labelKey: "commandPalette.cmd.tab.close",
       title: "Close tab or pane",
       group: "Tabs",
       keywords: ["close", "remove", "pane"],
@@ -193,6 +204,7 @@ export function createCommandItems(
     },
     {
       id: "pane.splitRight",
+      labelKey: "commandPalette.cmd.pane.splitRight",
       title: "Split pane right",
       group: "Panes",
       keywords: ["terminal", "pane", "split", "right", "column"],
@@ -203,6 +215,7 @@ export function createCommandItems(
     },
     {
       id: "pane.splitDown",
+      labelKey: "commandPalette.cmd.pane.splitDown",
       title: "Split pane down",
       group: "Panes",
       keywords: ["terminal", "pane", "split", "down", "row"],
@@ -213,6 +226,7 @@ export function createCommandItems(
     },
     {
       id: "git.graph",
+      labelKey: "commandPalette.cmd.git.graph",
       title: "Open git graph",
       group: "Git",
       keywords: ["git", "graph", "history", "log", "commits"],
@@ -221,6 +235,7 @@ export function createCommandItems(
     },
     {
       id: "git.source",
+      labelKey: "commandPalette.cmd.git.source",
       title: "Toggle source control",
       group: "Git",
       keywords: ["git", "source control", "changes", "staging", "diff"],
@@ -230,6 +245,7 @@ export function createCommandItems(
     },
     {
       id: "search.content",
+      labelKey: "commandPalette.cmd.search.content",
       title: "Find content in files",
       group: "Search",
       keywords: ["grep", "ripgrep", "text", "contents", "search in files"],
@@ -239,6 +255,7 @@ export function createCommandItems(
     },
     {
       id: "history.open",
+      labelKey: "commandPalette.cmd.history.open",
       title: "Search command history",
       group: "Search",
       keywords: ["history", "shell", "rerun", "previous commands"],
@@ -248,6 +265,7 @@ export function createCommandItems(
     },
     {
       id: "search.focus",
+      labelKey: "commandPalette.cmd.search.focus",
       title: "Find in current tab",
       group: "Search",
       keywords: ["find", "terminal", "editor", "current"],
@@ -258,6 +276,7 @@ export function createCommandItems(
     },
     {
       id: "explorer.search",
+      labelKey: "commandPalette.cmd.explorer.search",
       title: "Search files by name",
       group: "Search",
       keywords: ["explorer", "workspace", "file", "open"],
@@ -268,6 +287,7 @@ export function createCommandItems(
     },
     {
       id: "sidebar.toggle",
+      labelKey: "commandPalette.cmd.sidebar.toggle",
       title: "Toggle file explorer",
       group: "View",
       keywords: ["sidebar", "files", "explorer"],
@@ -277,6 +297,7 @@ export function createCommandItems(
     },
     {
       id: "explorer.toggleHidden",
+      labelKey: "commandPalette.cmd.explorer.toggleHidden",
       title: "Toggle hidden files",
       group: "View",
       keywords: ["dotfiles", "hidden", "explorer", "gitignore", "env"],
@@ -286,6 +307,7 @@ export function createCommandItems(
     },
     {
       id: "ai.toggle",
+      labelKey: "commandPalette.cmd.ai.toggle",
       title: "Toggle AI agent",
       group: "AI",
       keywords: ["assistant", "chat", "agent"],
@@ -295,6 +317,7 @@ export function createCommandItems(
     },
     {
       id: "ai.askSelection",
+      labelKey: "commandPalette.cmd.ai.askSelection",
       title: "Ask AI about selection",
       group: "AI",
       keywords: ["selection", "explain", "assistant", "chat"],

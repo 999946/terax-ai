@@ -45,6 +45,7 @@ export type SlashCommandMeta = {
   name: string;
   invocation: string;
   label: string;
+  labelKey: string;
   icon: typeof SparklesIcon;
 };
 
@@ -53,18 +54,21 @@ export const SLASH_COMMANDS: Record<string, SlashCommandMeta> = {
     name: "init",
     invocation: "/init",
     label: "Initialize workspace",
+    labelKey: "ai.slash.label.init",
     icon: SparklesIcon,
   },
   plan: {
     name: "plan",
     invocation: "/plan",
     label: "Plan mode",
+    labelKey: "ai.slash.label.plan",
     icon: CheckListIcon,
   },
   "claude-code": {
     name: "claude-code",
     invocation: "/claude-code",
     label: "Delegate to Claude Code",
+    labelKey: "ai.slash.label.claude-code",
     icon: ClaudeIcon,
   },
 };

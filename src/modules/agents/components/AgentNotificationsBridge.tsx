@@ -1,8 +1,9 @@
 import type { Tab } from "@/modules/tabs";
 import { hasLeaf, leafIdForPty } from "@/modules/terminal";
-import i18n from "@/modules/i18n/config";
 import { listen } from "@tauri-apps/api/event";
+import type { TFunction } from "i18next";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { displayAgent } from "../lib/format";
 import { maybeTriggerManagedReview } from "../lib/review";
 import { routeAgentNotification } from "../lib/route";
@@ -35,13 +36,14 @@ function route(
   session: AgentSession,
   kind: "attention" | "finished",
   ctx: Ctx,
+  t: TFunction,
 ): void {
   const info = tabInfo(ctx.tabs, session.leafId);
   const name = displayAgent(session.agent);
   const heading =
     kind === "attention"
-      ? i18n.t("agents.notif.attentionHeading", { name })
-      : i18n.t("agents.notif.finishedHeading", { name });
+      ? t("agents.notif.attentionHeading", { name })
+      : t("agents.notif.finishedHeading", { name });
 
   routeAgentNotification({
     source: "terminal",
@@ -53,13 +55,14 @@ function route(
     visible: ctx.activeId === session.tabId,
     // Stop fires every turn, so finished only updates the bell; attention toasts.
     allowToast: kind === "attention",
+    t,
     tabId: session.tabId,
     leafId: session.leafId,
     onActivate: () => ctx.onActivate(session.tabId, session.leafId),
   });
 }
 
-function handleSignal(sig: AgentSignal, ctx: Ctx): void {
+function handleSignal(sig: AgentSignal, ctx: Ctx, t: TFunction): void {
   const leafId = leafIdForPty(sig.id);
   if (leafId === null) return;
   const store = useAgentStore.getState();
@@ -77,13 +80,13 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "attention": {
       store.setStatus(leafId, "waiting");
       const session = store.sessions[leafId];
-      if (session) route(session, "attention", ctx);
+      if (session) route(session, "attention", ctx, t);
       return;
     }
     case "finished": {
       store.setStatus(leafId, "waiting");
       const session = store.sessions[leafId];
-      if (session) route(session, "finished", ctx);
+      if (session) route(session, "finished", ctx, t);
       maybeTriggerManagedReview(leafId);
       return;
     }
@@ -104,6 +107,7 @@ export function AgentNotificationsBridge({
   onActivate: Activate;
 }) {
   const focused = useWindowFocus();
+  const { t } = useTranslation();
   const ctxRef = useRef<Ctx>({ tabs, activeId, focused, onActivate });
   ctxRef.current = { tabs, activeId, focused, onActivate };
 
@@ -111,7 +115,7 @@ export function AgentNotificationsBridge({
     let alive = true;
     let unlisten: (() => void) | undefined;
     listen<AgentSignal>("terax:agent-signal", (e) =>
-      handleSignal(e.payload, ctxRef.current),
+      handleSignal(e.payload, ctxRef.current, t),
     )
       .then((u) => {
         if (alive) unlisten = u;
