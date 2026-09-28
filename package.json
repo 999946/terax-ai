@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "check-types": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.mjs",
+    "check:i18n:dead": "node scripts/check-i18n.mjs --dead",
     "lint": "eslint . && node scripts/check-i18n.mjs",
     "lint:fix": "eslint . --fix",
     "lint:biome": "biome lint ./src",
