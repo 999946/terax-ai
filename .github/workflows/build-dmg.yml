@@ -63,6 +63,13 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pin the sidecar build to this matrix arch. The beforeBuildCommand
+          # runs `pnpm build:cli`, whose build-cli.mjs falls back to the runner's
+          # host triple when TERAX_CLI_TARGET is unset. macos-latest is arm64,
+          # so without this the x86_64 job would build an aarch64 terax-cli
+          # sidecar and build.rs would panic on the missing
+          # terax-cli-x86_64-apple-darwin.
+          TERAX_CLI_TARGET: ${{ matrix.target }}
           # Keep unsigned public builds explicitly ad-hoc signed. This makes
           # arm64 code executable after a user removes browser quarantine.
           APPLE_SIGNING_IDENTITY: "-"
