@@ -105,15 +105,18 @@ describe("planFileTabOpen", () => {
 });
 
 describe("planMarkdownTabOpen", () => {
-  it("reuses markdown tabs only within the requested space", () => {
+  it("reuses markdown editor tabs only within the requested space", () => {
     const tabs: Tab[] = [
       terminal,
       {
         id: 3,
-        kind: "markdown",
+        kind: "editor",
         spaceId: "two",
         title: "README.md",
         path: "/repo/README.md",
+        dirty: false,
+        preview: false,
+        viewMode: "rendered",
       },
     ];
 
@@ -127,9 +130,12 @@ describe("planMarkdownTabOpen", () => {
     expect(plan.tabs).toContainEqual(
       expect.objectContaining({
         id: 4,
-        kind: "markdown",
+        kind: "editor",
         path: "/repo/README.md",
         spaceId: "one",
+        viewMode: "rendered",
+        dirty: false,
+        preview: false,
       }),
     );
     expect(plan.tabs).toContain(tabs[1]);
@@ -153,23 +159,27 @@ describe("planMarkdownTabOpen", () => {
     expect(filePlan.tabs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          kind: "markdown",
+          kind: "editor",
           path: "/repo/README.md",
+          viewMode: "rendered",
         }),
         expect.objectContaining({ kind: "editor", path: "/repo/main.rs" }),
       ]),
     );
   });
 
-  it("normalizes path separators when reusing a markdown tab", () => {
+  it("normalizes path separators when reusing a markdown editor tab", () => {
     const tabs: Tab[] = [
       terminal,
       {
         id: 3,
-        kind: "markdown",
+        kind: "editor",
         spaceId: "one",
         title: "README.md",
         path: "C:\\repo\\README.md",
+        dirty: false,
+        preview: false,
+        viewMode: "rendered",
       },
     ];
 

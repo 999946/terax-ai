@@ -143,11 +143,11 @@ describe("hydrateTabs", () => {
     ).toEqual([]);
   });
 
-  it("hydrates editor/preview/markdown as cold with derived titles", () => {
+  it("hydrates editor/preview and markdown-view editor as cold with derived titles", () => {
     const serialized: SerializedTab[] = [
       { kind: "editor", path: "/a/foo.ts" },
       { kind: "preview", url: "http://localhost:5173/x" },
-      { kind: "markdown", path: "/a/README.md" },
+      { kind: "editor", path: "/a/README.md", markdownView: "rendered" },
     ];
     const out = hydrateTabs(serialized, "s1", counter());
     expect(out.every((t) => t.cold === true)).toBe(true);
@@ -156,5 +156,6 @@ describe("hydrateTabs", () => {
       "localhost:5173",
       "README.md",
     ]);
+    expect(out[2]).toMatchObject({ path: "/a/README.md", viewMode: "rendered" });
   });
 });

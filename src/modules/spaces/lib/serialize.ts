@@ -5,7 +5,7 @@ import {
 } from "@/modules/terminal/lib/panes";
 import type {
   EditorTab,
-  MarkdownTab,
+  MarkdownViewMode,
   PreviewTab,
   Tab,
   TerminalTab,
@@ -22,9 +22,8 @@ export type SerializedTab =
       blocks?: boolean;
       customTitle?: string;
     }
-  | { kind: "editor"; path: string }
-  | { kind: "preview"; url: string }
-  | { kind: "markdown"; path: string };
+  | { kind: "editor"; path: string; markdownView?: MarkdownViewMode }
+  | { kind: "preview"; url: string };
 
 function basename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
@@ -60,7 +59,6 @@ export function isSerializableTab(tab: Tab): boolean {
       return !tab.private;
     case "editor":
     case "preview":
-    case "markdown":
       return true;
     default:
       return false;
@@ -78,11 +76,13 @@ function serializeTab(tab: Tab): SerializedTab | null {
         ...(tab.customTitle !== undefined && { customTitle: tab.customTitle }),
       };
     case "editor":
-      return { kind: "editor", path: tab.path };
+      return {
+        kind: "editor",
+        path: tab.path,
+        ...(tab.viewMode !== undefined && { markdownView: tab.viewMode }),
+      };
     case "preview":
       return { kind: "preview", url: tab.url };
-    case "markdown":
-      return { kind: "markdown", path: tab.path };
     default:
       return null;
   }
@@ -175,8 +175,8 @@ function hydrateTab(
         path: s.path,
         dirty: false,
         preview: false,
-      } satisfies EditorTab;
-    case "preview":
+        ...(s.markdownView !== undefined && { viewMode: s.markdownView }),
+      } satisfies EditorTab;    case "preview":
       return {
         id: allocId(),
         kind: "preview",
@@ -185,15 +185,6 @@ function hydrateTab(
         title: titleFromUrl(s.url),
         url: s.url,
       } satisfies PreviewTab;
-    case "markdown":
-      return {
-        id: allocId(),
-        kind: "markdown",
-        spaceId,
-        cold: true,
-        title: basename(s.path),
-        path: s.path,
-      } satisfies MarkdownTab;
     default:
       return null;
   }

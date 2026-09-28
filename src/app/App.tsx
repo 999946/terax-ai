@@ -701,8 +701,8 @@ export default function App() {
   const handleOpenFile = useCallback(
     (path: string, pin?: boolean) => {
       // Markdown opens in its rendered view by default; a per-tab toggle flips
-      // it to the raw editor. Other files default to preview (pin=false);
-      // explicit actions like context-menu "Open" pass pin=true to persist.
+      // it to the raw editor or split view. Other files default to preview
+      // (pin=false); explicit actions like context-menu "Open" pass pin=true.
       if (isMarkdownPath(path)) newMarkdownTab(path);
       else openFileTab(path, pin ?? false, { reusePreview: false });
     },
@@ -792,9 +792,7 @@ export default function App() {
     return null;
   })();
   const explorerActiveFilePath =
-    activeTab?.kind === "editor" || activeTab?.kind === "markdown"
-      ? activeTab.path
-      : null;
+    activeTab?.kind === "editor" ? activeTab.path : null;
   const isRepositoryContextCurrent = useCallback(
     (spaceId: string, workspaceKey: string) => {
       const currentSpaceId = useSpaces.getState().activeId ?? DEFAULT_SPACE_ID;

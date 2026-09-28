@@ -1,6 +1,13 @@
 import { cn, isMarkdownPath } from "@/lib/utils";
-import { MarkdownViewToggle } from "@/modules/markdown";
-import type { EditorTab, Tab } from "@/modules/tabs";
+import {
+  MarkdownPreviewPane,
+  MarkdownViewToggle,
+} from "@/modules/markdown";
+import type {
+  EditorTab,
+  MarkdownViewMode,
+  Tab,
+} from "@/modules/tabs";
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef } from "react";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
@@ -11,7 +18,7 @@ type Props = {
   onDirtyChange: (id: number, dirty: boolean) => void;
   registerHandle: (id: number, handle: EditorPaneHandle | null) => void;
   onCloseTab: (id: number) => void;
-  onSetMarkdownView: (id: number, mode: "rendered" | "raw") => void;
+  onSetMarkdownView: (id: number, mode: MarkdownViewMode) => void;
   onOpenFileHistory: (path: string) => void;
   onOpenCommitHistory: (input: {
     repoRoot: string;
@@ -103,6 +110,12 @@ export function EditorStack({
     <div className="relative h-full w-full">
       {editors.map((tab) => {
         const visible = tab.id === activeId;
+        // Markdown files carry a per-tab view mode (raw / rendered / split);
+        // plain files always show the source editor.
+        const isMd = isMarkdownPath(tab.path);
+        const mode: MarkdownViewMode = isMd ? tab.viewMode ?? "raw" : "raw";
+        const showEditor = mode !== "rendered";
+        const showPreview = isMd && mode !== "raw";
         return (
           <div
             key={tab.id}
@@ -112,24 +125,43 @@ export function EditorStack({
             )}
             aria-hidden={!visible}
           >
-            <div className="relative h-full overflow-hidden bg-background">
-              {isMarkdownPath(tab.path) && (
+            <div className="relative flex h-full overflow-hidden bg-background">
+              {isMd && (
                 <MarkdownViewToggle
-                  mode="raw"
-                  onChange={(mode) => onSetMarkdownView(tab.id, mode)}
+                  mode={mode}
+                  onChange={(m) => onSetMarkdownView(tab.id, m)}
                   renderedDisabled={tab.dirty}
                   renderedHint={t("editor.saveToPreview")}
                 />
               )}
-              <EditorPane
-                ref={getRefCallback(tab.id)}
-                path={tab.path}
-                overrideLanguage={tab.overrideLanguage}
-                onDirtyChange={getDirtyCallback(tab.id)}
-                onClose={getCloseCallback(tab.id)}
-                onOpenFileHistory={onOpenFileHistory}
-                onOpenCommitHistory={onOpenCommitHistory}
-              />
+              {showEditor && (
+                <div
+                  className={cn(
+                    "h-full min-w-0",
+                    mode === "split"
+                      ? "w-1/2 border-r border-border/60"
+                      : "flex-1",
+                  )}
+                >
+                  <EditorPane
+                    ref={getRefCallback(tab.id)}
+                    path={tab.path}
+                    overrideLanguage={tab.overrideLanguage}
+                    onDirtyChange={getDirtyCallback(tab.id)}
+                    onClose={getCloseCallback(tab.id)}
+                    onOpenFileHistory={onOpenFileHistory}
+                    onOpenCommitHistory={onOpenCommitHistory}
+                  />
+                </div>
+              )}
+              {showPreview && (
+                <div className={cn("h-full min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
+                  <MarkdownPreviewPane
+                    path={tab.path}
+                    visible={visible}
+                  />
+                </div>
+              )}
             </div>
           </div>
         );

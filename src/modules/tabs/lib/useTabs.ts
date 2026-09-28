@@ -50,6 +50,13 @@ export type TerminalTab = TabBase & {
   customTitle?: string;
 };
 
+/**
+ * How a markdown file's tab is shown. "rendered" = preview only, "raw" = the
+ * source editor only, "split" = source editor and rendered preview side by
+ * side. Non-markdown editors always behave as "raw".
+ */
+export type MarkdownViewMode = "rendered" | "raw" | "split";
+
 export type EditorTab = TabBase & {
   id: number;
   kind: "editor";
@@ -63,6 +70,8 @@ export type EditorTab = TabBase & {
    */
   preview: boolean;
   overrideLanguage?: string | null;
+  /** For markdown files. Absent (or "raw") = the plain source editor. */
+  viewMode?: MarkdownViewMode;
 };
 
 export type PreviewTab = TabBase & {
@@ -70,13 +79,6 @@ export type PreviewTab = TabBase & {
   kind: "preview";
   title: string;
   url: string;
-};
-
-export type MarkdownTab = TabBase & {
-  id: number;
-  kind: "markdown";
-  title: string;
-  path: string;
 };
 
 export type AiDiffStatus = "pending" | "approved" | "rejected";
@@ -133,7 +135,6 @@ export type Tab =
   | TerminalTab
   | EditorTab
   | PreviewTab
-  | MarkdownTab
   | AiDiffTab
   | GitDiffTab
   | GitHistoryTab
@@ -187,7 +188,7 @@ export function planMarkdownTabOpen(
   const pathKey = path.replace(/\\/g, "/");
   const existing = tabs.find(
     (tab) =>
-      tab.kind === "markdown" &&
+      tab.kind === "editor" &&
       tab.spaceId === spaceId &&
       tab.path.replace(/\\/g, "/") === pathKey,
   );
@@ -199,10 +200,15 @@ export function planMarkdownTabOpen(
       ...tabs,
       {
         id: tabId,
-        kind: "markdown",
+        kind: "editor",
         spaceId,
         title: basename(path),
         path,
+        dirty: false,
+        preview: false,
+        // Markdown opens in the rendered view by default; a per-tab toggle
+        // flips it to "raw" or "split".
+        viewMode: "rendered",
       },
     ],
     tabId,
@@ -1050,38 +1056,15 @@ export function useTabs(initial?: Partial<TerminalTab>) {
   }, []);
 
   const setMarkdownView = useCallback(
-    (id: number, mode: "rendered" | "raw") => {
+    (id: number, mode: MarkdownViewMode) => {
       setTabs((curr) =>
         curr.map((t) => {
-          if (
-            t.id !== id ||
-            !isMarkdownPath((t as { path?: string }).path ?? "")
-          )
-            return t;
-          if (mode === "raw" && t.kind === "markdown") {
-            return {
-              ...t,
-              kind: "editor" as const,
-              dirty: false,
-              preview: false,
-              overrideLanguage:
-                (t as { overrideLanguage?: string | null }).overrideLanguage ??
-                null,
-            };
-          }
-          if (mode === "rendered" && t.kind === "editor") {
-            if (t.dirty) return t;
-            return {
-              id: t.id,
-              kind: "markdown" as const,
-              spaceId: t.spaceId,
-              cold: t.cold,
-              title: t.title,
-              path: t.path,
-              overrideLanguage: t.overrideLanguage ?? null,
-            };
-          }
-          return t;
+          if (t.id !== id || t.kind !== "editor") return t;
+          if (!isMarkdownPath(t.path)) return t;
+          // Can't drop the unsaved source to show a stale rendered preview.
+          if (mode !== "raw" && t.dirty) return t;
+          if (t.viewMode === mode) return t;
+          return { ...t, viewMode: mode };
         }),
       );
     },
@@ -1264,12 +1247,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
               url: patch.url,
               title: patch.title ?? titleFromUrl(patch.url),
             }),
-          };
-        }
-        if (x.kind === "markdown") {
-          return {
-            ...x,
-            ...(patch.title !== undefined && { title: patch.title }),
           };
         }
         // editor tab: auto-promote from preview the moment the file becomes dirty.

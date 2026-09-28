@@ -18,7 +18,7 @@ export {
   type TerminalTab,
   type EditorTab,
   type PreviewTab,
-  type MarkdownTab,
+  type MarkdownViewMode,
   type AiDiffTab,
   type GitDiffTab,
   type GitHistoryTab,

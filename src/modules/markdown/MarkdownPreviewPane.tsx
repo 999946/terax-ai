@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Streamdown } from "streamdown";
 import { MarkdownLink } from "./MarkdownLink";
-import { MarkdownViewToggle } from "./MarkdownViewToggle";
 
 type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -23,12 +22,11 @@ type Status =
 type Props = {
   path: string;
   visible: boolean;
-  onSetView: (mode: "rendered" | "raw") => void;
 };
 
 const components = { a: MarkdownLink, code: MarkdownCode };
 
-export function MarkdownPreviewPane({ path, visible, onSetView }: Props) {
+export function MarkdownPreviewPane({ path, visible }: Props) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<Status>({ kind: "loading" });
 
@@ -64,7 +62,6 @@ export function MarkdownPreviewPane({ path, visible, onSetView }: Props) {
         !visible && "pointer-events-none",
       )}
     >
-      <MarkdownViewToggle mode="rendered" onChange={onSetView} />
       <div className="flex-1 overflow-auto">
         <div className="px-8 py-6">
           {status.kind === "loading" && (
