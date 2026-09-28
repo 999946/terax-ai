@@ -1931,6 +1931,40 @@ mod tests {
     }
 
     #[test]
+    fn parse_blame_porcelain_tolerates_crlf_and_bad_headers() {
+        let sha = "cccccccccccccccccccccccccccccccccccccccc";
+        // CRLF line endings (each line has its trailing \r trimmed), a non-hex /
+        // short header line that must be skipped, and a malformed author-time that
+        // falls back to 0.
+        let out = format!(
+            "{sha} 1 1 1\r\nauthor Chris\r\nauthor-mail <chris@x.io>\r\nauthor-time not-a-number\r\nsummary third commit\r\n\tline\r\nnot-a-sha-header 9 9 1\r\n",
+        );
+        let entries = parse_blame_porcelain(&out);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].sha, sha);
+        assert_eq!(entries[0].author, "Chris");
+        assert_eq!(entries[0].author_email, "chris@x.io");
+        assert_eq!(entries[0].subject, "third commit");
+        // Unparseable author-time defaults to 0.
+        assert_eq!(entries[0].timestamp_secs, 0);
+    }
+
+    #[test]
+    fn parse_blame_porcelain_handles_empty_author_mail() {
+        let sha = "dddddddddddddddddddddddddddddddddddddddd";
+        // `author-mail <>` yields an empty email (never panics on the brackets).
+        let out = format!(
+            "{sha} 1 1 1\nauthor Dana\nauthor-mail <>\nauthor-time 1700002000\nsummary d commit\n\tline\n",
+        );
+        let entries = parse_blame_porcelain(&out);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].author, "Dana");
+        assert_eq!(entries[0].author_email, "");
+        assert_eq!(entries[0].subject, "d commit");
+        assert_eq!(entries[0].timestamp_secs, 1700002000);
+    }
+
+    #[test]
     fn parse_shortstat_pulls_three_counts() {
         let line = " 5 files changed, 12 insertions(+), 3 deletions(-)";
         assert_eq!(parse_shortstat(line), (5, 12, 3));

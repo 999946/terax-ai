@@ -1,4 +1,4 @@
-import { type Extension, StateEffect, StateField } from "@codemirror/state";
+import { type ChangeSet, type Extension, type Text, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet, type ViewUpdate, WidgetType, ViewPlugin } from "@codemirror/view";
 import type { GitBlameEntry } from "@/modules/ai/lib/native";
 
@@ -17,6 +17,39 @@ export const setBlameEffect = StateEffect.define<Map<number, GitBlameEntry>>();
 export const setBlameContextEffect = StateEffect.define<BlameContext | null>();
 
 /**
+ * Remap every blame entry's line through the edits that just happened. `git
+ * blame` reports line numbers of the committed file on disk, so as the doc
+ * drifts the keys must follow — otherwise a committed line's badge would point
+ * at the wrong line or vanish. Extracted pure for headless unit tests.
+ */
+export function remapBlameMap(
+  value: Map<number, GitBlameEntry>,
+  changes: ChangeSet,
+  oldDoc: Text,
+  newDoc: Text,
+): Map<number, GitBlameEntry> {
+  if (value.size === 0) return value;
+  const next = new Map<number, GitBlameEntry>();
+  for (const [line, entry] of value) {
+    let from: number | undefined;
+    try {
+      from = oldDoc.line(line).from;
+    } catch {
+      continue; // line vanished from the pre-change doc
+    }
+    const mapped = changes.mapPos(from, 1);
+    let newLine: number | undefined;
+    try {
+      newLine = newDoc.lineAt(mapped).number;
+    } catch {
+      continue;
+    }
+    next.set(newLine, entry);
+  }
+  return next;
+}
+
+/**
  * Line-tracking blame map. `git blame` reports line numbers of the committed
  * file on disk, but the editor doc drifts as the user edits. Every entry's key
  * is the *current* doc line of a committed source line; on each document change
@@ -33,28 +66,7 @@ const blameField = StateField.define<Map<number, GitBlameEntry>>({
       if (effect.is(setBlameEffect)) return effect.value;
     }
     if (!tr.docChanged || value.size === 0) return value;
-    // Map every existing entry's line through the edit that just happened.
-    const changes = tr.changes;
-    const oldDoc = tr.startState.doc;
-    const newDoc = tr.state.doc;
-    const next = new Map<number, GitBlameEntry>();
-    for (const [line, entry] of value) {
-      let from: number | undefined;
-      try {
-        from = oldDoc.line(line).from;
-      } catch {
-        continue; // line vanished from the pre-change doc
-      }
-      const mapped = changes.mapPos(from, 1);
-      let newLine: number | undefined;
-      try {
-        newLine = newDoc.lineAt(mapped).number;
-      } catch {
-        continue;
-      }
-      next.set(newLine, entry);
-    }
-    return next;
+    return remapBlameMap(value, tr.changes, tr.startState.doc, tr.state.doc);
   },
 });
 

@@ -243,6 +243,16 @@ mod tests {
     }
 
     #[test]
+    fn nearest_existing_dir_returns_path_unchanged_when_no_separator() {
+        // A bare relative name with no / or \ that isn't an existing dir hits the
+        // give-up branch (rfind → None) and is returned as-is; canonical_dir will
+        // then legitimately error on it upstream.
+        let ws = WorkspaceEnv::Local;
+        let weird = "definitely_not_a_real_dir_terax";
+        assert_eq!(nearest_existing_dir(weird, &ws), weird);
+    }
+
+    #[test]
     fn resolve_within_repo_handles_deleted_directory() {
         let base = std::env::temp_dir().join("terax_git_deleted_dir_test");
         let _ = std::fs::remove_dir_all(&base);

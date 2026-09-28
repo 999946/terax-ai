@@ -129,4 +129,64 @@ describe("planCommitHistoryOpen", () => {
     expect(fresh.tabs[2]).toMatchObject({ path: "/repos/a/README.md" });
     expect(fresh.tabs[2].title).toBe("History · README.md");
   });
+
+  describe("focusSha", () => {
+    it("stores focusSha on a newly created tab", () => {
+      const result = planCommitHistoryOpen(
+        [],
+        { repoRoot: "/repos/a", branch: "main", focusSha: "abc1234" },
+        "space-a",
+        () => 1,
+      );
+      expect(result.targetId).toBe(1);
+      expect(result.tabs[0]).toMatchObject({
+        id: 1,
+        repoRoot: "/repos/a",
+        focusSha: "abc1234",
+      });
+    });
+
+    it("updates an existing tab's focusSha in place when it differs", () => {
+      const tabs: Tab[] = [history(1, "/repos/a")];
+      const result = planCommitHistoryOpen(
+        tabs,
+        { repoRoot: "/repos/a", branch: "main", focusSha: "abc1234" },
+        "space-a",
+        () => 2,
+      );
+      expect(result.targetId).toBe(1);
+      expect(result.tabs).not.toBe(tabs);
+      expect(result.tabs[0]).toMatchObject({ id: 1, focusSha: "abc1234" });
+    });
+
+    it("reuses the arrays by reference when the existing focusSha matches", () => {
+      const existing = history(1, "/repos/a");
+      const withSha = planCommitHistoryOpen(
+        [existing],
+        { repoRoot: "/repos/a", branch: "main", focusSha: "abc1234" },
+        "space-a",
+        () => 2,
+      );
+      const repeated = planCommitHistoryOpen(
+        withSha.tabs,
+        { repoRoot: "/repos/a", branch: "main", focusSha: "abc1234" },
+        "space-a",
+        () => 3,
+      );
+      expect(repeated.tabs).toBe(withSha.tabs);
+    });
+
+    it("treats undefined and null focusSha as the same (no re-planned array)", () => {
+      const tabs: Tab[] = [history(1, "/repos/a")];
+      // No branch → title stays "Git History", so only focusSha equality decides.
+      const result = planCommitHistoryOpen(
+        tabs,
+        { repoRoot: "/repos/a", focusSha: null },
+        "space-a",
+        () => 2,
+      );
+      // existing.focusSha is undefined; input is null → normalized equal → reuse.
+      expect(result.tabs).toBe(tabs);
+    });
+  });
 });
