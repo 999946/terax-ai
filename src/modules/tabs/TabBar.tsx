@@ -13,6 +13,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Active,
+  type Over,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
@@ -45,12 +61,15 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type PointerEventHandler,
+  type TouchEventHandler,
+  type ReactNode,
 } from "react";
 import { labelFor } from "./lib/tabLabel";
 import type { EditorTab, Tab } from "./lib/useTabs";
@@ -110,14 +129,15 @@ export function TabBar({
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
-  const [dropGap, setDropGap] = useState<number | null>(null);
   const [showAllLanguages, setShowAllLanguages] = useState(false);
-  const drag = useRef<{
-    pointerId: number;
-    startX: number;
-    fromId: number;
-    active: boolean;
-  } | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    }),
+  );
+  const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
+  const activeDragTab =
+    draggingId != null ? tabs.find((t) => t.id === draggingId) : undefined;
 
   // Play the enter animation only for tabs opened after the first paint, never
   // the restored set and never on switch/reorder (triggers are keyed, so they
@@ -169,24 +189,23 @@ export function TabBar({
     }
   }, [pill, pillReady]);
 
-  const gapAtX = (clientX: number) => {
-    const els = Array.from(
-      scrollRef.current?.querySelectorAll<HTMLElement>("[data-tab-id]") ?? [],
-    );
-    for (let i = 0; i < els.length; i++) {
-      const r = els[i].getBoundingClientRect();
-      if (clientX < r.left + r.width / 2) return i;
-    }
-    return els.length;
+  const handleDragStart = ({ active }: { active: Active }) => {
+    setDraggingId(active.id as number);
   };
 
-  const endDrag = (currentTarget: HTMLElement) => {
-    const st = drag.current;
-    if (st) currentTarget.releasePointerCapture?.(st.pointerId);
-    drag.current = null;
+  const handleDragCancel = () => {
     setDraggingId(null);
-    setDropGap(null);
-    document.body.style.userSelect = "";
+  };
+
+  // dnd-kit reports `over.id` against the pre-drag ordering, so the over index
+  // equals the visual index the dragged tab lands on — which is exactly what
+  // `reorderTabsByGap`'s gap-index contract expects.
+  const handleDragEnd = ({ active, over }: { active: Active; over: Over | null }) => {
+    setDraggingId(null);
+    if (!over || over.id === active.id) return;
+    const overIndex = tabs.findIndex((t) => t.id === over.id);
+    if (overIndex < 0) return;
+    onReorder(active.id as number, overIndex);
   };
 
   // Horizontal wheel scroll without holding shift.
@@ -226,43 +245,46 @@ export function TabBar({
             ref={listRef}
             className="relative h-7 w-max gap-0.5 bg-transparent p-0"
           >
-            <span
-              aria-hidden
-              className="pointer-events-none absolute left-0 top-1/2 h-7 rounded-md bg-foreground/[0.07] shadow-sm ring-1 ring-inset ring-foreground/[0.05]"
-              style={
-                pill
-                  ? {
-                      width: pill.width,
-                      transform: `translate(${pill.left}px, -50%)`,
-                      transitionProperty: pillReady
-                        ? "transform, width"
-                        : "none",
-                      transitionDuration: "var(--dur-base)",
-                      transitionTimingFunction: "var(--ease-premium)",
-                    }
-                  : { opacity: 0 }
-              }
-            />
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+            >
+              <SortableContext
+                items={tabIds}
+                strategy={horizontalListSortingStrategy}
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute left-0 top-1/2 h-7 rounded-md bg-foreground/[0.07] shadow-sm ring-1 ring-inset ring-foreground/[0.05]"
+                  style={
+                    pill
+                      ? {
+                          width: pill.width,
+                          transform: `translate(${pill.left}px, -50%)`,
+                          transitionProperty: pillReady
+                            ? "transform, width"
+                            : "none",
+                          transitionDuration: "var(--dur-base)",
+                          transitionTimingFunction: "var(--ease-premium)",
+                        }
+                      : { opacity: 0 }
+                  }
+                />
             {tabs.map((t, i) => {
               const isPreview =
                 (t.kind === "editor" || t.kind === "git-diff") && t.preview;
               const isActive = t.id === activeId;
               const isNew = !firstRender && !seen.has(t.id);
 
-              const srcIndex = tabs.findIndex((x) => x.id === draggingId);
-              const showGap = (gap: number) =>
-                draggingId !== null &&
-                dropGap === gap &&
-                gap !== srcIndex &&
-                gap !== srcIndex + 1;
-
               // While renaming, render a non-button cell so the <input> is not
               // nested inside the trigger <button> (invalid HTML, and WebKit
               // blocks focus/selection on inputs inside buttons).
               if (editingId === t.id && t.kind === "terminal") {
                 return (
-                  <Fragment key={t.id}>
-                    {showGap(i) && <DropIndicator />}
+                  <SortableTabNode key={t.id} id={t.id}>
                     <div
                       data-tab-id={t.id}
                       className={cn(
@@ -280,10 +302,7 @@ export function TabBar({
                         onCancel={() => setEditingId(null)}
                       />
                     </div>
-                    {i === tabs.length - 1 && showGap(tabs.length) && (
-                      <DropIndicator />
-                    )}
-                  </Fragment>
+                  </SortableTabNode>
                 );
               }
 
@@ -292,40 +311,6 @@ export function TabBar({
                   value={String(t.id)}
                   data-tab-id={t.id}
                   data-tab-active={isActive ? "true" : undefined}
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return;
-                    if ((e.target as HTMLElement).closest("[data-no-drag]"))
-                      return;
-                    drag.current = {
-                      pointerId: e.pointerId,
-                      startX: e.clientX,
-                      fromId: t.id,
-                      active: false,
-                    };
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }}
-                  onPointerMove={(e) => {
-                    const st = drag.current;
-                    if (!st || st.pointerId !== e.pointerId) return;
-                    if (!st.active) {
-                      if (Math.abs(e.clientX - st.startX) < 4) return;
-                      st.active = true;
-                      setDraggingId(st.fromId);
-                      document.body.style.userSelect = "none";
-                    }
-                    e.preventDefault();
-                    setDropGap(gapAtX(e.clientX));
-                  }}
-                  onPointerUp={(e) => {
-                    const st = drag.current;
-                    if (st?.active && dropGap !== null) {
-                      onReorder(st.fromId, dropGap);
-                    } else if (st && !st.active) {
-                      onSelect(t.id);
-                    }
-                    endDrag(e.currentTarget);
-                  }}
-                  onPointerCancel={(e) => endDrag(e.currentTarget)}
                   onDoubleClick={() => isPreview && onPin(t.id)}
                   onAuxClick={(e) => {
                     if (e.button === 1) {
@@ -334,19 +319,11 @@ export function TabBar({
                       onClose(t.id);
                     }
                   }}
-                  // Suppress Radix's switch-on-mousedown so a tab grabbed to
-                  // drag (or a plain click) only activates on release.
+                  // Only suppress the middle-click default; the left click lets
+                  // Radix activate normally (selection on mousedown), while
+                  // dragging is handled by dnd-kit's pointer sensor.
                   onMouseDown={(e) => {
-                    if (e.button === 1) {
-                      e.preventDefault();
-                      return;
-                    }
-                    if (
-                      e.button === 0 &&
-                      !(e.target as HTMLElement).closest("[data-no-drag]")
-                    ) {
-                      e.preventDefault();
-                    }
+                    if (e.button === 1) e.preventDefault();
                   }}
                   className={cn(
                     "group relative z-[1] h-7 shrink-0 justify-between gap-1.5 rounded-md bg-transparent text-xs transition-colors data-active:bg-transparent dark:data-active:bg-transparent",
@@ -586,15 +563,23 @@ export function TabBar({
               );
 
               return (
-                <Fragment key={t.id}>
-                  {showGap(i) && <DropIndicator />}
+                <SortableTabNode key={t.id} id={t.id}>
                   {tabNode}
-                  {i === tabs.length - 1 && showGap(tabs.length) && (
-                    <DropIndicator />
-                  )}
-                </Fragment>
+                </SortableTabNode>
               );
             })}
+              </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeDragTab ? (
+                  <div className="flex h-7 w-max items-center gap-1.5 rounded-md bg-card px-2 text-xs text-foreground shadow-lg ring-1 ring-border/70">
+                    <TabIcon tab={activeDragTab} />
+                    <span className="whitespace-nowrap">
+                      {labelFor(activeDragTab)}
+                    </span>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           </TabsList>
         </Tabs>
         <NewTabMenu
@@ -611,12 +596,43 @@ export function TabBar({
   );
 }
 
-function DropIndicator() {
+// Sortable wrapper for a tab: applies dnd-kit's drag transform so the strip
+// shifts smoothly as items are reordered, and dims the source tab while it's
+// being dragged (the visual "ghost" follows the cursor in the DragOverlay).
+function SortableTabNode({
+  id,
+  children,
+}: {
+  id: number;
+  children: ReactNode;
+}) {
+  const { setNodeRef, transform, transition, isDragging, listeners } =
+    useSortable({ id });
+  // Only the pointer handlers are attached — dropping onKeyDown keeps drag
+  // keyboard-only-free so Space/Enter still activate the tab button (no
+  // KeyboardSensor is registered deliberately).
+  const { onPointerDown, onTouchStart } = listeners ?? {};
+  const handlePointerDown = onPointerDown as
+    | PointerEventHandler<HTMLDivElement>
+    | undefined;
+  const handleTouchStart = onTouchStart as
+    | TouchEventHandler<HTMLDivElement>
+    | undefined;
   return (
-    <span
-      aria-hidden
-      className="my-0.5 w-0.5 shrink-0 self-stretch rounded-full bg-primary"
-    />
+    <div
+      ref={setNodeRef}
+      onPointerDown={handlePointerDown}
+      onTouchStart={handleTouchStart}
+      className="shrink-0"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : undefined,
+        zIndex: isDragging ? 2 : undefined,
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
