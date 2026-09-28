@@ -51,180 +51,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Read application version
-        id: version
-        shell: bash
-        run: |
-          # Split the command substitution onto its own line: nesting it inside
-          # double quotes (`echo "version=$(...)"`) loses the inner quotes through
-          # YAML->bash escaping and `node -p "require(...)"` silently returns empty.
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Build DMG
+      # tauri-action is the canonical way to publish Tauri releases: it runs
+      # `tauri build`, collects the DMG + signed updater artifacts, and merges
+      # each matrix job's per-arch entry into one combined latest.json before
+      # uploading it to the same GitHub Release (tagName). This replaces the
+      # hand-rolled build/stage/merge/release pipeline that expected `tauri
+      # build --bundles dmg` to write latest.json — it never does; only the
+      # .sig/.app.tar.gz are produced by the CLI, and merging them across
+      # architectures is exactly what this action handles for us.
+      - name: Build and publish (tauri-action)
+        uses: tauri-apps/tauri-action@v1
         env:
-          TERAX_CLI_TARGET: ${{ matrix.target }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Keep unsigned public builds explicitly ad-hoc signed. This makes
           # arm64 code executable after a user removes browser quarantine.
           APPLE_SIGNING_IDENTITY: "-"
-          # Updater artifacts (latest.json/.sig/.app.tar.gz) are only generated
-          # when a signing key is present. Without these the built-in updater
-          # gets a manifest but nothing to verify against.
+          # Updater artifacts are only generated when a signing key is present.
+          # Without these the built-in updater gets a manifest but nothing to
+          # verify against.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --bundles dmg --target ${{ matrix.target }}
-
-      - name: Assert updater artifacts exist
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_dir="src-tauri/target/${{ matrix.target }}/release"
-          app_archive=$(find "$release_dir" -maxdepth 3 -type f -name '*.app.tar.gz' -print -quit)
-          test -n "$app_archive" || {
-            echo "No *.app.tar.gz under $release_dir — is TAURI_SIGNING_PRIVATE_KEY set on the fork secrets?" >&2
-            exit 1
-          }
-          latest=$(find "$release_dir" -maxdepth 3 -type f -name 'latest.json' -print -quit)
-          test -n "$latest" || {
-            echo "No latest.json under $release_dir — updater artifacts not generated." >&2
-            exit 1
-          }
-          echo "updater artifact: $app_archive"
-          echo "updater manifest: $latest"
-
-      - name: Verify macOS bundle and DMG
-        shell: bash
-        run: |
-          set -euo pipefail
-          bundle_dir="src-tauri/target/${{ matrix.target }}/release/bundle"
-          dmg=$(find "$bundle_dir/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
-          test -n "$dmg"
-
-          case "${{ matrix.target }}" in
-            aarch64-apple-darwin) expected_arch='arm64' ;;
-            x86_64-apple-darwin) expected_arch='x86_64' ;;
-            *) echo "Unexpected target: ${{ matrix.target }}" >&2; exit 1 ;;
-          esac
-
-          hdiutil verify "$dmg"
-          mount_point=$(mktemp -d)
-          cleanup() {
-            hdiutil detach "$mount_point" -quiet 2>/dev/null || true
-            rmdir "$mount_point" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_point" >/dev/null
-          mounted_app=$(find "$mount_point" -maxdepth 1 -type d -name '*.app' -print -quit)
-          test -n "$mounted_app"
-
-          # Check every executable, including the bundled terax-cli sidecar.
-          # A single Intel Mach-O inside an arm64 app can make launch fail.
-          executable_count=0
-          while IFS= read -r executable; do
-            executable_count=$((executable_count + 1))
-            description=$(file "$executable")
-            printf '%s\n' "$description"
-            printf '%s\n' "$description" | grep -q "$expected_arch"
-          done < <(find "$mounted_app/Contents" -type f -perm -111 -print)
-          test "$executable_count" -gt 0
-
-          codesign --verify --deep --strict --verbose=2 "$mounted_app"
-          codesign -dv --verbose=4 "$mounted_app" 2>&1 | grep -E 'Identifier=|TeamIdentifier=|Signature=' || true
-
-          # Ad-hoc builds are not notarized, so Gatekeeper rejection is
-          # expected until Developer ID signing and notarization are added.
-          spctl -a -vv --type install "$mounted_app" || true
-
-      - name: Stage release assets (DMG + updater artifacts)
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_dir="src-tauri/target/${{ matrix.target }}/release"
-          stage="release-assets"
-          rm -rf "$stage"
-          mkdir -p "$stage"
-          # DMG (manual installs).
-          dmg=$(find "$release_dir/bundle/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
-          test -n "$dmg"
-          mv "$dmg" "$stage/Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
-          # Updater: signed .app.tar.gz (what the built-in updater installs on
-          # macOS) + this arch's latest.json, renamed so the release job's
-          # merge-multiple download doesn't collide on the shared filename.
-          app_archive=$(find "$release_dir" -maxdepth 3 -type f -name '*.app.tar.gz' -print -quit)
-          test -n "$app_archive"
-          cp "$app_archive" "$stage/"
-          latest=$(find "$release_dir" -maxdepth 3 -type f -name 'latest.json' -print -quit)
-          test -n "$latest"
-          cp "$latest" "$stage/latest-${{ matrix.arch }}.json"
-
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
         with:
-          name: Terax-v${{ steps.version.outputs.version }}-${{ matrix.arch }}
-          path: release-assets
-          if-no-files-found: error
-          retention-days: 14
-
-  release:
-    name: Publish DMG release
-    needs: build
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Read application version
-        id: version
-        run: echo "version=$(gh api repos/${{ github.repository }}/contents/package.json?ref=${{ github.sha }} --jq '.content' | base64 -d | jq -r .version)" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Download DMG artifacts
-        uses: actions/download-artifact@v4
-        with:
-          # Download both architecture artifacts without relying on the
-          # package version lookup matching the upload job exactly.
-          pattern: Terax-*
-          path: release-assets
-          merge-multiple: true
-
-      - name: Verify DMG artifacts
-        shell: bash
-        run: |
-          find release-assets -type f -name '*.dmg' -print
-          test -n "$(find release-assets -type f -name '*.dmg' -print -quit)"
-          # Exactly two updater archives + two per-arch manifests: guards
-          # against merge-multiple silently colliding on a shared filename
-          # and dropping one architecture's artifact.
-          find release-assets -type f -name '*.app.tar.gz' -print
-          test "$(find release-assets -type f -name '*.app.tar.gz' | wc -l | tr -d ' ')" -eq 2
-          find release-assets -type f -name 'latest-*.json' -print
-          test "$(find release-assets -type f -name 'latest-*.json' | wc -l | tr -d ' ')" -eq 2
-
-      - name: Merge per-arch update manifests
-        shell: bash
-        run: |
-          node scripts/merge-update-manifest.mjs \
-            release-assets/latest-apple-silicon.json \
-            release-assets/latest-intel.json \
-            release-assets/latest.json
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Terax v${{ steps.version.outputs.version }}
-          generate_release_notes: true
-          files: |
-            release-assets/*.dmg
-            release-assets/*.app.tar.gz
-            release-assets/latest.json
-          fail_on_unmatched_files: true
+          tagName: v__VERSION__
+          releaseName: "Terax v__VERSION__"
+          releaseBody: "See the assets to download this version and install."
+          releaseDraft: false
+          prerelease: false
+          # Build both the .dmg (manual installs) and the .app bundle (the
+          # signed .app.tar.gz the built-in updater installs). tauri-action
+          # generates latest.json for us.
+          args: --bundles app,dmg --target ${{ matrix.target }}
