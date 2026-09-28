@@ -114,7 +114,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "ZFc1MGNuVnpkR1ZrSUdOdmJXMWxiblE2SUcxcGJtbHphV2R1SUhCMVlteHBZeUJyWlhrNklEVkJORUkwTURBNE1rTkRORVZDUWdwU1YxTTNWSE41UTBGTVUydENZVGhqV0U4d1dVMW9kRkF3UTNOS1owbFVlRWhyU1hZeVQzVlRSMGxSUzNkU01tbGxNVTl4WWtOa053bz0=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQzNjQ0MEVGNzZBRTMyODgKUldTSU1xNTI3MEJrUTI4c2EvdHhFeTZJeUo0WEtObGRGTWxkU0I5cjJFN29kYnZjOWJhRnVVWDcK",
       "endpoints": [
         "https://github.com/999946/terax-ai/releases/latest/download/latest.json"
       ]
