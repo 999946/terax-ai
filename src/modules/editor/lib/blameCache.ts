@@ -32,6 +32,21 @@ export function clearBlameCache(): void {
   inflight.clear();
 }
 
+/**
+ * Drop any cached/in-flight blame for `path` (across every repo root). Called
+ * when a file is saved so the next blame refetch reflects the committed state —
+ * otherwise the cache (keyed only by path) would keep serving the pre-save data.
+ */
+export function invalidateBlameForPath(path: string): void {
+  const suffix = `|${path}`;
+  for (const key of cache.keys()) {
+    if (key.endsWith(suffix)) cache.delete(key);
+  }
+  for (const key of inflight.keys()) {
+    if (key.endsWith(suffix)) inflight.delete(key);
+  }
+}
+
 export async function fetchBlame(
   repoRoot: string,
   path: string,

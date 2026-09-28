@@ -853,9 +853,16 @@ pub fn commit_file_diff(
     })
 }
 
-/// Git blame per line for a single file. Returns entries sorted by line number
-/// (the porcelain output is naturally final-line ascending). Lines that are
-/// uncommitted (all-zero sha) are skipped — they have no commit info.
+/// Git blame per line for a single file. Returns entries sorted by *working-tree*
+/// line number.
+///
+/// Blame runs against `HEAD` (so every committed line has a real commit — the
+/// working tree can contain uncommitted/edited lines that `git blame` without a
+/// rev would emit as all-zero-sha and skip). HEAD line numbers are then aligned
+/// back to the working tree via `git diff HEAD` so the editor (which shows the
+/// working tree) can anchor badges on the right lines. Lines that are pure
+/// insertions have no committed counterpart and are skipped; modified lines keep
+/// the commit of their last committed form.
 pub fn blame(
     registry: &WorkspaceRegistry,
     repo_root: &str,
@@ -872,7 +879,7 @@ pub fn blame(
     let output = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        ["blame", "--line-porcelain", "--", &rel],
+        ["blame", "HEAD", "--line-porcelain", "--", &rel],
         DEFAULT_TIMEOUT_SECS,
     )?;
     if output.timed_out {
@@ -885,10 +892,138 @@ pub fn blame(
         });
     }
     let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
+    // HEAD blame yields line numbers in HEAD space. Diff HEAD against the working
+    // tree and remap each HEAD line to its working-tree position, so a commit's
+    // badge lands on the line the user actually sees.
+    let diff_out = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["diff", "--no-color", "HEAD", "--", &rel],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    let diff_stdout = if diff_out.exit_code == Some(0) {
+        std::str::from_utf8(&diff_out.stdout).unwrap_or("")
+    } else {
+        ""
+    };
+    let working_lines = count_working_lines(&resolved);
+    let working_for_head = align_head_to_working(diff_stdout, working_lines);
+
+    let head_entries = parse_blame_porcelain(stdout);
+    let mut by_head_line = std::collections::HashMap::with_capacity(head_entries.len());
+    for e in head_entries {
+        by_head_line.insert(e.line, e);
+    }
+    let mut entries = Vec::with_capacity(working_for_head.len());
+    for (working, head) in working_for_head {
+        if let Some(e) = by_head_line.get(&head) {
+            let mut e = e.clone();
+            e.line = working;
+            entries.push(e);
+        }
+    }
+    entries.sort_by_key(|e| e.line);
     Ok(GitBlameResult {
-        entries: parse_blame_porcelain(stdout),
+        entries,
         truncated: output.truncated,
     })
+}
+
+/// Number of 1-based lines in the working-tree file. 0 when the file is missing
+/// or unreadable, in which case the alignment's identity tail collapses (no
+/// badge anchors past the last diff hunk).
+fn count_working_lines(path: &Path) -> u32 {
+    let Ok(bytes) = std::fs::read(path) else {
+        return 0;
+    };
+    if bytes.is_empty() {
+        return 0;
+    }
+    (bytes.iter().filter(|&&b| b == b'\n').count() as u32) + 1
+}
+
+/// Build a `working-tree line → HEAD line` mapping from `git diff HEAD` output
+/// (unified format). `working_lines` is the total 1-based line count of the
+/// working file, used to fill the identity tail after the last hunk.
+///
+/// Each unified hunk `@@ -o[,n] +m[,k] @@` moves two cursors (old = HEAD,
+/// new = working). Context lines map 1:1; a `+` line that follows a `-` block is
+/// treated as the modified counterpart of the dropped HEAD line (an edited line
+/// keeps the commit of its pre-edit form); a `+` with no pending `-` is a pure
+/// insertion and maps to nothing.
+fn align_head_to_working(diff: &str, working_lines: u32) -> std::collections::HashMap<u32, u32> {
+    use std::collections::HashMap;
+    let mut map: HashMap<u32, u32> = HashMap::new();
+    let mut old: i64 = 1; // HEAD cursor
+    let mut new: i64 = 1; // working cursor
+    let mut pending_old: Vec<i64> = Vec::new(); // HEAD lines dropped by `-`, to attach to `+`
+    let mut in_hunk = false;
+    let lines: Vec<&str> = diff.lines().collect();
+    let mut i = 0;
+    while i < lines.len() {
+        let l = lines[i];
+        if let Some(rest) = l.strip_prefix("@@") {
+            if let Some((h_old, h_new)) = parse_hunk_range(rest) {
+                // Fill the unchanged gap between the previous hunk and this one.
+                while old < h_old && new < h_new {
+                    map.insert(new as u32, old as u32);
+                    old += 1;
+                    new += 1;
+                }
+                old = h_old;
+                new = h_new;
+                in_hunk = true;
+            }
+            i += 1;
+            continue;
+        }
+        if in_hunk {
+            let c = l.chars().next().unwrap_or(' ');
+            match c {
+                ' ' => {
+                    map.insert(new as u32, old as u32);
+                    old += 1;
+                    new += 1;
+                }
+                '+' => {
+                    if let Some(prev) = pending_old.first().copied() {
+                        map.insert(new as u32, prev as u32);
+                        pending_old.remove(0);
+                    }
+                    new += 1;
+                }
+                '-' => {
+                    pending_old.push(old);
+                    old += 1;
+                }
+                '\\' => {} // "\ No newline at end of file"
+                _ => {}
+            }
+        }
+        i += 1;
+    }
+    // Identity tail: unchanged trailing lines map 1:1 up to the working file's
+    // total line count.
+    while new <= working_lines as i64 {
+        map.insert(new as u32, old as u32);
+        new += 1;
+        old += 1;
+    }
+    map
+}
+
+/// Parse the trailing portion of a unified hunk header into `(old_start, new_start)`.
+fn parse_hunk_range(s: &str) -> Option<(i64, i64)> {
+    let t = s.trim_start();
+    let old_start = t
+        .strip_prefix('-')?
+        .split(|c: char| c == ',' || c == ' ' || c == '+')
+        .next()?
+        .parse::<i64>()
+        .ok()?;
+    let plus = t.split_ascii_whitespace().find(|p| p.starts_with('+'))?;
+    let new_start = plus[1..].split(',').next()?.parse::<i64>().ok()?;
+    Some((old_start, new_start))
 }
 
 /// Parse `git blame --line-porcelain` output into per-line entries.
@@ -2011,5 +2146,66 @@ mod tests {
             "fatal: your current branch 'main' does not have any commits yet"
         )));
         assert!(!looks_like_no_head(&mk("fatal: pathspec did not match")));
+    }
+
+    #[test]
+    fn align_head_to_working_clean_file_is_identity() {
+        // No hunks → every working line maps to the same HEAD line.
+        let map = align_head_to_working("", 5);
+        assert_eq!(map.get(&1), Some(&1));
+        assert_eq!(map.get(&5), Some(&5));
+        assert_eq!(map.len(), 5);
+    }
+
+    #[test]
+    fn align_head_to_working_insertion_skips_and_keeps_surrounding() {
+        // diff: line 2 is a pure insertion (no `-`). Working line 2 should have
+        // no HEAD line; lines 1 and 3-5 keep their HEAD counterparts.
+        let diff = "\
+@@ -1,4 +1,5 @@
+ line1
++INSERTED
+ line2
+ line3
+ line4
+";
+        let map = align_head_to_working(diff, 5);
+        assert_eq!(map.get(&1), Some(&1));
+        assert!(!map.contains_key(&2), "insertion must not map to a HEAD line");
+        assert_eq!(map.get(&3), Some(&2));
+        assert_eq!(map.get(&4), Some(&3));
+        assert_eq!(map.get(&5), Some(&4));
+    }
+
+    #[test]
+    fn align_head_to_working_modified_line_keeps_preimage() {
+        // line 2 changed: `-line2` + `+edited`. The edited working line maps to
+        // the pre-edit HEAD line 2.
+        let diff = "\
+@@ -1,3 +1,3 @@
+ line1
+-line2
++edited
+ line3
+";
+        let map = align_head_to_working(diff, 3);
+        assert_eq!(map.get(&2), Some(&2));
+        assert_eq!(map.get(&1), Some(&1));
+        assert_eq!(map.get(&3), Some(&3));
+    }
+
+    #[test]
+    fn align_head_to_working_deletion_shifts_following_lines() {
+        // line 2 deleted: remaining working lines shift up by one against HEAD.
+        let diff = "\
+@@ -1,3 +1,2 @@
+ line1
+-line2
+ line3
+";
+        let map = align_head_to_working(diff, 2);
+        assert_eq!(map.get(&1), Some(&1));
+        assert_eq!(map.get(&2), Some(&3), "line3 moved up to working line 2");
+        assert_eq!(map.len(), 2);
     }
 }

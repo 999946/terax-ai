@@ -46,7 +46,7 @@ import {
 import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
 import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
-import { fetchBlame } from "./lib/blameCache";
+import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
 import {
   buildSharedExtensions,
   DEFAULT_INDENT,
@@ -256,6 +256,7 @@ export const EditorPane = memo(
         }
       }
       onSavedRef.current?.();
+      if (path) invalidateBlameForPath(path);
     }, []);
     const performSaveRef = useRef(performSave);
     performSaveRef.current = performSave;
