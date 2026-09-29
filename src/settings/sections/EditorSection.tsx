@@ -31,6 +31,7 @@ import {
   setEditorFormatterByLang,
   setEditorWordWrap,
   setEditorWordWrapColumn,
+  setGitDiffCollapseUnchanged,
   setVimMode,
 } from "@/modules/settings/store";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -48,6 +49,9 @@ export function EditorSection() {
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
+  const gitDiffCollapseUnchanged = usePreferencesStore(
+    (s) => s.gitDiffCollapseUnchanged,
+  );
   const editorWordWrapColumn = usePreferencesStore(
     (s) => s.editorWordWrapColumn,
   );
@@ -123,6 +127,15 @@ export function EditorSection() {
             onChange={(v) => void setEditorWordWrapColumn(v)}
           />
         )}
+        <SettingRow
+          title={t("settings.editor.collapseUnchanged")}
+          description={t("settings.editor.collapseUnchangedDescription")}
+        >
+          <Switch
+            checked={gitDiffCollapseUnchanged}
+            onCheckedChange={(v) => void setGitDiffCollapseUnchanged(v)}
+          />
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

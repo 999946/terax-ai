@@ -21,6 +21,7 @@ import {
 } from "./lib/extensions";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { DiffViewToggle } from "./DiffViewToggle";
 import { DEFAULT_DIFF_MODE, type DiffMode } from "./diffMode";
 
@@ -145,6 +146,9 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   const mergeRootRef = useRef<HTMLDivElement | null>(null);
   const mergeViewRef = useRef<MergeView | null>(null);
   const themeExt = useEditorThemeExt();
+  const gitDiffCollapseUnchanged = usePreferencesStore(
+    (s) => s.gitDiffCollapseUnchanged,
+  );
   const [diffMode, setDiffMode] = useState<DiffMode>(DEFAULT_DIFF_MODE);
   const [state, setState] = useState<LoadState>(() =>
     active ? loadStateFromCache(source) : { kind: "idle" },
@@ -217,6 +221,12 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
   const useFallback = isBinary || isTooLarge;
 
   const langExt = loaded?.langExt ?? null;
+  // "Collapse unchanged" only when the setting is on; off (default) shows all
+  // lines. Pass undefined (not {}) so the merge view leaves folding disabled.
+  const collapseUnchanged = gitDiffCollapseUnchanged
+    ? { margin: 3, minSize: 6 }
+    : undefined;
+
   const extensions = useMemo(
     () => [
       ...SHARED_EXT,
@@ -229,11 +239,11 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
         highlightChanges: true,
         gutter: true,
         syntaxHighlightDeletions: true,
-        collapseUnchanged: { margin: 3, minSize: 6 },
+        collapseUnchanged,
       }),
       DIFF_THEME,
     ],
-    [originalContent, langExt],
+    [originalContent, langExt, gitDiffCollapseUnchanged],
   );
 
   // Cache-hit path only: the diff came from the cache before the language
@@ -271,7 +281,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
       parent: root,
       gutter: true,
       highlightChanges: true,
-      collapseUnchanged: { margin: 3, minSize: 6 },
+      collapseUnchanged,
     });
     const dom = view.dom;
     dom.style.height = "100%";
@@ -282,7 +292,7 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
       root.innerHTML = "";
       mergeViewRef.current = null;
     };
-  }, [splitReady, originalContent, modifiedContent, langExt, themeExt]);
+  }, [splitReady, originalContent, modifiedContent, langExt, themeExt, gitDiffCollapseUnchanged]);
 
   const stats = useMemo(
     () =>

@@ -157,6 +157,7 @@ export type Preferences = {
   vimMode: boolean;
   editorWordWrap: boolean;
   editorWordWrapColumn: number;
+  gitDiffCollapseUnchanged: boolean;
   showHidden: boolean;
   explorerGitDecorations: boolean;
   gitTargetBranches: string[];
@@ -256,6 +257,7 @@ const KEY_RECENT_MODELS = "recentModelIds";
 const KEY_VIM_MODE = "vimMode";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_WORD_WRAP_COLUMN = "editorWordWrapColumn";
+const KEY_GIT_DIFF_COLLAPSE_UNCHANGED = "gitDiffCollapseUnchanged";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
 const KEY_EXPLORER_GIT_DECORATIONS = "explorerGitDecorations";
@@ -353,6 +355,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vimMode: false,
   editorWordWrap: false,
   editorWordWrapColumn: EDITOR_WORD_WRAP_COLUMN_DEFAULT,
+  gitDiffCollapseUnchanged: false,
   showHidden: false,
   explorerGitDecorations: true,
   gitTargetBranches: [],
@@ -509,6 +512,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_EDITOR_WORD_WRAP_COLUMN) ??
         DEFAULT_PREFERENCES.editorWordWrapColumn,
     ),
+    gitDiffCollapseUnchanged:
+      get<boolean>(KEY_GIT_DIFF_COLLAPSE_UNCHANGED) ??
+      DEFAULT_PREFERENCES.gitDiffCollapseUnchanged,
     showHidden:
       get<boolean>(KEY_SHOW_HIDDEN) ??
       get<boolean>(LEGACY_KEY_SHOW_HIDDEN_DIRS) ??
@@ -799,6 +805,12 @@ export async function setEditorWordWrap(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_WORD_WRAP, value);
 }
 
+export async function setGitDiffCollapseUnchanged(
+  value: boolean,
+): Promise<void> {
+  await writePref(KEY_GIT_DIFF_COLLAPSE_UNCHANGED, value);
+}
+
 export function clampEditorWordWrapColumn(value: number): number {
   if (!Number.isFinite(value)) return EDITOR_WORD_WRAP_COLUMN_DEFAULT;
   return Math.min(
@@ -1035,6 +1047,7 @@ export async function onPreferencesChange(
     [KEY_VIM_MODE]: "vimMode",
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_WORD_WRAP_COLUMN]: "editorWordWrapColumn",
+    [KEY_GIT_DIFF_COLLAPSE_UNCHANGED]: "gitDiffCollapseUnchanged",
     [KEY_SHOW_HIDDEN]: "showHidden",
     [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",
     [KEY_GIT_TARGET_BRANCHES]: "gitTargetBranches",

@@ -311,6 +311,9 @@ export const en: Record<string, string> = {
   "settings.editor.vimModeDescription": "Vim mode description",
   "settings.editor.wordWrap": "Word wrap",
   "settings.editor.wordWrapDescription": "Word wrap description",
+  "settings.editor.collapseUnchanged": "Collapse unchanged regions",
+  "settings.editor.collapseUnchangedDescription":
+    "When enabled, unchanged blocks in the git diff view are collapsed so only changed regions are shown. Off by default.",
   "settings.editor.wrapColumn": "Wrap column",
   "settings.models.automatic": "Automatic",
   "settings.models.defaults": "Defaults",

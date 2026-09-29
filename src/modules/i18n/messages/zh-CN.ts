@@ -199,6 +199,9 @@ export const zhCN: Record<string, string> = {
   "settings.editor.vimModeDescription": "启用 Vim 编辑模式。",
   "settings.editor.wordWrap": "自动换行",
   "settings.editor.wordWrapDescription": "控制编辑器中的长行是否自动换行。",
+  "settings.editor.collapseUnchanged": "收起未改动段",
+  "settings.editor.collapseUnchangedDescription":
+    "开启后，git diff 视图中未改动的大段代码将折叠，仅显示改动区域。默认关闭。",
   "settings.editor.wrapColumn": "换行列",
   "settings.models.automatic": "自动",
   "settings.models.defaults": "默认值",
