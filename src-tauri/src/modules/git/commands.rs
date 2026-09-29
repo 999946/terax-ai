@@ -2,9 +2,9 @@ use tauri::{AppHandle, Manager};
 
 use crate::modules::git::operations;
 use crate::modules::git::types::{
-    DiscardEntry, GitBlameResult, GitBranchListResult, GitCommitFileChange, GitCommitResult,
-    GitDiffContentResult, GitDiffResult, GitLogEntry, GitMergeStatusResult, GitPanelSnapshot,
-    GitPushResult, GitRepoInfo, GitStashListResult, GitStatusSnapshot,
+    DiscardEntry, GitBlameResult, GitBranchListResult, GitCommitFileChange, GitCommitInput,
+    GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry, GitMergeStatusResult,
+    GitPanelSnapshot, GitPushResult, GitRepoInfo, GitStashListResult, GitStatusSnapshot,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -156,14 +156,34 @@ pub async fn git_discard(
 
 #[tauri::command]
 pub async fn git_commit(
-    repo_root: String,
-    message: String,
+    input: GitCommitInput,
     workspace: Option<WorkspaceEnv>,
     app: AppHandle,
 ) -> Result<GitCommitResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
-        operations::commit(r, &repo_root, &message, &workspace).map_err(Into::into)
+        operations::commit(
+            r,
+            &input.repo_root,
+            &input.subject,
+            input.body.as_deref(),
+            input.amend,
+            &workspace,
+        )
+        .map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_diff_cached_check(
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<Option<String>, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::diff_cached_check(r, &repo_root, &workspace).map_err(Into::into)
     })
     .await
 }

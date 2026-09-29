@@ -104,12 +104,20 @@ export type PendingDiscard = {
   label: string;
 };
 
+export type CommitOptions = {
+  push?: boolean;
+  amend?: boolean;
+};
+
 type SourceControlPanelState = {
   panelState: PanelState;
   repo: GitRepoInfo | null;
   status: GitStatusSnapshot | null;
   selected: DiffSelection | null;
-  commitMessage: string;
+  subject: string;
+  body: string;
+  amendEnabled: boolean;
+  beforeCommitCheck: boolean;
   actionBusy: string | null;
   statusError: string | null;
   actionError: string | null;
@@ -128,7 +136,10 @@ type SourceControlPanelState = {
   stagedEmptyText: string;
   unstagedEmptyText: string;
   pendingDiscard: PendingDiscard | null;
-  setCommitMessage: (value: string) => void;
+  setSubject: (value: string) => void;
+  setBody: (value: string) => void;
+  setAmendEnabled: (value: boolean) => void;
+  setBeforeCommitCheck: (value: boolean) => void;
   refresh: () => Promise<void>;
   selectEntry: (entry: SourceControlEntry) => Promise<void>;
   selectFile: (entry: SourceControlFileEntry) => Promise<void>;
@@ -146,7 +157,7 @@ type SourceControlPanelState = {
   stageAllEntries: () => Promise<void>;
   unstageAllEntries: () => Promise<void>;
   generateCommitMessage: () => Promise<void>;
-  commit: () => Promise<void>;
+  commit: (opts?: CommitOptions) => Promise<void>;
   push: () => Promise<void>;
 };
 
@@ -244,6 +255,22 @@ function cleanCommitMessage(raw: string): string {
 
 function isValidCommitMessage(message: string): boolean {
   return CONVENTIONAL_PREFIX.test(message);
+}
+
+/** Split a full commit message into a subject line and a body at the first blank line. */
+function splitCommitMessage(text: string): { subject: string; body: string } {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  const blank = normalized.search(/\n[ \t]*\n/);
+  if (blank === -1) {
+    return { subject: normalized, body: "" };
+  }
+  return {
+    subject: normalized.slice(0, blank).trim(),
+    body: normalized
+      .slice(blank)
+      .replace(/\n[ \t]*\n/, "\n\n")
+      .trim(),
+  };
 }
 
 function buildCommitMessagePrompt(
@@ -429,7 +456,10 @@ export function useSourceControlPanel(
   const [repo, setRepo] = useState<GitRepoInfo | null>(null);
   const [status, setStatus] = useState<GitStatusSnapshot | null>(null);
   const [selected, setSelected] = useState<DiffSelection | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [amendEnabled, setAmendEnabled] = useState(false);
+  const [beforeCommitCheck, setBeforeCommitCheck] = useState(false);
   const [localActionBusy, setLocalActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -969,7 +999,9 @@ export function useSourceControlPanel(
       if (!isValidCommitMessage(message)) {
         throw new Error(t("sourceControl.invalidAiMessage"));
       }
-      setCommitMessage(message);
+      const split = splitCommitMessage(message);
+      setSubject(split.subject);
+      setBody(split.body);
       setActionMessage(null);
     } catch (error) {
       setActionError(normalizeError(error, t("sourceControl.unknownError")));
@@ -992,25 +1024,52 @@ export function useSourceControlPanel(
     t,
   ]);
 
-  const commit = useCallback(async () => {
-    if (!repo || summary.busyAction) return;
-    setLocalActionBusy("commit");
-    setActionMessage(null);
-    setActionError(null);
-    try {
-      const result = await native.gitCommit(repo.repoRoot, commitMessage);
-      setCommitMessage("");
-      setActionMessage(
-        `Committed ${result.commitSha.slice(0, 7)} ${result.summary}`,
-      );
-      invalidateRepoDiffs(repo.repoRoot);
-      await summary.refresh({ remote: "never" });
-    } catch (error) {
-      setActionError(normalizeError(error, t("sourceControl.unknownError")));
-    } finally {
-      setLocalActionBusy(null);
-    }
-  }, [commitMessage, repo, summary, t]);
+  const commit = useCallback(
+    async (opts?: CommitOptions) => {
+      if (!repo || summary.busyAction) return;
+      setLocalActionBusy("commit");
+      setActionMessage(null);
+      setActionError(null);
+      try {
+        if (beforeCommitCheck) {
+          const errors = await native.gitDiffCachedCheck(repo.repoRoot);
+          if (errors) {
+            setActionError(
+              `${t("sourceControl.whitespaceCheckFailed")}\n${errors}`,
+            );
+            return;
+          }
+        }
+        const result = await native.gitCommit(
+          repo.repoRoot,
+          subject.trim(),
+          body.trim() || null,
+          { amend: opts?.amend ?? false },
+        );
+        setSubject("");
+        setBody("");
+        let pushError: string | null = null;
+        if (opts?.push) {
+          const pushResult = await summary.runRemoteAction("push");
+          if (!pushResult.ok) pushError = pushResult.error ?? null;
+        }
+        invalidateRepoDiffs(repo.repoRoot);
+        await summary.refresh({ remote: "never" });
+        if (pushError) {
+          setActionError(pushError);
+        } else {
+          setActionMessage(
+            `Committed ${result.commitSha.slice(0, 7)} ${result.summary}`,
+          );
+        }
+      } catch (error) {
+        setActionError(normalizeError(error, t("sourceControl.unknownError")));
+      } finally {
+        setLocalActionBusy(null);
+      }
+    },
+    [beforeCommitCheck, body, repo, subject, summary, t],
+  );
 
   const push = useCallback(async () => {
     if (!repo) return;
@@ -1060,7 +1119,10 @@ export function useSourceControlPanel(
     repo,
     status,
     selected,
-    commitMessage,
+    subject,
+    body,
+    amendEnabled,
+    beforeCommitCheck,
     actionBusy: localActionBusy ?? summary.busyAction,
     statusError: summary.localError,
     actionError,
@@ -1079,7 +1141,10 @@ export function useSourceControlPanel(
     stagedEmptyText,
     unstagedEmptyText,
     pendingDiscard: pendingDiscardView,
-    setCommitMessage,
+    setSubject,
+    setBody,
+    setAmendEnabled,
+    setBeforeCommitCheck,
     refresh,
     selectEntry,
     selectFile,

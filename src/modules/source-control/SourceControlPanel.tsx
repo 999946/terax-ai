@@ -253,18 +253,20 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
   const commitShortcut = IS_MAC ? "⌘↩" : "Ctrl+Enter";
   const generateShortcut = IS_MAC ? "⌘G" : "Ctrl+G";
+  const commitMessageReady =
+    scm.subject.trim().length > 0 || scm.amendEnabled;
   const canCommit =
     scm.stagedEntries.length > 0 &&
-    scm.commitMessage.trim().length > 0 &&
+    commitMessageReady &&
     !fixedTargetPending &&
     !scm.actionBusy;
   const commitDisabledReason = scm.actionBusy
     ? t("sourceControl.waitActionFinish")
     : scm.stagedEntries.length === 0
       ? t("sourceControl.stageToCommit")
-      : scm.commitMessage.trim().length === 0
-        ? t("sourceControl.enterMessageToCommit")
-        : null;
+      : commitMessageReady
+        ? null
+        : t("sourceControl.enterMessageToCommit");
   const commitHint = canCommit
     ? t("sourceControl.commitShortcutHint", { shortcut: commitShortcut })
     : (commitDisabledReason ??
@@ -295,14 +297,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     return null;
   }, [scm.actionError, scm.actionMessage, scm.remoteError]);
 
-  const handleCommitShortcut = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleCommitShortcut = (
+    event: KeyboardEvent<HTMLElement>,
+  ) => {
     if (
       event.key === "Enter" &&
       (event.metaKey || event.ctrlKey) &&
       canCommit
     ) {
       event.preventDefault();
-      void scm.commit();
+      void scm.commit({ amend: scm.amendEnabled });
       return;
     }
     if (
@@ -635,69 +639,84 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         {panelState === "ready" && scm.status ? (
           <>
             <div className="relative shrink-0 space-y-2 border-b border-border/40 bg-gradient-to-b from-card/65 to-card/30 px-2.5 pb-2.5 pt-2.5">
+              <div className="flex items-center justify-between pr-1">
+                <label className="flex cursor-pointer select-none items-center gap-1.5 text-[10.5px] text-muted-foreground hover:text-foreground">
+                  <Checkbox
+                    aria-label={t("sourceControl.amendAria")}
+                    checked={scm.amendEnabled}
+                    onCheckedChange={(v) => scm.setAmendEnabled(v === true)}
+                    className="size-3.5"
+                  />
+                  <span>{t("sourceControl.amend")}</span>
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`${scm.generateCommitMessageHint} (${generateShortcut})`}
+                      disabled={!scm.canGenerateCommitMessage}
+                      onClick={() => void scm.generateCommitMessage()}
+                      className={cn(
+                        "inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground/65 transition-colors",
+                        "hover:bg-foreground/[0.06] hover:text-foreground",
+                        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/65",
+                      )}
+                    >
+                      {scm.actionBusy === "generate-message" ? (
+                        <Spinner className="size-3" />
+                      ) : (
+                        <HugeiconsIcon
+                          icon={AiContentGenerator02Icon}
+                          size={14}
+                          strokeWidth={1.75}
+                        />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="left"
+                    className={cn(
+                      SOURCE_CONTROL_TOOLTIP_CLASS,
+                      "text-[10.5px]",
+                    )}
+                  >
+                    {`${scm.generateCommitMessageHint} (${generateShortcut})`}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
               <div
                 className={cn(
                   "relative rounded-lg border bg-background/95 shadow-sm transition-colors",
-                  scm.commitMessage.length > 0
+                  scm.subject.length > 0 || scm.body.length > 0
                     ? "border-border/70"
                     : "border-border/45",
                   "focus-within:border-primary/45 focus-within:shadow-md focus-within:shadow-primary/5",
                 )}
               >
-                <Textarea
-                  value={scm.commitMessage}
-                  onChange={(event) => scm.setCommitMessage(event.target.value)}
+                <Input
+                  value={scm.subject}
+                  onChange={(event) => scm.setSubject(event.target.value)}
                   onKeyDown={handleCommitShortcut}
-                  placeholder={t("sourceControl.commitMessagePlaceholder")}
-                  rows={3}
-                  className={cn(
-                    "min-h-[72px] border-border resize-none rounded-lg bg-transparent px-3 pb-7 pt-2.5 text-[12.5px] leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus:border-0",
-                  )}
+                  placeholder={t("sourceControl.subjectPlaceholder")}
+                  className="h-8 rounded-none border-0 border-b border-border/30 bg-transparent px-3 text-[12.5px] font-medium leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus-visible:border-0"
+                />
+                <Textarea
+                  value={scm.body}
+                  onChange={(event) => scm.setBody(event.target.value)}
+                  onKeyDown={handleCommitShortcut}
+                  placeholder={t("sourceControl.bodyPlaceholder")}
+                  rows={2}
+                  className="min-h-[52px] resize-none rounded-none border-0 bg-transparent px-3 pb-7 pt-2 text-[12.5px] leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus-visible:border-0"
                 />
                 <div className="pointer-events-none absolute inset-x-3 bottom-1.5 flex items-center justify-between p-1 gap-2 text-[10px] tabular-nums text-muted-foreground/55">
-                  {scm.commitMessage.length > 0 ? (
-                    <span>{t("sourceControl.charCount", { count: scm.commitMessage.length })}</span>
+                  {scm.subject.length + scm.body.length > 0 ? (
+                    <span>{t("sourceControl.charCount", { count: scm.subject.length + scm.body.length })}</span>
                   ) : (
                     <span className="flex gap-2 items-center">
                       {commitShortcut} <p>{t("sourceControl.toCommit")}</p>
                     </span>
                   )}
-                </div>
-                <div className="absolute right-1 top-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label={`${scm.generateCommitMessageHint} (${generateShortcut})`}
-                        disabled={!scm.canGenerateCommitMessage}
-                        onClick={() => void scm.generateCommitMessage()}
-                        className={cn(
-                          "inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground/65 transition-colors",
-                          "hover:bg-foreground/[0.06] hover:text-foreground",
-                          "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/65",
-                        )}
-                      >
-                        {scm.actionBusy === "generate-message" ? (
-                          <Spinner className="size-3" />
-                        ) : (
-                          <HugeiconsIcon
-                            icon={AiContentGenerator02Icon}
-                            size={14}
-                            strokeWidth={1.75}
-                          />
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="left"
-                      className={cn(
-                        SOURCE_CONTROL_TOOLTIP_CLASS,
-                        "text-[10.5px]",
-                      )}
-                    >
-                      {`${scm.generateCommitMessageHint} (${generateShortcut})`}
-                    </TooltipContent>
-                  </Tooltip>
                 </div>
               </div>
 
@@ -724,28 +743,73 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </span>
               </div>
 
+              <label className="flex cursor-pointer select-none items-center gap-1.5 text-[10.5px] text-muted-foreground hover:text-foreground">
+                <Checkbox
+                  aria-label={t("sourceControl.beforeCommitCheckAria")}
+                  checked={scm.beforeCommitCheck}
+                  onCheckedChange={(v) => scm.setBeforeCommitCheck(v === true)}
+                  className="size-3.5"
+                />
+                <span>{t("sourceControl.beforeCommitCheck")}</span>
+              </label>
+
               <div className="grid w-full grid-cols-2 gap-1.5">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="xs"
-                      className="h-7 cursor-pointer text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
-                      disabled={!canCommit}
-                      onClick={() => void scm.commit()}
+                <div className="flex min-w-0 items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="xs"
+                        className="h-7 flex-1 cursor-pointer text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
+                        disabled={!canCommit}
+                        onClick={() => void scm.commit({ amend: scm.amendEnabled })}
+                      >
+                        {scm.actionBusy === "commit"
+                          ? t("sourceControl.committing")
+                          : scm.amendEnabled
+                            ? t("sourceControl.amendCommit")
+                            : t("sourceControl.commit")}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      className={cn(
+                        SOURCE_CONTROL_TOOLTIP_CLASS,
+                        "text-[10.5px]",
+                      )}
                     >
-                      {scm.actionBusy === "commit" ? t("sourceControl.committing") : t("sourceControl.commit")}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className={cn(
-                      SOURCE_CONTROL_TOOLTIP_CLASS,
-                      "text-[10.5px]",
-                    )}
-                  >
-                    {commitHint}
-                  </TooltipContent>
-                </Tooltip>
+                      {commitHint}
+                    </TooltipContent>
+                  </Tooltip>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={t("sourceControl.moreCommitActions")}
+                        disabled={!canCommit}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <HugeiconsIcon
+                          icon={MoreHorizontalIcon}
+                          size={13}
+                          strokeWidth={1.8}
+                        />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      className={COMPACT_CONTENT}
+                      align="start"
+                    >
+                      <DropdownMenuItem
+                        className={COMPACT_ITEM}
+                        disabled={!canCommit}
+                        onSelect={() => void scm.commit({ push: true })}
+                      >
+                        <span className="flex-1">{t("sourceControl.commitAndPush")}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

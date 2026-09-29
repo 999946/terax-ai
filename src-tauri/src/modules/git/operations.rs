@@ -442,20 +442,38 @@ pub fn discard(
 pub fn commit(
     registry: &WorkspaceRegistry,
     repo_root: &str,
-    message: &str,
+    subject: &str,
+    body: Option<&str>,
+    amend: bool,
     workspace: &WorkspaceEnv,
 ) -> Result<GitCommitResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
-    let trimmed = message.trim();
-    if trimmed.is_empty() {
+    let trimmed_subject = subject.trim();
+    let trimmed_body = body.map(str::trim).filter(|s| !s.is_empty());
+    // Non-amend commits require a message; amend keeps the previous message
+    // when the textarea is empty.
+    if !amend && trimmed_subject.is_empty() {
         return Err(GitError::EmptyCommitMessage);
+    }
+
+    let mut args: Vec<OsString> = vec!["commit".into()];
+    if amend {
+        args.push("--amend".into());
+    }
+    if !trimmed_subject.is_empty() {
+        args.push("-m".into());
+        args.push(trimmed_subject.into());
+    }
+    if let Some(body) = trimmed_body {
+        args.push("-m".into());
+        args.push(body.into());
     }
 
     let output = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        [OsStr::new("commit"), OsStr::new("-m"), OsStr::new(trimmed)],
+        args,
         DEFAULT_TIMEOUT_SECS,
     )?;
     if output.exit_code != Some(0) && nothing_to_commit(&output) {
@@ -478,6 +496,41 @@ pub fn commit(
         commit_sha: sha,
         summary,
     })
+}
+
+/// Whitespace-check only the staged changes (read-only). Returns None when clean,
+/// or the `git diff --cached --check` error text when whitespace errors are found.
+pub fn diff_cached_check(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Option<String>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["diff", "--cached", "--check"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if output.exit_code == Some(0) {
+        return Ok(None);
+    }
+    let mut message = String::new();
+    for chunk in [output.stdout, output.stderr] {
+        let text = String::from_utf8_lossy(&chunk).trim().to_string();
+        if text.is_empty() {
+            continue;
+        }
+        if !message.is_empty() {
+            message.push('\n');
+        }
+        message.push_str(&text);
+    }
+    if message.is_empty() {
+        message = "staged changes contain whitespace errors".into();
+    }
+    Ok(Some(message))
 }
 
 pub fn push(

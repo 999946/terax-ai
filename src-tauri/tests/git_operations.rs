@@ -117,8 +117,15 @@ fn stage_then_commit_produces_log_entry() {
     assert!(entry.staged);
     assert!(!entry.untracked);
 
-    let commit =
-        operations::commit(&fx.registry, &fx.repo_str(), "add a", &fx.workspace).expect("commit");
+    let commit = operations::commit(
+        &fx.registry,
+        &fx.repo_str(),
+        "add a",
+        None,
+        false,
+        &fx.workspace,
+    )
+    .expect("commit");
     assert_eq!(commit.summary, "add a");
     assert_eq!(commit.commit_sha.len(), 40);
 
@@ -174,11 +181,83 @@ fn commit_with_empty_message_is_rejected() {
     fx.write_file("a.txt", "alpha\n");
     fx.run_git(&["add", "a.txt"]);
 
-    match operations::commit(&fx.registry, &fx.repo_str(), "   ", &fx.workspace) {
+    match operations::commit(
+        &fx.registry,
+        &fx.repo_str(),
+        "   ",
+        None,
+        false,
+        &fx.workspace,
+    ) {
         Err(GitError::EmptyCommitMessage) => {}
         Err(other) => panic!("expected EmptyCommitMessage, got {other}"),
         Ok(_) => panic!("expected error for empty message"),
     }
+}
+
+#[test]
+fn commit_with_subject_and_body_produces_full_message() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "alpha\n");
+    fx.run_git(&["add", "a.txt"]);
+
+    let commit = operations::commit(
+        &fx.registry,
+        &fx.repo_str(),
+        "fix(git): split subject and body",
+        Some("Body paragraph."),
+        false,
+        &fx.workspace,
+    )
+    .expect("commit");
+
+    assert_eq!(commit.summary, "fix(git): split subject and body");
+    let out = std::process::Command::new("git")
+        .args(["show", "-s", "--format=%B", "HEAD"])
+        .current_dir(fx.repo_str())
+        .output()
+        .expect("git show");
+    let message = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(message.starts_with("fix(git): split subject and body\n"));
+    assert!(message.contains("Body paragraph."));
+}
+
+#[test]
+fn amend_keeps_previous_message_when_fields_empty() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "alpha\n");
+    fx.run_git(&["add", "a.txt"]);
+    operations::commit(
+        &fx.registry,
+        &fx.repo_str(),
+        "first",
+        None,
+        false,
+        &fx.workspace,
+    )
+    .expect("initial commit");
+
+    // Stage an additional change, then amend with empty subject/body: the
+    // previous message is kept (git commit --amend with no -m preserves it).
+    fx.write_file("a.txt", "alpha\nbeta\n");
+    fx.run_git(&["add", "a.txt"]);
+    let amended = operations::commit(
+        &fx.registry,
+        &fx.repo_str(),
+        "",
+        None,
+        true,
+        &fx.workspace,
+    )
+    .expect("amend");
+
+    assert_eq!(amended.summary, "first");
 }
 
 #[test]

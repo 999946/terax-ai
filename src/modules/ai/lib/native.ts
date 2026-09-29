@@ -353,10 +353,24 @@ export const native = {
       entries,
       workspace: currentWorkspaceEnv(),
     }),
-  gitCommit: (repoRoot: string, message: string) =>
+  gitCommit: (
+    repoRoot: string,
+    subject: string,
+    body?: string | null,
+    opts?: { amend?: boolean },
+  ) =>
     invoke<GitCommitResult>("git_commit", {
+      input: {
+        repoRoot,
+        subject,
+        body: body ?? null,
+        amend: opts?.amend ?? false,
+      },
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitDiffCachedCheck: (repoRoot: string) =>
+    invoke<string | null>("git_diff_cached_check", {
       repoRoot,
-      message,
       workspace: currentWorkspaceEnv(),
     }),
   gitFetch: (repoRoot: string) =>

@@ -56,6 +56,15 @@ pub struct DiscardEntry {
     pub untracked: bool,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitInput {
+    pub repo_root: String,
+    pub subject: String,
+    pub body: Option<String>,
+    pub amend: bool,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitDiffResult {
