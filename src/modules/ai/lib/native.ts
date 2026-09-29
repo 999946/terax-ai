@@ -230,11 +230,7 @@ export const native = {
       maxResults: params.maxResults ?? null,
       workspace: currentWorkspaceEnv(),
     }),
-  runCommand: (
-    command: string,
-    cwd?: string | null,
-    timeoutSecs?: number,
-  ) =>
+  runCommand: (command: string, cwd?: string | null, timeoutSecs?: number) =>
     invoke<CommandOutput>("shell_run_command", {
       command,
       cwd: cwd ?? null,
@@ -390,12 +386,12 @@ export const native = {
     }),
   gitLog: (
     repoRoot: string,
-    options?: { limit?: number; beforeSha?: string; path?: string },
+    options?: { limit?: number; continuation?: string[]; path?: string },
   ) =>
     invoke<GitLogEntry[]>("git_log", {
       repoRoot,
       limit: options?.limit ?? null,
-      beforeSha: options?.beforeSha ?? null,
+      continuation: options?.continuation ?? null,
       path: options?.path ?? null,
       workspace: currentWorkspaceEnv(),
     }),
@@ -494,7 +490,11 @@ export const native = {
       repoRoot,
       workspace: currentWorkspaceEnv(),
     }),
-  gitStashPush: (repoRoot: string, message: string, includeUntracked: boolean) =>
+  gitStashPush: (
+    repoRoot: string,
+    message: string,
+    includeUntracked: boolean,
+  ) =>
     invoke<void>("git_stash_push", {
       repoRoot,
       message,

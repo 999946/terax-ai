@@ -347,14 +347,23 @@ export function GitHistoryPane({
   const loadMore = useCallback(async () => {
     if (inflightMoreRef.current || endReached) return;
     if (loadStatus !== "idle") return;
-    const last = commits[commits.length - 1];
-    if (!last) return;
+    // Resume from every unwalked lane head, not just one first-parent cursor —
+    // otherwise the merge-branch lanes never get consumed and the graph grows
+    // unbounded (hundreds of lines on large repos).
+    const unwalked = graphCacheRef.current.tail.lanes.filter(
+      (sha): sha is string => sha != null,
+    );
+    if (unwalked.length === 0) {
+      // Every lane head is resolved — nothing further to walk.
+      setEndReached(true);
+      return;
+    }
     inflightMoreRef.current = true;
     setLoadStatus("more");
     try {
       const entries = await native.gitLog(repoRoot, {
         limit: PAGE_SIZE,
-        beforeSha: last.sha,
+        continuation: unwalked,
         ...(path ? { path } : {}),
       });
       setCommits((prev) => {
@@ -371,7 +380,7 @@ export function GitHistoryPane({
     } finally {
       inflightMoreRef.current = false;
     }
-  }, [commits, endReached, loadStatus, path, repoRoot, t]);
+  }, [endReached, loadStatus, path, repoRoot, t]);
 
   useEffect(() => {
     filesInflightRef.current.clear();
@@ -443,7 +452,15 @@ export function GitHistoryPane({
     }
     setSelectedSha(focusSha);
     virtualizer.scrollToIndex(index, { align: "center" });
-  }, [focusSha, commits, endReached, loadStatus, activeSearch, loadMore, virtualizer]);
+  }, [
+    focusSha,
+    commits,
+    endReached,
+    loadStatus,
+    activeSearch,
+    loadMore,
+    virtualizer,
+  ]);
 
   const handleRefresh = useCallback(() => {
     filesInflightRef.current.clear();
@@ -471,7 +488,10 @@ export function GitHistoryPane({
         }
         bumpFiles();
       } catch (err) {
-        cache.set(sha, { state: "error", error: normalizeError(err, t("gitHistory.unknownError")) });
+        cache.set(sha, {
+          state: "error",
+          error: normalizeError(err, t("gitHistory.unknownError")),
+        });
         bumpFiles();
       } finally {
         filesInflightRef.current.delete(sha);
@@ -749,10 +769,9 @@ const CommitRow = memo(function CommitRow({
       onClick={(event) => onClick(commit.sha, event)}
       className={cn(
         "group relative grid h-full w-full cursor-pointer items-center gap-3 border-l-2 pr-3 text-left transition-colors",
-        selected
-          ? "border-l-primary bg-primary/10"
-          : "border-l-transparent",
-        !selected && (active ? "bg-accent/45 border-l-primary/70" : "hover:bg-accent/25"),
+        selected ? "border-l-primary bg-primary/10" : "border-l-transparent",
+        !selected &&
+          (active ? "bg-accent/45 border-l-primary/70" : "hover:bg-accent/25"),
       )}
       style={{ gridTemplateColumns: gridTemplate }}
     >
@@ -780,7 +799,9 @@ const CommitRow = memo(function CommitRow({
         {commit.subject ? (
           highlight(commit.subject, query)
         ) : (
-          <span className="text-muted-foreground">{t("gitHistory.noSubject")}</span>
+          <span className="text-muted-foreground">
+            {t("gitHistory.noSubject")}
+          </span>
         )}
       </span>
       <span aria-hidden />
@@ -797,7 +818,9 @@ const CommitRow = memo(function CommitRow({
           {initials}
         </span>
         <span className="min-w-0 truncate">
-          {commit.author ? highlight(commit.author, query) : t("gitHistory.unknownAuthor")}
+          {commit.author
+            ? highlight(commit.author, query)
+            : t("gitHistory.unknownAuthor")}
         </span>
       </span>
       <span className="text-right font-mono text-[10.5px] tabular-nums text-muted-foreground/75">
@@ -810,7 +833,9 @@ const CommitRow = memo(function CommitRow({
             title={
               commit.filesChanged === 1
                 ? t("gitHistory.fileChangedOne", { count: commit.filesChanged })
-                : t("gitHistory.fileChangedMany", { count: commit.filesChanged })
+                : t("gitHistory.fileChangedMany", {
+                    count: commit.filesChanged,
+                  })
             }
           >
             <HugeiconsIcon
@@ -889,12 +914,16 @@ function CommitDetail({
           </span>
           <div className="min-w-0 flex-1 text-[12.5px] font-semibold leading-snug text-foreground">
             {commit.subject || (
-              <span className="text-muted-foreground">{t("gitHistory.noSubject")}</span>
+              <span className="text-muted-foreground">
+                {t("gitHistory.noSubject")}
+              </span>
             )}
           </div>
         </div>
         <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10.5px] text-muted-foreground">
-          <span className="truncate">{commit.author || t("gitHistory.unknownAuthor")}</span>
+          <span className="truncate">
+            {commit.author || t("gitHistory.unknownAuthor")}
+          </span>
           {commit.authorEmail ? (
             <>
               <span className="text-muted-foreground/45">·</span>
@@ -1053,7 +1082,9 @@ const FileRow = memo(function FileRow({
       </div>
       <div className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums">
         {file.isBinary ? (
-          <span className="text-muted-foreground/70">{t("gitHistory.binary")}</span>
+          <span className="text-muted-foreground/70">
+            {t("gitHistory.binary")}
+          </span>
         ) : (
           <>
             {file.added > 0 ? (

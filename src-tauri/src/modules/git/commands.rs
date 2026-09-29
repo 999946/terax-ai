@@ -231,7 +231,7 @@ pub async fn git_push(
 pub async fn git_log(
     repo_root: String,
     limit: Option<u32>,
-    before_sha: Option<String>,
+    continuation: Option<Vec<String>>,
     path: Option<String>,
     workspace: Option<WorkspaceEnv>,
     app: AppHandle,
@@ -242,7 +242,7 @@ pub async fn git_log(
             r,
             &repo_root,
             limit.unwrap_or(30),
-            before_sha.as_deref(),
+            continuation.as_deref(),
             path.as_deref(),
             &workspace,
         )

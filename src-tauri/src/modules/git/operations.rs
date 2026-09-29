@@ -574,7 +574,7 @@ pub fn log(
     registry: &WorkspaceRegistry,
     repo_root: &str,
     limit: u32,
-    before_sha: Option<&str>,
+    continuation: Option<&[String]>,
     path: Option<&str>,
     workspace: &WorkspaceEnv,
 ) -> Result<Vec<GitLogEntry>> {
@@ -583,15 +583,16 @@ pub fn log(
     let bounded = limit.clamp(1, MAX_LOG_LIMIT);
     let count_arg = format!("--max-count={bounded}");
     let format_arg = format!("--format={LOG_FORMAT}");
-    let cursor = match before_sha {
-        Some(sha) if !sha.is_empty() => {
-            if !sha_is_safe(sha) {
-                return Err(GitError::command("git log", "invalid cursor sha"));
+    // Continuation SHAs are the graph's unwalked lane heads from the previous
+    // page (emitted by git, so valid hex) — but guard against argument injection
+    // through a malformed value all the same.
+    if let Some(revs) = continuation {
+        for rev in revs {
+            if !sha_is_safe(rev) {
+                return Err(GitError::command("git log", "invalid continuation sha"));
             }
-            Some(format!("{sha}^"))
         }
-        _ => None,
-    };
+    }
     let path_filter = match path {
         Some(p) if !p.is_empty() => {
             let spec = pathspec_from_input(&repo_root.local_path, p)?;
@@ -608,12 +609,15 @@ pub fn log(
     let mut args: Vec<&OsStr> = vec![
         OsStr::new("log"),
         OsStr::new("--no-color"),
+        OsStr::new("--topo-order"),
         OsStr::new("--shortstat"),
         OsStr::new(&count_arg),
         OsStr::new(&format_arg),
     ];
-    if let Some(spec) = cursor.as_deref() {
-        args.push(OsStr::new(spec));
+    if let Some(revs) = continuation {
+        for rev in revs {
+            args.push(OsStr::new(rev));
+        }
     }
     if let Some(spec) = path_filter.as_deref() {
         args.push(OsStr::new("--"));
