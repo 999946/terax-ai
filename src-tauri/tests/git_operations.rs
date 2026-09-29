@@ -261,6 +261,54 @@ fn amend_keeps_previous_message_when_fields_empty() {
 }
 
 #[test]
+fn diff_cached_check_is_clean_when_staged_changes_have_no_whitespace_errors() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "alpha\n");
+    fx.run_git(&["add", "a.txt"]);
+
+    let result = operations::diff_cached_check(&fx.registry, &fx.repo_str(), &fx.workspace)
+        .expect("diff_cached_check");
+    assert!(result.is_none(), "clean staged diff should report no errors");
+}
+
+#[test]
+fn diff_cached_check_reports_trailing_whitespace() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "alpha \n"); // trailing space
+    fx.run_git(&["add", "a.txt"]);
+
+    let result = operations::diff_cached_check(&fx.registry, &fx.repo_str(), &fx.workspace)
+        .expect("diff_cached_check");
+    let message = result.expect("trailing whitespace should be reported");
+    assert!(message.to_lowercase().contains("whitespace") || message.contains("trailing"));
+}
+
+#[test]
+fn diff_cached_check_ignores_worktree_only_changes() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "clean\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+
+    // Add a trailing-space change to the worktree but do NOT stage it:
+    // `--cached --check` only inspects the index, so it must stay clean.
+    fx.write_file("a.txt", "clean \n");
+
+    let result = operations::diff_cached_check(&fx.registry, &fx.repo_str(), &fx.workspace)
+        .expect("diff_cached_check");
+    assert!(result.is_none(), "unstaged whitespace must not block commit");
+}
+
+#[test]
 fn log_on_empty_repo_returns_empty_list() {
     if skip_if_no_git() {
         return;

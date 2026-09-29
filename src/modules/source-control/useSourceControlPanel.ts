@@ -170,7 +170,7 @@ function normalizeError(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function normalizeStatusCode(status: string): string {
+export function normalizeStatusCode(status: string): string {
   const code = status.trim().toUpperCase();
   switch (code) {
     case "?":
@@ -258,7 +258,10 @@ function isValidCommitMessage(message: string): boolean {
 }
 
 /** Split a full commit message into a subject line and a body at the first blank line. */
-function splitCommitMessage(text: string): { subject: string; body: string } {
+export function splitCommitMessage(text: string): {
+  subject: string;
+  body: string;
+} {
   const normalized = text.replace(/\r\n/g, "\n").trim();
   const blank = normalized.search(/\n[ \t]*\n/);
   if (blank === -1) {
@@ -325,7 +328,8 @@ function optimisticStage(
     if (!paths.has(file.path)) return file;
     if (file.staged && !file.unstaged) return file;
     changed = true;
-    const wt = file.worktreeStatus !== " " ? file.worktreeStatus : file.indexStatus;
+    const wt =
+      file.worktreeStatus !== " " ? file.worktreeStatus : file.indexStatus;
     return {
       ...file,
       indexStatus: wt,
@@ -355,7 +359,8 @@ function optimisticUnstage(
       continue;
     }
     changed = true;
-    const idx = file.indexStatus !== " " ? file.indexStatus : file.worktreeStatus;
+    const idx =
+      file.indexStatus !== " " ? file.indexStatus : file.worktreeStatus;
     if (idx === "R" && file.originalPath) {
       next.push({
         path: file.originalPath,
@@ -595,7 +600,11 @@ export function useSourceControlPanel(
   useEffect(() => () => cancelReconcile(), [cancelReconcile]);
 
   const openSelection = useCallback(
-    (sel: DiffSelection, repoRoot: string, file: GitChangedFile | undefined) => {
+    (
+      sel: DiffSelection,
+      repoRoot: string,
+      file: GitChangedFile | undefined,
+    ) => {
       onOpenDiff?.({
         path: sel.path,
         repoRoot,
@@ -693,7 +702,10 @@ export function useSourceControlPanel(
   const selectEntry = useCallback(
     async (entry: SourceControlEntry) => {
       if (!repo) return;
-      const nextSelection: DiffSelection = { path: entry.path, mode: entry.mode };
+      const nextSelection: DiffSelection = {
+        path: entry.path,
+        mode: entry.mode,
+      };
       if (sameSelection(selected, nextSelection)) {
         setActionError(null);
         setActionMessage(null);

@@ -39,12 +39,19 @@ import {
 } from "@/components/ui/tooltip";
 import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { type GitBranchEntry, type GitStashEntry, native } from "@/modules/ai/lib/native";
+import {
+  type GitBranchEntry,
+  type GitStashEntry,
+  native,
+} from "@/modules/ai/lib/native";
 import {
   copyToClipboard,
   revealInFinder,
 } from "@/modules/explorer/lib/contextActions";
-import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
+import {
+  fileIconUrl,
+  folderIconUrl,
+} from "@/modules/explorer/lib/iconResolver";
 import {
   COMPACT_CONTENT,
   COMPACT_ITEM,
@@ -99,6 +106,7 @@ import {
   type SourceControlFileEntry,
 } from "./useSourceControlPanel";
 import { MergeStatusIcons } from "./MergeStatusIcons";
+import { statusAccent, statusColor } from "./statusTokens";
 
 type Props = {
   open: boolean;
@@ -193,38 +201,6 @@ function upstreamBadgeLabel(
   return upstream;
 }
 
-/** File status → Tailwind text-color token (theme-aware semantic color). */
-function statusColor(code: string): string {
-  switch (code) {
-    case "A":
-    case "U":
-      return "text-added";
-    case "M":
-    case "R":
-      return "text-modified";
-    case "D":
-      return "text-deleted";
-    default:
-      return "text-muted-foreground";
-  }
-}
-
-/** File status → accent-bar background token on the row's leading edge. */
-function statusAccent(code: string): string {
-  switch (code) {
-    case "A":
-    case "U":
-      return "bg-added";
-    case "M":
-    case "R":
-      return "bg-modified";
-    case "D":
-      return "bg-deleted";
-    default:
-      return "bg-muted-foreground/40";
-  }
-}
-
 function checkboxValue(state: CheckState): boolean | "indeterminate" {
   if (state === "checked") return true;
   if (state === "indeterminate") return "indeterminate";
@@ -268,8 +244,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
   const commitShortcut = IS_MAC ? "⌘↩" : "Ctrl+Enter";
   const generateShortcut = IS_MAC ? "⌘G" : "Ctrl+G";
-  const commitMessageReady =
-    scm.subject.trim().length > 0 || scm.amendEnabled;
+  const commitMessageReady = scm.subject.trim().length > 0 || scm.amendEnabled;
   const canCommit =
     scm.stagedEntries.length > 0 &&
     commitMessageReady &&
@@ -285,9 +260,8 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const commitHint = canCommit
     ? t("sourceControl.commitShortcutHint", { shortcut: commitShortcut })
     : (commitDisabledReason ??
-       t("sourceControl.commitShortcutHint", { shortcut: commitShortcut }));
-  const pushHint =
-    scm.pushHint ?? t("sourceControl.pushUnavailable");
+      t("sourceControl.commitShortcutHint", { shortcut: commitShortcut }));
+  const pushHint = scm.pushHint ?? t("sourceControl.pushUnavailable");
   const pushDisabledReason = fixedTargetPending
     ? t("sourceControl.waitRepoLoad")
     : scm.actionBusy
@@ -312,9 +286,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     return null;
   }, [scm.actionError, scm.actionMessage, scm.remoteError]);
 
-  const handleCommitShortcut = (
-    event: KeyboardEvent<HTMLElement>,
-  ) => {
+  const handleCommitShortcut = (event: KeyboardEvent<HTMLElement>) => {
     if (
       event.key === "Enter" &&
       (event.metaKey || event.ctrlKey) &&
@@ -389,9 +361,14 @@ export const SourceControlPanel = memo(function SourceControlPanel({
 
   const rows = useMemo<RowDescriptor[]>(() => {
     const result: RowDescriptor[] = [];
-    if (isDiverged) result.push({ kind: "banner-diverged", key: "banner-diverged" });
+    if (isDiverged)
+      result.push({ kind: "banner-diverged", key: "banner-diverged" });
     if (changedCount > 0) {
-      result.push({ kind: "list-header", key: "list-header", count: changedCount });
+      result.push({
+        kind: "list-header",
+        key: "list-header",
+        count: changedCount,
+      });
       result.push(...flattenChangeTree(changeTree, expandedDirs));
     }
     return result;
@@ -413,7 +390,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   const focusableIndices = useMemo(() => {
     const out: number[] = [];
     rows.forEach((row, index) => {
-      if ((row.kind === "file" || row.kind === "dir")) out.push(index);
+      if (row.kind === "file" || row.kind === "dir") out.push(index);
     });
     return out;
   }, [rows]);
@@ -498,7 +475,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
           moveFocus(-1);
           break;
         case "Enter": {
-          const index = focusedRowKey ? rowKeyToIndex.get(focusedRowKey) : undefined;
+          const index = focusedRowKey
+            ? rowKeyToIndex.get(focusedRowKey)
+            : undefined;
           const row = index === undefined ? undefined : rows[index];
           if (row?.kind === "dir") {
             event.preventDefault();
@@ -514,12 +493,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         }
         case "ArrowRight":
         case "ArrowLeft": {
-          const index = focusedRowKey ? rowKeyToIndex.get(focusedRowKey) : undefined;
+          const index = focusedRowKey
+            ? rowKeyToIndex.get(focusedRowKey)
+            : undefined;
           const row = index === undefined ? undefined : rows[index];
           if (row?.kind !== "dir") break;
           event.preventDefault();
-          if (event.key === "ArrowRight" && !row.isExpanded) toggleDir(row.path);
-          else if (event.key === "ArrowLeft" && row.isExpanded) toggleDir(row.path);
+          if (event.key === "ArrowRight" && !row.isExpanded)
+            toggleDir(row.path);
+          else if (event.key === "ArrowLeft" && row.isExpanded)
+            toggleDir(row.path);
           break;
         }
         case " ":
@@ -545,7 +528,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         }
       }
     },
-    [focusedEntry, focusedRowKey, handleRefresh, moveFocus, rowKeyToIndex, rows, scm, toggleDir],
+    [
+      focusedEntry,
+      focusedRowKey,
+      handleRefresh,
+      moveFocus,
+      rowKeyToIndex,
+      rows,
+      scm,
+      toggleDir,
+    ],
   );
 
   if (!open) return null;
@@ -618,7 +610,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               strokeWidth={1.85}
               className="shrink-0"
             />
-            <span className="flex-1 text-[12px] font-medium">{t("sourceControl.commitGraph")}</span>
+            <span className="flex-1 text-[12px] font-medium">
+              {t("sourceControl.commitGraph")}
+            </span>
             <HugeiconsIcon
               icon={ArrowRight01Icon}
               size={12}
@@ -726,7 +720,11 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 />
                 <div className="pointer-events-none absolute inset-x-3 bottom-1.5 flex items-center justify-between p-1 gap-2 text-[10px] tabular-nums text-muted-foreground/55">
                   {scm.subject.length + scm.body.length > 0 ? (
-                    <span>{t("sourceControl.charCount", { count: scm.subject.length + scm.body.length })}</span>
+                    <span>
+                      {t("sourceControl.charCount", {
+                        count: scm.subject.length + scm.body.length,
+                      })}
+                    </span>
                   ) : (
                     <span className="flex gap-2 items-center">
                       {commitShortcut} <p>{t("sourceControl.toCommit")}</p>
@@ -751,7 +749,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                     ? t("sourceControl.nothingStaged")
                     : stagedCount === 1
                       ? t("sourceControl.stagedFileOne", { count: stagedCount })
-                      : t("sourceControl.stagedFileMany", { count: stagedCount })}
+                      : t("sourceControl.stagedFileMany", {
+                          count: stagedCount,
+                        })}
                 </span>
                 <span className="ml-auto shrink-0 truncate text-muted-foreground/65">
                   {pushStatusLabel}
@@ -776,7 +776,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                         size="xs"
                         className="h-7 flex-1 cursor-pointer text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
                         disabled={!canCommit}
-                        onClick={() => void scm.commit({ amend: scm.amendEnabled })}
+                        onClick={() =>
+                          void scm.commit({ amend: scm.amendEnabled })
+                        }
                       >
                         {scm.actionBusy === "commit"
                           ? t("sourceControl.committing")
@@ -820,7 +822,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                         disabled={!canCommit}
                         onSelect={() => void scm.commit({ push: true })}
                       >
-                        <span className="flex-1">{t("sourceControl.commitAndPush")}</span>
+                        <span className="flex-1">
+                          {t("sourceControl.commitAndPush")}
+                        </span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -836,7 +840,9 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       }
                       onClick={() => void scm.push()}
                     >
-                      {scm.actionBusy === "push" ? t("sourceControl.pushing") : t("sourceControl.push")}
+                      {scm.actionBusy === "push"
+                        ? t("sourceControl.pushing")
+                        : t("sourceControl.push")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -931,12 +937,18 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("sourceControl.discardTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("sourceControl.discardTitle")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {scm.pendingDiscard?.scope === "all"
-                ? t("sourceControl.discardAllBody", { label: scm.pendingDiscard.label })
+                ? t("sourceControl.discardAllBody", {
+                    label: scm.pendingDiscard.label,
+                  })
                 : scm.pendingDiscard
-                  ? t("sourceControl.discardBody", { label: scm.pendingDiscard.label })
+                  ? t("sourceControl.discardBody", {
+                      label: scm.pendingDiscard.label,
+                    })
                   : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1050,7 +1062,9 @@ function DivergedBanner() {
         <span className="font-medium text-foreground/85">
           {t("sourceControl.divergedFromUpstream")}
         </span>
-        <span className="ml-1 opacity-75">{t("sourceControl.resolveInTerminal")}</span>
+        <span className="ml-1 opacity-75">
+          {t("sourceControl.resolveInTerminal")}
+        </span>
       </span>
     </div>
   );
@@ -1144,10 +1158,17 @@ function DirRow({
             icon={ArrowRight01Icon}
             size={12}
             strokeWidth={2.25}
-            className={cn("transition-transform", row.isExpanded && "rotate-90")}
+            className={cn(
+              "transition-transform",
+              row.isExpanded && "rotate-90",
+            )}
           />
         </span>
-        {iconUrl ? <img src={iconUrl} alt="" className="size-4 shrink-0" /> : <span className="size-4 shrink-0" />}
+        {iconUrl ? (
+          <img src={iconUrl} alt="" className="size-4 shrink-0" />
+        ) : (
+          <span className="size-4 shrink-0" />
+        )}
         <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/95">
           {row.name}
         </span>
@@ -1225,7 +1246,9 @@ const EntryRow = memo(function EntryRow({
                 ? "bg-accent/55 text-foreground"
                 : "hover:bg-accent/30",
           )}
-          style={{ paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP }}
+          style={{
+            paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP,
+          }}
         >
           <span
             className={cn(
@@ -1242,7 +1265,9 @@ const EntryRow = memo(function EntryRow({
               <Spinner className="size-3" />
             ) : (
               <Checkbox
-                aria-label={t("sourceControl.stagePathAria", { path: entry.path })}
+                aria-label={t("sourceControl.stagePathAria", {
+                  path: entry.path,
+                })}
                 checked={checkboxValue(entry.checkState)}
                 disabled={disabled}
                 onCheckedChange={() => void onToggleStageFile(entry)}
@@ -1303,11 +1328,7 @@ const EntryRow = memo(function EntryRow({
                 {isDiscardBusy ? (
                   <Spinner className="size-3" />
                 ) : (
-                  <HugeiconsIcon
-                    icon={UndoIcon}
-                    size={11}
-                    strokeWidth={1.9}
-                  />
+                  <HugeiconsIcon icon={UndoIcon} size={11} strokeWidth={1.9} />
                 )}
               </IconActionButton>
             ) : null}
@@ -1679,7 +1700,12 @@ function RepoRowItem({
         {repository.label}
       </span>
       <span className="flex min-w-0 flex-1 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
-        <HugeiconsIcon icon={GitBranchIcon} size={9} strokeWidth={2} className="shrink-0" />
+        <HugeiconsIcon
+          icon={GitBranchIcon}
+          size={9}
+          strokeWidth={2}
+          className="shrink-0"
+        />
         <span className="min-w-0 truncate">{repository.branch ?? "—"}</span>
         {repository.ahead > 0 ? (
           <span className="inline-flex shrink-0 items-center gap-0.5">
@@ -1728,7 +1754,11 @@ function RepoRowItem({
               onClick={(e) => e.stopPropagation()}
               className="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
             >
-              <HugeiconsIcon icon={MoreHorizontalIcon} size={13} strokeWidth={1.8} />
+              <HugeiconsIcon
+                icon={MoreHorizontalIcon}
+                size={13}
+                strokeWidth={1.8}
+              />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -1738,8 +1768,14 @@ function RepoRowItem({
             {/* Switch branch */}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className={COMPACT_ITEM}>
-                <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={1.8} />
-                <span className="flex-1">{t("sourceControl.switchBranch")}</span>
+                <HugeiconsIcon
+                  icon={GitBranchIcon}
+                  size={13}
+                  strokeWidth={1.8}
+                />
+                <span className="flex-1">
+                  {t("sourceControl.switchBranch")}
+                </span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className={COMPACT_CONTENT}>
                 {loadingBranches ? (
@@ -1761,7 +1797,10 @@ function RepoRowItem({
                         {localBranches.map((b) => (
                           <DropdownMenuSub key={b.name}>
                             <DropdownMenuSubTrigger
-                              className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                              className={cn(
+                                COMPACT_ITEM,
+                                "flex items-center gap-2",
+                              )}
                             >
                               {b.isHead ? (
                                 <HugeiconsIcon
@@ -1773,7 +1812,9 @@ function RepoRowItem({
                               ) : (
                                 <span className="w-3.5 shrink-0" />
                               )}
-                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {b.name}
+                              </span>
                               {b.ahead > 0 || b.behind > 0 ? (
                                 <span className="flex shrink-0 items-center gap-1 pl-1 text-[10px] font-medium tabular-nums text-muted-foreground/70">
                                   {b.ahead > 0 ? (
@@ -1805,32 +1846,56 @@ function RepoRowItem({
                                 disabled={branchBusy}
                                 onSelect={() => void handleCheckout(b.name)}
                               >
-                                <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.switchBranch")}</span>
+                                <HugeiconsIcon
+                                  icon={GitBranchIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.switchBranch")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={COMPACT_ITEM}
                                 disabled={branchBusy || b.isHead}
                                 onSelect={() => void handleMerge(b.name)}
                               >
-                                <HugeiconsIcon icon={GitMergeIcon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.mergeBranch")}</span>
+                                <HugeiconsIcon
+                                  icon={GitMergeIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.mergeBranch")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={COMPACT_ITEM}
                                 disabled={branchBusy}
                                 onSelect={() => void handleUpdateBranch(b.name)}
                               >
-                                <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.updateBranch")}</span>
+                                <HugeiconsIcon
+                                  icon={Download01Icon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.updateBranch")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={COMPACT_ITEM}
                                 disabled={branchBusy}
                                 onSelect={() => void handlePushBranch(b.name)}
                               >
-                                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.push")}</span>
+                                <HugeiconsIcon
+                                  icon={ArrowUp01Icon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.push")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -1838,7 +1903,11 @@ function RepoRowItem({
                                 disabled={branchBusy || b.isHead}
                                 onSelect={() => setDeleteTarget(b.name)}
                               >
-                                <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+                                <HugeiconsIcon
+                                  icon={UndoIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
                                 <span className="flex-1 text-destructive">
                                   {t("sourceControl.deleteBranch")}
                                 </span>
@@ -1859,10 +1928,15 @@ function RepoRowItem({
                         {remoteBranches.map((b) => (
                           <DropdownMenuSub key={b.name}>
                             <DropdownMenuSubTrigger
-                              className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                              className={cn(
+                                COMPACT_ITEM,
+                                "flex items-center gap-2",
+                              )}
                             >
                               <span className="w-3.5 shrink-0" />
-                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {b.name}
+                              </span>
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent className={COMPACT_CONTENT}>
                               <DropdownMenuItem
@@ -1870,31 +1944,55 @@ function RepoRowItem({
                                 disabled={branchBusy}
                                 onSelect={() => void handleCheckout(b.name)}
                               >
-                                <HugeiconsIcon icon={GitBranchIcon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.switchBranch")}</span>
+                                <HugeiconsIcon
+                                  icon={GitBranchIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.switchBranch")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={COMPACT_ITEM}
                                 disabled={branchBusy}
                                 onSelect={() => void handleMerge(b.name)}
                               >
-                                <HugeiconsIcon icon={GitMergeIcon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.mergeBranch")}</span>
+                                <HugeiconsIcon
+                                  icon={GitMergeIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.mergeBranch")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={COMPACT_ITEM}
                                 disabled={branchBusy}
                                 onSelect={() => void handleUpdateBranch(b.name)}
                               >
-                                <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.updateBranch")}</span>
+                                <HugeiconsIcon
+                                  icon={Download01Icon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.updateBranch")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className={COMPACT_ITEM}
                                 disabled
                               >
-                                <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={1.8} />
-                                <span className="flex-1">{t("sourceControl.push")}</span>
+                                <HugeiconsIcon
+                                  icon={ArrowUp01Icon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.push")}
+                                </span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -1902,7 +2000,11 @@ function RepoRowItem({
                                 disabled={branchBusy}
                                 onSelect={() => setDeleteTarget(b.name)}
                               >
-                                <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+                                <HugeiconsIcon
+                                  icon={UndoIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
                                 <span className="flex-1 text-destructive">
                                   {t("sourceControl.deleteBranch")}
                                 </span>
@@ -1943,7 +2045,11 @@ function RepoRowItem({
                   disabled={branchBusy}
                   onSelect={() => setStashMessageOpen(true)}
                 >
-                  <HugeiconsIcon icon={PlusSignIcon} size={13} strokeWidth={1.8} />
+                  <HugeiconsIcon
+                    icon={PlusSignIcon}
+                    size={13}
+                    strokeWidth={1.8}
+                  />
                   <span className="flex-1">{t("sourceControl.newStash")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -1952,7 +2058,9 @@ function RepoRowItem({
                     className={cn(COMPACT_ITEM, "opacity-60")}
                     disabled
                   >
-                    <span className="flex-1">{t("sourceControl.noStashes")}</span>
+                    <span className="flex-1">
+                      {t("sourceControl.noStashes")}
+                    </span>
                   </DropdownMenuItem>
                 ) : (
                   stashes.map((s) => (
@@ -1968,16 +2076,28 @@ function RepoRowItem({
                           disabled={branchBusy}
                           onSelect={() => void handleStashApply(s.index)}
                         >
-                          <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
-                          <span className="flex-1">{t("sourceControl.applyStash")}</span>
+                          <HugeiconsIcon
+                            icon={Download01Icon}
+                            size={13}
+                            strokeWidth={1.8}
+                          />
+                          <span className="flex-1">
+                            {t("sourceControl.applyStash")}
+                          </span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className={COMPACT_ITEM}
                           disabled={branchBusy}
                           onSelect={() => void handleStashPop(s.index)}
                         >
-                          <HugeiconsIcon icon={ArrowDown01Icon} size={13} strokeWidth={1.8} />
-                          <span className="flex-1">{t("sourceControl.popStash")}</span>
+                          <HugeiconsIcon
+                            icon={ArrowDown01Icon}
+                            size={13}
+                            strokeWidth={1.8}
+                          />
+                          <span className="flex-1">
+                            {t("sourceControl.popStash")}
+                          </span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -1985,7 +2105,11 @@ function RepoRowItem({
                           disabled={branchBusy}
                           onSelect={() => setStashDropTarget(s.index)}
                         >
-                          <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+                          <HugeiconsIcon
+                            icon={UndoIcon}
+                            size={13}
+                            strokeWidth={1.8}
+                          />
                           <span className="flex-1 text-destructive">
                             {t("sourceControl.dropStash")}
                           </span>
@@ -2000,7 +2124,11 @@ function RepoRowItem({
             {/* Merge branch */}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className={COMPACT_ITEM}>
-                <HugeiconsIcon icon={GitMergeIcon} size={13} strokeWidth={1.8} />
+                <HugeiconsIcon
+                  icon={GitMergeIcon}
+                  size={13}
+                  strokeWidth={1.8}
+                />
                 <span className="flex-1">{t("sourceControl.mergeBranch")}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className={COMPACT_CONTENT}>
@@ -2027,9 +2155,14 @@ function RepoRowItem({
                               key={b.name}
                               disabled={branchBusy}
                               onSelect={() => void handleMerge(b.name)}
-                              className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                              className={cn(
+                                COMPACT_ITEM,
+                                "flex items-center gap-2",
+                              )}
                             >
-                              <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                              <span className="min-w-0 flex-1 truncate">
+                                {b.name}
+                              </span>
                             </DropdownMenuItem>
                           ))}
                       </>
@@ -2047,9 +2180,14 @@ function RepoRowItem({
                             key={b.name}
                             disabled={branchBusy}
                             onSelect={() => void handleMerge(b.name)}
-                            className={cn(COMPACT_ITEM, "flex items-center gap-2")}
+                            className={cn(
+                              COMPACT_ITEM,
+                              "flex items-center gap-2",
+                            )}
                           >
-                            <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {b.name}
+                            </span>
                           </DropdownMenuItem>
                         ))}
                       </>
@@ -2071,7 +2209,11 @@ function RepoRowItem({
               disabled={busy === "fetch"}
               onSelect={() => void handleRemote("fetch")}
             >
-              <HugeiconsIcon icon={FolderCloudIcon} size={13} strokeWidth={1.8} />
+              <HugeiconsIcon
+                icon={FolderCloudIcon}
+                size={13}
+                strokeWidth={1.8}
+              />
               <span className="flex-1">{t("sourceControl.fetch")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -2079,7 +2221,11 @@ function RepoRowItem({
               disabled={busy === "pull"}
               onSelect={() => void handleRemote("pull")}
             >
-              <HugeiconsIcon icon={Download01Icon} size={13} strokeWidth={1.8} />
+              <HugeiconsIcon
+                icon={Download01Icon}
+                size={13}
+                strokeWidth={1.8}
+              />
               <span className="flex-1">{t("sourceControl.pull")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -2104,7 +2250,9 @@ function RepoRowItem({
               className={COMPACT_ITEM}
               onSelect={() => void revealInFinder(normalizedRoot)}
             >
-              <span className="flex-1">{t("sourceControl.revealInFinder")}</span>
+              <span className="flex-1">
+                {t("sourceControl.revealInFinder")}
+              </span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -2153,7 +2301,9 @@ function RepoRowItem({
               disabled={!newBranchName.trim() || busy === "create"}
               onClick={() => void handleCreateBranch()}
             >
-              {busy === "create" ? t("sourceControl.creating") : t("sourceControl.createBranch")}
+              {busy === "create"
+                ? t("sourceControl.creating")
+                : t("sourceControl.createBranch")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2172,7 +2322,9 @@ function RepoRowItem({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? t("sourceControl.deleteBranchConfirmBody", { branch: deleteTarget })
+                ? t("sourceControl.deleteBranchConfirmBody", {
+                    branch: deleteTarget,
+                  })
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
