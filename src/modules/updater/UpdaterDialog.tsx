@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { interpolate } from "@/modules/i18n/locale";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useUpdater } from "./useUpdater";
@@ -95,8 +94,8 @@ export function UpdaterDialog() {
               : downloading
                 ? t("update.downloading")
                 : manual
-                  ? interpolate(t("updater.versionAvailable"), { version: manual.version })
-                  : interpolate(t("updater.versionAvailable"), { version: update?.version ?? "" })}
+                  ? t("updater.versionAvailable", { version: manual.version })
+                  : t("updater.versionAvailable", { version: update?.version ?? "" })}
           </DialogTitle>
           <DialogDescription>
             {ready
@@ -106,7 +105,9 @@ export function UpdaterDialog() {
                   ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`
                   : formatBytes(status.downloaded)
                 : manual
-                  ? interpolate(t("updater.manualInstallGuide"), { version: manual.currentVersion })
+                  ? t("updater.manualInstallGuide", {
+                      version: manual.currentVersion,
+                    })
                   : t("updater.newVersionReady")}
           </DialogDescription>
         </DialogHeader>
@@ -157,7 +158,7 @@ export function UpdaterDialog() {
                 {t("common.later")}
               </Button>
               <Button size="sm" onClick={() => void install()}>
-                {t("update.installVersion")}
+                {t("update.installVersion", { version: update?.version ?? "" })}
               </Button>
             </>
           )}
