@@ -61,6 +61,25 @@ export function buildChangeTree(entries: SourceControlFileEntry[]): ChangeNode[]
     });
   }
 
+  // Collapse chains of empty dirs (a dir whose only child is a dir, no files)
+  // into a single node, e.g. src/xxx/xxx, instead of src → xxx → xxx.
+  const collapseEmptyDirs = (nodes: ChangeNode[]) => {
+    for (const node of nodes) {
+      if (node.kind !== "dir") continue;
+      collapseEmptyDirs(node.children);
+      while (
+        node.children.length === 1 &&
+        node.children[0].kind === "dir"
+      ) {
+        const child = node.children[0];
+        node.name = `${node.name}/${child.name}`;
+        node.path = child.path;
+        node.children = child.children;
+      }
+    }
+  };
+  collapseEmptyDirs(roots);
+
   const sort = (nodes: ChangeNode[]) => {
     nodes.sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;

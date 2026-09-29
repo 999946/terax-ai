@@ -46,6 +46,8 @@ const DYNAMIC_KEYS = [
   "settings.models.local.ollama.hint", "settings.models.local.openrouter.hint",
   // src/modules/markdown/MarkdownViewToggle.tsx MODES[].i18nKey
   "markdown.viewRendered", "markdown.viewSplit", "markdown.viewRaw",
+  // src/modules/editor/DiffViewToggle.tsx MODES[].i18nKey
+  "editor.diffViewSplit", "editor.diffViewInline",
   // src/settings/SettingsApp.tsx TABS[].labelKey
   "settings.tabs.general", "settings.tabs.editor", "settings.tabs.themes",
   "settings.tabs.shortcuts", "settings.tabs.models", "settings.tabs.agents",
@@ -65,6 +67,7 @@ const EXPECTED_VARIABLE_CALLS = new Set([
   "settings/sections/GeneralSection.tsx:w.label",
   "settings/sections/ModelsSection.tsx:meta.modelHintKey",
   "modules/markdown/MarkdownViewToggle.tsx:i18nKey",
+  "modules/editor/DiffViewToggle.tsx:i18nKey",
   // labelKey 字段驱动的变量键调用（统一 t 后，key 一律以 labelKey 字面量挂载在数据上）
   "settings/SettingsApp.tsx:tab.labelKey",
   "modules/ai/components/ChipsRow.tsx:cmd.labelKey",

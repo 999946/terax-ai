@@ -280,6 +280,8 @@ export const zhCN: Record<string, string> = {
   "editor.undo": "撤销",
   "editor.redo": "重做",
   "editor.viewFileHistory": "查看文件历史",
+  "editor.diffViewSplit": "左右分栏",
+  "editor.diffViewInline": "行内",
   "terminal.runAgain": "再次运行",
   "terminal.blockActions": "块操作",
   "terminal.copyCommand": "复制命令",

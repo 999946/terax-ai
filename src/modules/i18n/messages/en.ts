@@ -122,6 +122,8 @@ export const en: Record<string, string> = {
   "editor.undo": "Undo",
   "editor.redo": "Redo",
   "editor.viewFileHistory": "View File History",
+  "editor.diffViewSplit": "Split",
+  "editor.diffViewInline": "Inline",
   "terminal.runAgain": "Run again",
   "terminal.blockActions": "Block actions",
   "terminal.copyCommand": "Copy command",

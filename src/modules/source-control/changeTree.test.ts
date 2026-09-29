@@ -31,19 +31,48 @@ describe("change tree", () => {
   });
 
   it("hides descendants of collapsed directories", () => {
-    const rows = flattenChangeTree(buildChangeTree([entry("src/lib/a.ts")]), new Set());
-    expect(rows.map((row) => row.key)).toEqual(["dir:src"]);
+    const rows = flattenChangeTree(
+      buildChangeTree([entry("src/lib/a.ts")]),
+      new Set(["src/lib"]),
+    );
+    expect(rows.map((row) => row.key)).toEqual([
+      "dir:src/lib",
+      "file:src/lib/a.ts",
+    ]);
   });
 
   it("normalizes Windows paths", () => {
     const rows = flattenChangeTree(
       buildChangeTree([entry("src\\lib\\a.ts")]),
-      new Set(["src", "src/lib"]),
+      new Set(["src/lib"]),
+    );
+    expect(rows.map((row) => row.key)).toEqual([
+      "dir:src/lib",
+      "file:src/lib/a.ts",
+    ]);
+  });
+
+  it("collapses a chain of empty dirs into a single node", () => {
+    const rows = flattenChangeTree(
+      buildChangeTree([entry("src/a/b/c/file.ts")]),
+      new Set(["src/a/b/c"]),
+    );
+    expect(rows.map((row) => row.key)).toEqual([
+      "dir:src/a/b/c",
+      "file:src/a/b/c/file.ts",
+    ]);
+  });
+
+  it("keeps a directory that contains files expanded", () => {
+    const rows = flattenChangeTree(
+      buildChangeTree([entry("src/a.ts"), entry("src/b/c.ts")]),
+      new Set(["src", "src/b"]),
     );
     expect(rows.map((row) => row.key)).toEqual([
       "dir:src",
-      "dir:src/lib",
-      "file:src/lib/a.ts",
+      "dir:src/b",
+      "file:src/b/c.ts",
+      "file:src/a.ts",
     ]);
   });
 });

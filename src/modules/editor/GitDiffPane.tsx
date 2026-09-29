@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { unifiedMergeView } from "@codemirror/merge";
+import { MergeView, unifiedMergeView } from "@codemirror/merge";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
@@ -21,6 +21,8 @@ import {
 } from "./lib/extensions";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
+import { DiffViewToggle } from "./DiffViewToggle";
+import { DEFAULT_DIFF_MODE, type DiffMode } from "./diffMode";
 
 type WorkingSource = {
   kind: "working";
@@ -140,7 +142,10 @@ function loadStateFromCache(source: WorkingSource | CommitSource): LoadState {
 export function GitDiffPane({ source, chipLabel, active }: Props) {
   const { t } = useTranslation();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
+  const mergeRootRef = useRef<HTMLDivElement | null>(null);
+  const mergeViewRef = useRef<MergeView | null>(null);
   const themeExt = useEditorThemeExt();
+  const [diffMode, setDiffMode] = useState<DiffMode>(DEFAULT_DIFF_MODE);
   const [state, setState] = useState<LoadState>(() =>
     active ? loadStateFromCache(source) : { kind: "idle" },
   );
@@ -247,6 +252,38 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
     };
   }, [useFallback, path, state]);
 
+  // Split view: build a two-pane merge (a = original, b = modified) imperatively.
+  const splitReady = state.kind === "loaded" && !useFallback && diffMode === "split";
+  useEffect(() => {
+    if (!splitReady || !mergeRootRef.current) return;
+    const root = mergeRootRef.current;
+    const splitExts: Extension[] = [
+      ...SHARED_EXT,
+      DEFAULT_INDENT,
+      languageCompartment.of(langExt ?? []),
+      ...READONLY_EXT,
+      DIFF_THEME,
+      themeExt,
+    ];
+    const view = new MergeView({
+      a: { doc: originalContent, extensions: splitExts },
+      b: { doc: modifiedContent, extensions: splitExts },
+      parent: root,
+      gutter: true,
+      highlightChanges: true,
+      collapseUnchanged: { margin: 3, minSize: 6 },
+    });
+    const dom = view.dom;
+    dom.style.height = "100%";
+    dom.style.overflow = "auto";
+    mergeViewRef.current = view;
+    return () => {
+      view.destroy();
+      root.innerHTML = "";
+      mergeViewRef.current = null;
+    };
+  }, [splitReady, originalContent, modifiedContent, langExt, themeExt]);
+
   const stats = useMemo(
     () =>
       useFallback ? countDiffLines(fallbackPatch) : { added: 0, removed: 0 },
@@ -294,7 +331,10 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {loaded && !useFallback ? (
+          <DiffViewToggle mode={diffMode} onChange={setDiffMode} />
+        ) : null}
         {state.kind === "loading" || state.kind === "idle" ? (
           <div className="flex h-full items-center justify-center gap-2 text-[11px] text-muted-foreground">
             <Spinner className="size-3" />
@@ -310,6 +350,8 @@ export function GitDiffPane({ source, chipLabel, active }: Props) {
               {fallbackPatch || t("editor.diffPreviewUnavailable")}
             </pre>
           </ScrollArea>
+        ) : diffMode === "split" ? (
+          <div ref={mergeRootRef} className="h-full" />
         ) : (
           <CodeMirror
             ref={cmRef}
