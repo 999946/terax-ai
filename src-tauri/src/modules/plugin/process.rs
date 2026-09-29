@@ -385,6 +385,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn non_executable_file_is_ignored() {
         let tmp = tempfile::tempdir().unwrap();
         let p = tmp.path().join(".volta/bin/node");
