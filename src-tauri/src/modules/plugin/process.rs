@@ -367,9 +367,19 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         fake_node(tmp.path(), ".nvm/versions/node/v18.0.0/bin/node");
         let v22 = fake_node(tmp.path(), ".nvm/versions/node/v22.1.0/bin/node");
+        // The fn returns the path via a read_dir round-trip, whose platform
+        // separator can drift from a freshly-joined PathBuf on Windows. Compare
+        // by components so `/` vs `\` can't false-fail this cross-platform test.
         assert_eq!(
-            version_manager_node_in(tmp.path()),
-            Some(v22.to_string_lossy().into_owned())
+            version_manager_node_in(tmp.path()).map(|s| std::path::Path::new(&s)
+                .components()
+                .map(|c| c.as_os_str().to_owned())
+                .collect::<Vec<_>>()),
+            Some(
+                v22.components()
+                    .map(|c| c.as_os_str().to_owned())
+                    .collect::<Vec<_>>()
+            )
         );
     }
 
