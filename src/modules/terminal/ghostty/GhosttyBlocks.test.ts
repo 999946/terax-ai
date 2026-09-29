@@ -22,6 +22,9 @@ describe.each(["ghostty-vt", "ghostty-vt-scalar"])(
     });
 
     function create() {
+      // `blocks` is reassigned below and captured by the onEvent closure before
+      // its first assignment, so it must stay `let` (eslint false positive).
+      // eslint-disable-next-line prefer-const
       let blocks: GhosttyBlocks;
       const model = new AdaptedGhosttyTerminalModel(core, {
         backend: "ghostty-webgpu",

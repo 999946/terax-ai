@@ -11,7 +11,7 @@ import {
   renamedPath,
   spacesEmptiedByTabs,
 } from "./tabCloseGuards";
-import type { EditorTab, MarkdownTab } from "@/modules/tabs";
+import type { EditorTab } from "@/modules/tabs";
 
 function hazards(
   dirtyIds: number[] = [],
@@ -75,12 +75,15 @@ describe("path-backed explorer mutations", () => {
     spaceId,
   });
 
-  const markdown = (id: number, path: string): MarkdownTab => ({
+  const markdown = (id: number, path: string): EditorTab => ({
     id,
-    kind: "markdown",
+    kind: "editor",
     title: path,
     path,
+    dirty: false,
+    preview: false,
     spaceId: "local",
+    viewMode: "rendered",
   });
 
   it("normalizes Windows separators for containment and rename", () => {

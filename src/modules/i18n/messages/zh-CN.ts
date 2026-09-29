@@ -511,6 +511,7 @@ export const zhCN: Record<string, string> = {
   "settings.shortcuts.items.view.zenMode": "切换专注模式",
   "settings.shortcuts.items.editor.undo": "撤销",
   "settings.shortcuts.items.editor.redo": "重做",
+  "settings.shortcuts.items.editor.save": "保存文件",
   "settings.shortcuts.items.editor.aiComplete": "触发 AI 补全",
   "settings.shortcuts.items.editor.codeComplete": "触发代码补全",
   "settings.shortcuts.groups.AI": "AI",

@@ -418,6 +418,7 @@ export const SHORTCUTS: Shortcut[] = [
   // CodeMirror also binds Mod-s; the global handler preventDefaults first.
   {
     id: "editor.save",
+    labelKey: "settings.shortcuts.items.editor.save",
     label: "Save file",
     group: "Editor",
     defaultBindings: [{ [MOD_PROP]: true, key: "s" }],

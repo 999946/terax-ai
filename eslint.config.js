@@ -12,6 +12,13 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    rules: {
+      // Vendored upstream code (packages/ghostty-core) rethrows without a
+      // `cause`; the fork doesn't enforce this rule anywhere else either.
+      "preserve-caught-error": "off",
+    },
+  },
+  {
     files: ["scripts/**/*.mjs"],
     languageOptions: {
       globals: {
@@ -85,6 +92,17 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  // Test files commonly bind `_`-prefixed mocks/params that are intentionally
+  // unused, and upstream tests cast heterogeneous tool results to a loose
+  // `Record<string, any>` (already annotated with biome-ignore upstream);
+  // tolerate both the same way the src block does.
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrors": "none" }],
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
 );

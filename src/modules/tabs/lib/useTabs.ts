@@ -1249,13 +1249,6 @@ export function useTabs(initial?: Partial<TerminalTab>) {
             }),
           };
         }
-        if (x.kind === "markdown") {
-          return {
-            ...x,
-            ...(patch.title !== undefined && { title: patch.title }),
-            ...(patch.path !== undefined && { path: patch.path }),
-          };
-        }
         // editor tab: auto-promote from preview the moment the file becomes dirty.
         const autoPin =
           patch.dirty === true && (x as EditorTab).preview

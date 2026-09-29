@@ -835,7 +835,6 @@ export async function setTerminalRenderer(
 export async function setTerminalScreenReader(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_SCREEN_READER, value);
 }
-}
 
 export async function setTerminalCursorBlink(value: boolean): Promise<void> {
   await writePref(KEY_TERMINAL_CURSOR_BLINK, value);

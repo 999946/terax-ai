@@ -1017,7 +1017,7 @@ fn parse_hunk_range(s: &str) -> Option<(i64, i64)> {
     let t = s.trim_start();
     let old_start = t
         .strip_prefix('-')?
-        .split(|c: char| c == ',' || c == ' ' || c == '+')
+        .split([',', ' ', '+'] as [char; 3])
         .next()?
         .parse::<i64>()
         .ok()?;

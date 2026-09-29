@@ -480,6 +480,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     (name: string) =>
       new Promise<"replace" | "skip">((resolve) => {
         let settled = false;
+        // `finish` closes over `id` before it's assigned, so it must stay `let`.
+        // eslint-disable-next-line prefer-const
         let id: string | number;
         const finish = (resolution: "replace" | "skip", dismiss: boolean) => {
           if (settled) return;

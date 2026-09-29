@@ -511,6 +511,7 @@ export const en: Record<string, string> = {
   "settings.shortcuts.items.view.zenMode": "Toggle zen mode",
   "settings.shortcuts.items.editor.undo": "Undo",
   "settings.shortcuts.items.editor.redo": "Redo",
+  "settings.shortcuts.items.editor.save": "Save file",
   "settings.shortcuts.items.editor.aiComplete": "Trigger AI completion",
   "settings.shortcuts.items.editor.codeComplete": "Trigger code completion",
   "settings.shortcuts.groups.AI": "AI",

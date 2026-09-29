@@ -116,7 +116,6 @@ export function GeneralSection() {
   const terminalScreenReader = usePreferencesStore(
     (s) => s.terminalScreenReader,
   );
-  );
   const terminalCursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);

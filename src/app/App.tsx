@@ -474,7 +474,6 @@ export default function App() {
     },
     [disposeTab, newTabInSpace],
   );
-  );
 
   const {
     pendingCloseTab,
@@ -776,7 +775,7 @@ export default function App() {
   const handleExplorerPathRenamed = useCallback(
     (from: string, to: string) => {
       for (const tab of tabsRef.current) {
-        if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
+        if (tab.kind !== "editor") continue;
         const path = renamedPath(tab.path, from, to);
         if (path === null) continue;
         const i = path.lastIndexOf("/");

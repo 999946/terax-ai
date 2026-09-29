@@ -7,7 +7,8 @@ use modules::{
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, State};
+use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{PhysicalPosition, WindowEvent};
 use tauri_plugin_window_state::StateFlags;
 
 /// Drained on first read so HMR / re-mounts can't replay the launch dir.
@@ -371,6 +372,7 @@ pub fn run() {
             vibrancy::window_backdrop_kind,
             vibrancy::window_set_backdrop,
             modules::window_presentation::window_presentation_state,
+            open_settings_window,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

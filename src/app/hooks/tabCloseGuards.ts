@@ -27,7 +27,7 @@ export function renamedPath(
 export function hasOpenPathTab(tabs: readonly Tab[], path: string): boolean {
   return tabs.some(
     (tab) =>
-      (tab.kind === "editor" || tab.kind === "markdown") &&
+      tab.kind === "editor" &&
       pathAtOrUnder(tab.path, path),
   );
 }
@@ -73,7 +73,7 @@ export function deletedPathTabs(
   const dirtyIds: number[] = [];
   const cleanIds: number[] = [];
   for (const tab of tabs) {
-    if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
+    if (tab.kind !== "editor") continue;
     if (!paths.some((path) => pathAtOrUnder(tab.path, path))) continue;
     (tab.kind === "editor" && tab.dirty ? dirtyIds : cleanIds).push(tab.id);
   }
