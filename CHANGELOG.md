@@ -4,6 +4,20 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.0-beta] - 2026-09-29
+
+### 变更
+- **合并官方 upstream 代码**：将 crynta/terax-ai 全部最新代码合入 fork，同时**完整保留 fork 特性**（spaces、国际化 i18n、dnd-kit 标签拖拽、设置浮层、Markdown 渲染/分栏/原始三态视图、git 合并状态、Ghostty 终端渲染等）。在 merge-upstream 分支逐文件解决与上游的冲突（优先处理 ghostty 相关），随后快进并入 main；未改动上游语义的实现均以 fork 为准
+- **并入上游新增能力**：独立设置窗口（`open_settings_window`）、窗口 vibrancy/原生背景、终端渲染方式（WebGPU/WebGL）与读屏选项等，与 fork 原有设置浮层并存
+- **修复 markdown 标签表示的分叉**：上游用独立的 `markdown` 标签类型，fork 用 `editor` 类型 + 三态视图；统一回 fork 的表示以匹配渲染层
+
+### 工程
+- **发布流程改用 tauri-action**：dmg 构建自动生成并合并 `latest.json`，配合此前生成的签名私钥，解决历史版本发布缺失 latest.json、updater 签名不完整的异常；本次 v0.9.0-beta 发布产物（aarch64/x64 两款 dmg + `.sig` + `latest.json`）齐全
+- **CI 三处失败修复**：ubuntu clippy（macOS 专属 import 加 cfg 门控）、Windows nextest（不可执行文件测试按 Unix 语义门控；nvm 节点路径按 components 比较，规避 Windows 分隔符差异）、前端 Size budget（合并带入上游新代码，预算 1.5MB→1.65MB）；全部转绿
+- **校验全绿**：`pnpm lint`、`pnpm check-types`、`pnpm test`（174 文件 / 1230 用例）、`cargo clippy -D warnings`、`cargo test`（全量）均通过
+
+---
+
 ## [v0.8.45] - 2026-09-28
 
 ### 变更
