@@ -83,13 +83,15 @@ function basename(path: string): string {
 }
 
 /**
- * Resolve the git repo that contains a space's bound folder. Used to show
- * per-space merge-status icons below the plugin info. A folder outside any
- * repo (or a workspace folder spanning several repos) yields null → no icons.
+ * Resolve the git repo(s) for a space's bound folder. When the root is itself
+ * inside a single repo, that repo is shown. When the root is a container
+ * folder (not inside any repo — e.g. a workspace root holding several repos
+ * in its sub-directories), the repos found below it are listed instead. Each
+ * repo drives its own merge-status icon row.
  */
 type SpaceRepoState =
   | { kind: "loading" }
-  | { kind: "ok"; repo: GitRepoInfo | null }
+  | { kind: "ok"; repos: GitRepoInfo[] }
   | { kind: "error"; message: string };
 
 function repoErrorMessage(e: unknown): string {
@@ -98,20 +100,24 @@ function repoErrorMessage(e: unknown): string {
   return "Could not resolve repository.";
 }
 
-function useSpaceRepo(root: string | null): SpaceRepoState {
+function useSpaceRepos(root: string | null): SpaceRepoState {
   const [state, setState] = useState<SpaceRepoState>({ kind: "loading" });
   useEffect(() => {
     let alive = true;
     if (!root) {
       // No bound folder at all → no repository, but not an error.
-      setState({ kind: "ok", repo: null });
+      setState({ kind: "ok", repos: [] });
       return;
     }
     setState({ kind: "loading" });
     native
       .gitResolveRepo(root)
-      .then((repo) => {
-        if (alive) setState({ kind: "ok", repo });
+      .then(async (repo) => {
+        if (!alive) return;
+        // Root is inside a repo → show it; otherwise discover the repos under
+        // the root (gitListRepos finds the next-level sub-directory repos too).
+        const repos = repo ? [repo] : await native.gitListRepos(root);
+        if (alive) setState({ kind: "ok", repos });
       })
       .catch((e) => {
         if (alive) setState({ kind: "error", message: repoErrorMessage(e) });
@@ -419,7 +425,7 @@ function SpaceRow({
   const { t } = useTranslation();
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
   const info = space.info;
-  const repoState = useSpaceRepo(space.root);
+  const repoState = useSpaceRepos(space.root);
 
   return (
     <div className="relative">
@@ -498,35 +504,34 @@ function SpaceRow({
               >
                 {repoState.message}
               </span>
-            ) : repoState.kind === "ok" && repoState.repo ? (
-              <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
-                <HugeiconsIcon
-                  icon={GitBranchIcon}
-                  size={9}
-                  strokeWidth={2}
-                  className="shrink-0"
-                />
-                <span className="min-w-0 truncate font-medium text-foreground/75">
-                  {basename(repoState.repo.repoRoot)}
+            ) : repoState.kind === "ok" && repoState.repos.length > 0 ? (
+              repoState.repos.map((repo) => (
+                <span
+                  key={repo.repoRoot}
+                  className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground"
+                >
+                  <HugeiconsIcon
+                    icon={GitBranchIcon}
+                    size={9}
+                    strokeWidth={2}
+                    className="shrink-0"
+                  />
+                  <span className="min-w-0 truncate font-medium text-foreground/75">
+                    {basename(repo.repoRoot)}
+                  </span>
+                  <span className="shrink-0">{repo.branch ?? "—"}</span>
+                  <MergeStatusIcons
+                    repoRoot={repo.repoRoot}
+                    branch={repo.branch ?? null}
+                    className="ml-0.5"
+                  />
                 </span>
-                <span className="shrink-0">
-                  {repoState.repo.branch ?? "—"}
-                </span>
-              </span>
+              ))
             ) : repoState.kind === "ok" ? (
               <span className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/60">
                 {t("spaces.noRepository")}
               </span>
             ) : null}
-            <MergeStatusIcons
-              repoRoot={
-                repoState.kind === "ok" ? (repoState.repo?.repoRoot ?? null) : null
-              }
-              branch={
-                repoState.kind === "ok" ? (repoState.repo?.branch ?? null) : null
-              }
-              className="mt-0.5"
-            />
           </span>
         )}
         {!editing && (
