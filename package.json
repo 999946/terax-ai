@@ -33,7 +33,19 @@
     "analyze:bundle": "ANALYZE=true vite build",
     "analyze:eager": "node scripts/eager-graph.mjs src/main.tsx",
     "size": "size-limit",
-    "knip": "knip"
+    "knip": "knip",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "eslint --fix"
+    ],
+    "src/**/*.{ts,tsx,json}": [
+      "biome format --write --no-errors-on-unmatched"
+    ],
+    "src/**/*.{ts,tsx,mjs}": [
+      "node scripts/check-i18n.mjs"
+    ]
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.94",
@@ -136,7 +148,9 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
+    "husky": "^9.1.7",
     "knip": "^6.35.1",
+    "lint-staged": "^17.6.0",
     "react-compiler-healthcheck": "^1.0.0",
     "react-scan": "^0.5.7",
     "rollup-plugin-visualizer": "^7.1.1",
