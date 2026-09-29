@@ -87,25 +87,40 @@ function basename(path: string): string {
  * per-space merge-status icons below the plugin info. A folder outside any
  * repo (or a workspace folder spanning several repos) yields null → no icons.
  */
-function useSpaceRepo(root: string | null) {
-  const [resolvedRepo, setResolvedRepo] = useState<GitRepoInfo | null>(null);
+type SpaceRepoState =
+  | { kind: "loading" }
+  | { kind: "ok"; repo: GitRepoInfo | null }
+  | { kind: "error"; message: string };
+
+function repoErrorMessage(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (e instanceof Error && e.message) return e.message;
+  return "Could not resolve repository.";
+}
+
+function useSpaceRepo(root: string | null): SpaceRepoState {
+  const [state, setState] = useState<SpaceRepoState>({ kind: "loading" });
   useEffect(() => {
     let alive = true;
-    setResolvedRepo(null);
-    if (!root) return;
+    if (!root) {
+      // No bound folder at all → no repository, but not an error.
+      setState({ kind: "ok", repo: null });
+      return;
+    }
+    setState({ kind: "loading" });
     native
       .gitResolveRepo(root)
       .then((repo) => {
-        if (alive) setResolvedRepo(repo);
+        if (alive) setState({ kind: "ok", repo });
       })
-      .catch(() => {
-        if (alive) setResolvedRepo(null);
+      .catch((e) => {
+        if (alive) setState({ kind: "error", message: repoErrorMessage(e) });
       });
     return () => {
       alive = false;
     };
   }, [root]);
-  return { resolvedRepo };
+  return state;
 }
 
 export function SpaceSwitcherContent({
@@ -404,7 +419,7 @@ function SpaceRow({
   const { t } = useTranslation();
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
   const info = space.info;
-  const { resolvedRepo } = useSpaceRepo(space.root);
+  const repoState = useSpaceRepo(space.root);
 
   return (
     <div className="relative">
@@ -476,7 +491,14 @@ function SpaceRow({
                 ) : null}
               </span>
             ) : null}
-            {resolvedRepo ? (
+            {repoState.kind === "error" ? (
+              <span
+                className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-destructive"
+                title={repoState.message}
+              >
+                {repoState.message}
+              </span>
+            ) : repoState.kind === "ok" && repoState.repo ? (
               <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground">
                 <HugeiconsIcon
                   icon={GitBranchIcon}
@@ -485,16 +507,24 @@ function SpaceRow({
                   className="shrink-0"
                 />
                 <span className="min-w-0 truncate font-medium text-foreground/75">
-                  {basename(resolvedRepo.repoRoot)}
+                  {basename(repoState.repo.repoRoot)}
                 </span>
                 <span className="shrink-0">
-                  {resolvedRepo.branch ?? "—"}
+                  {repoState.repo.branch ?? "—"}
                 </span>
+              </span>
+            ) : repoState.kind === "ok" ? (
+              <span className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/60">
+                {t("spaces.noRepository")}
               </span>
             ) : null}
             <MergeStatusIcons
-              repoRoot={resolvedRepo?.repoRoot ?? null}
-              branch={resolvedRepo?.branch ?? null}
+              repoRoot={
+                repoState.kind === "ok" ? (repoState.repo?.repoRoot ?? null) : null
+              }
+              branch={
+                repoState.kind === "ok" ? (repoState.repo?.branch ?? null) : null
+              }
               className="mt-0.5"
             />
           </span>

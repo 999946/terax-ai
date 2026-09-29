@@ -53,6 +53,7 @@ export const zhCN: Record<string, string> = {
   "spaces.deleteFolderDescription": "这将移除该工作空间，并永久删除其文件夹及全部内容。此操作无法撤销。",
   "spaces.newTab": "新建标签页",
   "spaces.noTabs": "没有标签页",
+  "spaces.noRepository": "无仓库",
   "commandPalette.title": "命令面板",
   "commandPalette.group.General": "常规",
   "commandPalette.group.Spaces": "空间",
