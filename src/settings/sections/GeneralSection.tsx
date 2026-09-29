@@ -422,7 +422,7 @@ export function GeneralSection() {
                   value={style.value}
                   className="text-[12px]"
                 >
-                  {style.label}
+                  {t(style.label)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -453,7 +453,7 @@ export function GeneralSection() {
                   value={w.value}
                   className="text-[12px]"
                 >
-                  {w.label}
+                  {t(w.label)}
                 </SelectItem>
               ))}
             </SelectContent>

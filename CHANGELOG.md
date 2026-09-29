@@ -11,9 +11,13 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 - **并入上游新增能力**：独立设置窗口（`open_settings_window`）、窗口 vibrancy/原生背景、终端渲染方式（WebGPU/WebGL）与读屏选项等，与 fork 原有设置浮层并存
 - **修复 markdown 标签表示的分叉**：上游用独立的 `markdown` 标签类型，fork 用 `editor` 类型 + 三态视图；统一回 fork 的表示以匹配渲染层
 
+### 修复
+- **设置里「光标样式」「字体粗细」下拉显示原始 key 而非译文**：这两个下拉的选项 `label` 存的是 i18n key 字符串，渲染时漏了 `t()` 翻译，导致直接显示 `settings.general.bar` 这类 key 文本。现补上 `t()` 翻译，正常显示中文（竖线/方块/下划线、普通/中等/半粗/粗体）；并在 `check:i18n` 登记对应的变量键调用与动态 key，防止回归
+
 ### 工程
 - **发布流程改用 tauri-action**：dmg 构建自动生成并合并 `latest.json`，配合此前生成的签名私钥，解决历史版本发布缺失 latest.json、updater 签名不完整的异常；本次 v0.9.0-beta 发布产物（aarch64/x64 两款 dmg + `.sig` + `latest.json`）齐全
 - **CI 三处失败修复**：ubuntu clippy（macOS 专属 import 加 cfg 门控）、Windows nextest（不可执行文件测试按 Unix 语义门控；nvm 节点路径按 components 比较，规避 Windows 分隔符差异）、前端 Size budget（合并带入上游新代码，预算 1.5MB→1.65MB）；全部转绿
+- **清理 i18n 死键**：移除上游合并后遗留、源码零引用的 5 条词条（`settings.general.webglRenderer*`、`settings.shortcuts.groups.Spaces`），en 与 zh-CN 语言包同步删除以保持 key 对齐
 - **校验全绿**：`pnpm lint`、`pnpm check-types`、`pnpm test`（174 文件 / 1230 用例）、`cargo clippy -D warnings`、`cargo test`（全量）均通过
 
 ---

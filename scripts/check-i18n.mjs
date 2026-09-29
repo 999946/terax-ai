@@ -36,6 +36,11 @@ const DYNAMIC_KEYS = [
   "editor.aiDiffPendingReview", "editor.aiDiffApplied", "editor.aiDiffRejected",
   // src/settings/sections/GeneralSection.tsx APPEARANCE[].label
   "settings.general.system", "settings.general.light", "settings.general.dark",
+  // src/settings/sections/GeneralSection.tsx TERMINAL_CURSOR_STYLES[].label
+  "settings.general.bar", "settings.general.block", "settings.general.underline",
+  // src/settings/sections/GeneralSection.tsx TERMINAL_FONT_WEIGHTS[].label
+  "settings.general.normal", "settings.general.medium", "settings.general.semiBold",
+  "settings.general.bold",
   // src/settings/sections/ModelsSection.tsx meta.modelHintKey
   "settings.models.local.lmstudio.hint", "settings.models.local.mlx.hint",
   "settings.models.local.ollama.hint", "settings.models.local.openrouter.hint",
@@ -56,6 +61,8 @@ const EXPECTED_VARIABLE_CALLS = new Set([
   "modules/agents/components/NotificationBell.tsx:NOTIF_LABEL_KEY[n.kind]",
   "modules/editor/AiDiffPane.tsx:STATUS_KEY[status]",
   "settings/sections/GeneralSection.tsx:o.label",
+  "settings/sections/GeneralSection.tsx:style.label",
+  "settings/sections/GeneralSection.tsx:w.label",
   "settings/sections/ModelsSection.tsx:meta.modelHintKey",
   "modules/markdown/MarkdownViewToggle.tsx:i18nKey",
   // labelKey 字段驱动的变量键调用（统一 t 后，key 一律以 labelKey 字面量挂载在数据上）
