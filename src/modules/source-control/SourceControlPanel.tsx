@@ -193,18 +193,33 @@ function upstreamBadgeLabel(
   return upstream;
 }
 
+/** File status → Tailwind text-color token (theme-aware semantic color). */
+function statusColor(code: string): string {
+  switch (code) {
+    case "A":
+    case "U":
+      return "text-added";
+    case "M":
+    case "R":
+      return "text-modified";
+    case "D":
+      return "text-deleted";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
+/** File status → accent-bar background token on the row's leading edge. */
 function statusAccent(code: string): string {
   switch (code) {
     case "A":
-      return "bg-emerald-500/85";
     case "U":
-      return "bg-teal-500/85";
+      return "bg-added";
     case "M":
-      return "bg-amber-500/85";
-    case "D":
-      return "bg-rose-500/85";
     case "R":
-      return "bg-sky-500/85";
+      return "bg-modified";
+    case "D":
+      return "bg-deleted";
     default:
       return "bg-muted-foreground/40";
   }
@@ -1252,9 +1267,8 @@ const EntryRow = memo(function EntryRow({
               <span
                 className={cn(
                   "truncate text-[12px] leading-tight",
-                  isSelected || focused
-                    ? "font-semibold text-foreground"
-                    : "font-medium text-foreground/95",
+                  statusColor(entry.statusCode),
+                  isSelected || focused ? "font-semibold" : "font-medium",
                   pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
                 )}
               >
