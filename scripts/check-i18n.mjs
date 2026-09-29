@@ -108,6 +108,24 @@ function readEnKeys(path) {
   return keys;
 }
 
+/** 含 {占位符} com 的 key：其 t() 调用必须传插值参数。 */
+function readPlaceholderKeys(path) {
+  const src = readFileSync(path, "utf8");
+  const keys = new Set();
+  for (const m of src.matchAll(/^\s*"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/gm)) {
+    if (/\{[a-zA-Z_]+\}/.test(m[2])) keys.add(m[1]);
+  }
+  return keys;
+}
+
+/**
+ * 豁免：value 里的 {占位符} 是「文档性示例」，本就该原样展示给用户，
+ * 不是动态插值。如自定义命令说明里的 {file} 是告诉用户可用的占位符写法。
+ */
+const INTERPOLATION_EXEMPT_KEYS = new Set([
+  "settings.editor.customCommandDescription",
+]);
+
 /** 递归收集 src 下待扫描的 .ts/.tsx（跳过测试文件与语言包本身）。 */
 function walkFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -130,6 +148,10 @@ function lineAt(src, index) {
 }
 
 const enKeys = readEnKeys(EN);
+const placeholderKeys = readPlaceholderKeys(EN);
+
+/** 漏插值参数的 t() 调用（key 含 {占位符} 但未传参）→ 位置。 */
+const badInterpolation = [];
 
 /** 缺失的字面量 key → 出现位置列表。 */
 const missingLiterals = new Map();
@@ -226,6 +248,43 @@ for (const file of files) {
       uncoveredVars.get(sig).push(`${rel}:${lineAt(src, m.index)}`);
     }
   }
+
+  // 插值参数红线：key 含 {占位符} 的 t() 调用必须传插值对象
+  // （`, { … }`），否则渲染出未替换的“{var}”原文。豁免项见
+  // INTERPOLATION_EXEMPT_KEYS（文档性示例占位符，本就该原样展示）。
+  const tCallRe = /(?<![A-Za-z_$])t\s*\(/g;
+  let tm;
+  while ((tm = tCallRe.exec(src))) {
+    const open = tm.index + src.slice(tm.index, tCallRe.lastIndex).indexOf("(");
+    let depth = 0;
+    let end = -1;
+    for (let i = open; i < src.length; i++) {
+      const c = src[i];
+      if (c === "(") depth++;
+      else if (c === ")") {
+        depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end < 0) continue;
+    const call = src.slice(open + 1, end);
+    const keyRe = /["']([^"']+)["']/g;
+    const present = [];
+    let km;
+    while ((km = keyRe.exec(call))) {
+      const k = km[1];
+      if (placeholderKeys.has(k) && !INTERPOLATION_EXEMPT_KEYS.has(k)) present.push(k);
+    }
+    if (present.length === 0) continue;
+    if (!/,\s*\{/.test(call)) {
+      badInterpolation.push(
+        `${rel}:${lineAt(src, tm.index)}  t(${call.replace(/\s+/g, " ").slice(0, 70)})  → ${present.join(", ")}`,
+      );
+    }
+  }
 }
 
 // 反向死键：en.ts 定义了、但 src 里从未以该字面量引用。
@@ -243,7 +302,7 @@ const missingDynamic = DYNAMIC_KEYS.filter((k) => !enKeys.has(k));
 const bad =
   missingLiterals.size + missingLabelKeys.size + uncoveredVars.size +
   missingDynamic.length + badTemplates.length + badAliases.length +
-  badGlobals.length + badDynamic.length;
+  badGlobals.length + badDynamic.length + badInterpolation.length;
 
 // 反向死键报告（--dead）在任何 exit 之前打印，便于清理残留词条。
 if (wantDead) {
@@ -264,7 +323,7 @@ if (bad === 0) {
   console.log(
     `✓ check-i18n: ${distinctLiterals.size} 个字面量 key、${labelKeySet.size} 个 labelKey 字段、` +
       `${DYNAMIC_KEYS.length} 个手动登记动态 key 全部存在于 en.ts，无缺失。` +
-      `写法合规：无模板字符串 key、无别名解构、无全局 i18n.t、无动态拼接 key。`,
+      `写法合规：无模板字符串 key、无别名解构、无全局 i18n.t、无动态拼接 key、无漏插值参数。`,
   );
   process.exit(0);
 }
@@ -296,6 +355,9 @@ for (const loc of badGlobals) {
 }
 for (const loc of badDynamic) {
   console.error(`  禁止的动态/拼接 key  →  ${loc}  （key 须为字符串常量，动态请挂到数据的 labelKey）`);
+}
+for (const loc of badInterpolation) {
+  console.error(`  漏插值参数（key 含 {占位符} 但 t() 未传插值对象）  →  ${loc}  （请按 {var} 传 { var }）`);
 }
 console.error(
   "\n  修复：缺的 key 补到 src/modules/i18n/messages/{en,zh-CN}.ts；" +
