@@ -55,7 +55,7 @@ Output streams from `pty_open` via a Tauri `Channel<PtyEvent>`.
 #### Mutate
 
 - `fs_create_file` / `fs_create_dir`
-- `fs_rename` / `fs_delete` / `fs_copy`
+- `fs_rename` / `fs_move` / `fs_delete` / `fs_delete_batch` / `fs_copy`
 
 #### Watch
 
@@ -119,7 +119,8 @@ Three distinct surfaces:
 ### Settings panel
 
 - `get_launch_dir` - CLI launch directory, drained on first read
-- Settings open as an in-app floating panel (`src/modules/settings/floatingSettingsStore.ts` + `FloatingSettingsOverlay.tsx`): a space-independent overlay above the workspace surface, kept out of any Space's tab list, driven by a global zustand store (`open`/`section`) that survives Space switches. No separate Settings webview window.
+- `get_launch_files` - files opened at launch (CLI args or OS Open With), drained on first read
+- `open_settings_window` - open the settings (optional `tab` deep-link); the frontend drives settings through an in-app floating panel (`src/modules/settings/floatingSettingsStore.ts` + `FloatingSettingsOverlay.tsx`): a space-independent overlay above the workspace surface, kept out of any Space's tab list, driven by a global zustand store (`open`/`section`) that survives Space switches.
 
 ### CLI control plane
 

@@ -1,6 +1,10 @@
 pub mod modules;
 
-use modules::{agent, control, fs, git, history, lsp, net, plugin, pty, secrets, shell, workspace};
+#[cfg(target_os = "macos")]
+use modules::app_menu;
+use modules::{
+    agent, control, fs, git, history, lsp, net, plugin, pty, secrets, shell, vibrancy, workspace,
+};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
@@ -75,6 +79,86 @@ fn parse_launch_target() -> LaunchTarget {
     resolve_launch_target(entries)
 }
 
+const fn settings_always_on_top(is_macos: bool) -> bool {
+    !is_macos
+}
+
+#[tauri::command]
+async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
+    let url_path = match tab.as_deref() {
+        Some(t) if !t.is_empty() => format!("settings.html?tab={}", t),
+        _ => "settings.html".to_string(),
+    };
+
+    if let Some(window) = app.get_webview_window("settings") {
+        #[cfg(not(target_os = "macos"))]
+        let _ = window.set_always_on_top(true);
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
+            // emit() serializes via JSON — no string-escape footgun, unlike
+            // eval() with format!(). Frontend listens via Tauri event API.
+            let _ = window.emit("terax:settings-tab", t);
+        }
+        return Ok(());
+    }
+
+    let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
+        .title("Settings")
+        .inner_size(900.0, 700.0)
+        .min_inner_size(820.0, 620.0)
+        .resizable(true)
+        .visible(false)
+        .always_on_top(settings_always_on_top(cfg!(target_os = "macos")));
+
+    // A normal-level child stays above Terax but recedes with the app on macOS.
+    // Never combine the macOS parent with always_on_top; that breaks WebView
+    // compositing and can hide Settings behind the main window (#33, #957).
+    let builder = if let Some(main) = app.get_webview_window("main") {
+        builder.parent(&main).map_err(|e| e.to_string())?
+    } else {
+        builder
+    };
+
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+
+    // On Linux/Windows we render our own titlebar, so drop native chrome
+    // and make the window transparent.
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    let builder = builder.decorations(false).transparent(true);
+
+    let window = builder.build().map_err(|e| e.to_string())?;
+
+    // Some Linux compositors (GNOME/Mutter with CSD-by-default) ignore the
+    // builder-time decorations flag — re-assert it after realize.
+    #[cfg(target_os = "linux")]
+    {
+        let _ = window.set_decorations(false);
+    }
+
+    #[cfg(target_os = "macos")]
+    if let Some(main) = app.get_webview_window("main") {
+        if let (Ok(main_pos), Ok(main_size), Ok(settings_size)) = (
+            main.outer_position(),
+            main.outer_size(),
+            window.outer_size(),
+        ) {
+            let x = main_pos.x
+                + ((main_size.width as i32).saturating_sub(settings_size.width as i32)) / 2;
+            let y = main_pos.y
+                + ((main_size.height as i32).saturating_sub(settings_size.height as i32)) / 2;
+            let _ = window.set_position(PhysicalPosition::new(x, y));
+        } else {
+            let _ = window.center();
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(windows)]
@@ -99,8 +183,11 @@ pub fn run() {
     let control_for_setup = control_state.clone();
 
     let builder = tauri::Builder::default();
-    #[cfg(target_os = "linux")]
     let builder = builder.plugin(tauri_plugin_clipboard_manager::init());
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(app_menu::build)
+        .on_menu_event(app_menu::handle_event);
     builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -132,12 +219,27 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(move |_app| {
+            #[cfg(target_os = "macos")]
+            modules::window_presentation::macos::install(_app.handle());
             if let Err(error) = control::start(_app.handle().clone(), control_for_setup.clone()) {
                 log::warn!("could not start Terax control server: {error}");
+            }
+            #[cfg(target_os = "macos")]
+            if let Some(main) = _app.get_webview_window("main") {
+                let handle = _app.handle().clone();
+                main.on_window_event(move |event| {
+                    // CloseRequested can be cancelled by the frontend guard.
+                    if matches!(event, WindowEvent::Destroyed) {
+                        if let Some(settings) = handle.get_webview_window("settings") {
+                            let _ = settings.destroy();
+                        }
+                    }
+                });
             }
             Ok(())
         })
         .manage(pty::PtyState::default())
+        .manage(modules::window_presentation::WindowPresentationState::default())
         .manage(control_state)
         .manage(plugin::PluginState::default())
         .manage(shell::ShellState::default())
@@ -159,6 +261,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
             pty::pty_write,
+            pty::pty_ack_output,
+            pty::pty_diagnostics,
             pty::pty_resize,
             pty::pty_close,
             pty::pty_close_all,
@@ -175,7 +279,9 @@ pub fn run() {
             fs::mutate::fs_create_file,
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,
+            fs::mutate::fs_move,
             fs::mutate::fs_delete,
+            fs::mutate::fs_delete_batch,
             fs::mutate::fs_copy,
             fs::watch::fs_watch_add,
             fs::watch::fs_watch_remove,
@@ -262,6 +368,9 @@ pub fn run() {
             history::history_commands,
             history::history_record,
             history::history_list,
+            vibrancy::window_backdrop_kind,
+            vibrancy::window_set_backdrop,
+            modules::window_presentation::window_presentation_state,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -270,6 +379,8 @@ pub fn run() {
                 // Servers exit on stdin EOF, but destructors are not guaranteed
                 // on process exit; kill explicitly.
                 tauri::RunEvent::Exit => {
+                    #[cfg(target_os = "macos")]
+                    modules::window_presentation::macos::uninstall();
                     if let Some(state) = app.try_state::<lsp::LspState>() {
                         state.kill_all();
                     }
@@ -314,7 +425,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod launch_target_tests {
-    use super::{resolve_launch_target, LaunchEntry, LaunchTarget};
+    use super::{resolve_launch_target, settings_always_on_top, LaunchEntry, LaunchTarget};
     use std::path::PathBuf;
 
     #[test]
@@ -359,5 +470,11 @@ mod launch_target_tests {
         ]);
         assert_eq!(out.dir.as_deref(), Some("/workspace"));
         assert_eq!(out.files, vec!["/other/x.rs".to_string()]);
+    }
+
+    #[test]
+    fn settings_float_only_outside_macos() {
+        assert!(!settings_always_on_top(true));
+        assert!(settings_always_on_top(false));
     }
 }

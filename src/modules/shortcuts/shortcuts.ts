@@ -48,6 +48,7 @@ export type ShortcutId =
   | "sidebar.toggle"
   | "editor.undo"
   | "editor.redo"
+  | "editor.save"
   | "editor.aiComplete"
   | "editor.codeComplete";
 
@@ -393,11 +394,9 @@ export const SHORTCUTS: Shortcut[] = [
     group: "View",
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "'" }],
   },
-  // Editor entries are display-only: CodeMirror's historyKeymap binds these
-  // keys natively. We register them here so the shortcuts dialog can surface
-  // them — they don't have App-level handlers, so `useGlobalShortcuts` falls
-  // through without `preventDefault`, leaving CodeMirror to handle the event.
-  // Also excluded from the customization UI in ShortcutsSection.
+  // Editor undo/redo: App.tsx registers handlers and useGlobalShortcuts
+  // preventDefaults on match. Keep Mod+Y and add macOS Mod+Shift+Z (#941).
+  // Still excluded from the customization UI in ShortcutsSection.
   {
     id: "editor.undo",
     labelKey: "settings.shortcuts.items.editor.undo",
@@ -410,7 +409,18 @@ export const SHORTCUTS: Shortcut[] = [
     labelKey: "settings.shortcuts.items.editor.redo",
     label: "Redo",
     group: "Editor",
-    defaultBindings: [{ [MOD_PROP]: true, key: "y" }],
+    defaultBindings: [
+      { [MOD_PROP]: true, key: "y" },
+      { [MOD_PROP]: true, shift: true, key: "z" },
+    ],
+  },
+  // Mod+S at the app layer so WKWebView cannot steal "Save Page" (#969).
+  // CodeMirror also binds Mod-s; the global handler preventDefaults first.
+  {
+    id: "editor.save",
+    label: "Save file",
+    group: "Editor",
+    defaultBindings: [{ [MOD_PROP]: true, key: "s" }],
   },
   {
     id: "editor.aiComplete",

@@ -9,12 +9,6 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import {
@@ -44,7 +38,8 @@ import {
   setTerminalLetterSpacing,
   setTerminalScrollback,
   setTerminalShell,
-  setTerminalWebglEnabled,
+  setTerminalRenderer,
+  setTerminalScreenReader,
   setZoomLevel,
   TERMINAL_FONT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
@@ -117,8 +112,10 @@ export function GeneralSection() {
   useEffect(() => {
     setGitTargetBranchesDraft((gitTargetBranches ?? []).join(", "));
   }, [gitTargetBranches]);
-  const terminalWebglEnabled = usePreferencesStore(
-    (s) => s.terminalWebglEnabled,
+  const terminalRenderer = usePreferencesStore((s) => s.terminalRenderer);
+  const terminalScreenReader = usePreferencesStore(
+    (s) => s.terminalScreenReader,
+  );
   );
   const terminalCursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
@@ -369,31 +366,31 @@ export function GeneralSection() {
       <div className="flex flex-col gap-2">
         <Label>{t("settings.general.terminal")}</Label>
         <SettingRow
-          title={
-            <span className="inline-flex items-center gap-1.5">
-              {t("settings.general.webglRenderer")}
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className="cursor-help text-[11px] text-muted-foreground/70 leading-none"
-                      aria-label={t("settings.general.webglRendererInfo")}
-                    >
-                      ⓘ
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-65 text-[11px]">
-                    {t("settings.general.webglRendererTooltip")}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </span>
-          }
-          description={t("settings.general.webglRendererDescription")}
+          title="Terminal renderer"
+          description="Automatic uses WebGPU with WebGL fallback. Choose WebGL for graphics compatibility. Applies to new terminals."
+        >
+          <Select
+            value={terminalRenderer}
+            onValueChange={(value) =>
+              void setTerminalRenderer(value === "webgl" ? "webgl" : "auto")
+            }
+          >
+            <SelectTrigger className="h-8 w-36 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Automatic</SelectItem>
+              <SelectItem value="webgl">WebGL</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow
+          title="Screen reader support"
+          description="Expose terminal output as accessible text. Page Up and Page Down browse history when the output region is focused."
         >
           <Switch
-            checked={terminalWebglEnabled}
-            onCheckedChange={(v) => void setTerminalWebglEnabled(v)}
+            checked={terminalScreenReader}
+            onCheckedChange={(value) => void setTerminalScreenReader(value)}
           />
         </SettingRow>
         <SettingRow

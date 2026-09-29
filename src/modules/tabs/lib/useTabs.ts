@@ -1,7 +1,7 @@
 import { isMarkdownPath } from "@/lib/utils";
 import {
-  createAgentPanePlan,
   type AgentInstanceCount,
+  createAgentPanePlan,
 } from "@/modules/agents/lib/launcher";
 import {
   findLeafCwd,
@@ -18,7 +18,7 @@ import {
   splitLeaf,
   swapLeafInDirection,
 } from "@/modules/terminal/lib/panes";
-import { disposeSession } from "@/modules/terminal/lib/useTerminalSession";
+import { disposeSession } from "@/modules/terminal/lib/terminalSessionApi";
 import {
   useCallback,
   useEffect,
@@ -1247,6 +1247,13 @@ export function useTabs(initial?: Partial<TerminalTab>) {
               url: patch.url,
               title: patch.title ?? titleFromUrl(patch.url),
             }),
+          };
+        }
+        if (x.kind === "markdown") {
+          return {
+            ...x,
+            ...(patch.title !== undefined && { title: patch.title }),
+            ...(patch.path !== undefined && { path: patch.path }),
           };
         }
         // editor tab: auto-promote from preview the moment the file becomes dirty.

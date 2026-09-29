@@ -19,10 +19,14 @@ type Props = {
   onSelect: (env: WorkspaceEnv) => void;
 };
 
+/** Hook-free wrapper so non-Windows never subscribes to the workspace env store. */
 export function WorkspaceEnvSelector({ onSelect }: Props) {
-  const { t } = useTranslation();
-
   if (!IS_WINDOWS) return null;
+  return <WorkspaceEnvSelectorWindows onSelect={onSelect} />;
+}
+
+function WorkspaceEnvSelectorWindows({ onSelect }: Props) {
+  const { t } = useTranslation();
   const env = useWorkspaceEnvStore((s) => s.env);
   const distros = useWorkspaceEnvStore((s) => s.distros);
   const loading = useWorkspaceEnvStore((s) => s.loading);

@@ -62,9 +62,9 @@ import { FloatingSettingsOverlay } from "@/modules/settings/FloatingSettingsOver
 import { useFloatingSettings } from "@/modules/settings/floatingSettingsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  shouldDisablePaneSwapShortcut,
   type ShortcutHandlers,
   type ShortcutId,
+  shouldDisablePaneSwapShortcut,
   useGlobalShortcuts,
 } from "@/modules/shortcuts";
 import {
@@ -100,27 +100,32 @@ import {
   disposeSession,
   findLeafCwd,
   hasLeaf,
+  isTerminalSurfaceTarget,
   leafIds,
   navigateFocusedBlocks,
-  ptyIdForLeaf,
   type PaneBounds,
+  ptyIdForLeaf,
   type TerminalPaneHandle,
   useAgentActivityStore,
   useTerminalFileDrop,
   whenSessionReady,
   writeToSession,
 } from "@/modules/terminal";
-import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
+import type { TerminalSearchController } from "@/modules/terminal/search/TerminalSearchController";
+import {
+  ThemeProvider,
+  useThemeFileEditing,
+  WindowVibrancyBridge,
+} from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import {
   useWorkspaceEnvStore,
-  workspaceScopeKey,
   type WorkspaceEnv,
+  workspaceScopeKey,
 } from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { SearchAddon } from "@xterm/addon-search";
 import {
   useCallback,
   useEffect,
@@ -136,6 +141,11 @@ import {
 } from "./components/WorkspaceInputBar";
 import { WorkspaceSurface } from "./components/WorkspaceSurface";
 import { useAppCloseGuard } from "./hooks/useAppCloseGuard";
+import {
+  hasOpenPathTab,
+  renamedPath,
+  spacesEmptiedByTabs,
+} from "./hooks/tabCloseGuards";
 import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
 import { usePluginLifecycle } from "@/modules/plugin/usePluginLifecycle";
@@ -197,9 +207,9 @@ export default function App() {
   }, [tabs, activeId]);
   const activeLeafId = activeTerminalTab?.activeLeafId ?? null;
 
-  const searchAddons = useRef<Map<number, SearchAddon>>(new Map());
+  const searchAddons = useRef<Map<number, TerminalSearchController>>(new Map());
   const [activeSearchAddon, setActiveSearchAddon] =
-    useState<SearchAddon | null>(null);
+    useState<TerminalSearchController | null>(null);
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
   const terminalRefs = useRef<Map<number, TerminalPaneHandle>>(new Map());
   const editorRefs = useRef<Map<number, EditorPaneHandle>>(new Map());
@@ -411,7 +421,7 @@ export default function App() {
   }, [activeId, activeLeafId]);
 
   const handleSearchReady = useCallback(
-    (leafId: number, addon: SearchAddon) => {
+    (leafId: number, addon: TerminalSearchController) => {
       searchAddons.current.set(leafId, addon);
       if (leafId === activeLeafId) setActiveSearchAddon(addon);
     },
@@ -451,6 +461,20 @@ export default function App() {
     },
     [closeAllInSpace],
   );
+  const disposeDeletedTabs = useCallback(
+    (ids: number[]) => {
+      if (ids.length === 0) return;
+      for (const spaceId of spacesEmptiedByTabs(tabsRef.current, ids)) {
+        const root = useSpaces
+          .getState()
+          .spaces.find((s) => s.id === spaceId)?.root;
+        newTabInSpace(spaceId, root ?? undefined);
+      }
+      for (const id of ids) disposeTab(id);
+    },
+    [disposeTab, newTabInSpace],
+  );
+  );
 
   const {
     pendingCloseTab,
@@ -470,11 +494,12 @@ export default function App() {
     cancelDeleteClose,
     confirmCloseMany,
     cancelCloseMany,
-    handlePathDeleted,
+    handlePathsDeleted,
   } = useTabCloseGuards({
     tabs,
     activeId,
     disposeTab,
+    disposeDeletedTabs,
     disposeTabs,
     disposeAllTabsInSpace,
   });
@@ -748,25 +773,25 @@ export default function App() {
     })();
   }, [booted, openLaunchFiles]);
 
-  const handlePathRenamed = useCallback(
+  const handleExplorerPathRenamed = useCallback(
     (from: string, to: string) => {
-      for (const t of tabs) {
-        if (t.kind !== "editor") continue;
-        if (t.path === from) {
-          const i = to.lastIndexOf("/");
-          updateTab(t.id, { path: to, title: i === -1 ? to : to.slice(i + 1) });
-        } else if (t.path.startsWith(`${from}/`)) {
-          const suffix = t.path.slice(from.length);
-          const newPath = `${to}${suffix}`;
-          const i = newPath.lastIndexOf("/");
-          updateTab(t.id, {
-            path: newPath,
-            title: i === -1 ? newPath : newPath.slice(i + 1),
-          });
-        }
+      for (const tab of tabsRef.current) {
+        if (tab.kind !== "editor" && tab.kind !== "markdown") continue;
+        const path = renamedPath(tab.path, from, to);
+        if (path === null) continue;
+        const i = path.lastIndexOf("/");
+        updateTab(tab.id, {
+          path,
+          title: i === -1 ? path : path.slice(i + 1),
+        });
       }
     },
-    [tabs, updateTab],
+    [updateTab],
+  );
+
+  const canReplaceExplorerPath = useCallback(
+    (path: string) => !hasOpenPathTab(tabsRef.current, path),
+    [],
   );
 
   const activeTerminalLeafCwd =
@@ -983,6 +1008,9 @@ export default function App() {
       "view.zenMode": () => setZenMode((v) => !v),
       "editor.undo": () => editorRefs.current.get(activeId)?.undo(),
       "editor.redo": () => editorRefs.current.get(activeId)?.redo(),
+      "editor.save": () => {
+        void editorRefs.current.get(activeId)?.save();
+      },
       "editor.aiComplete": () =>
         editorRefs.current.get(activeId)?.triggerAiComplete(),
       "editor.codeComplete": () =>
@@ -1027,6 +1055,7 @@ export default function App() {
       if (
         id === "editor.undo" ||
         id === "editor.redo" ||
+        id === "editor.save" ||
         id === "editor.aiComplete" ||
         id === "editor.codeComplete"
       ) {
@@ -1035,19 +1064,17 @@ export default function App() {
       if (id === "ai.askSelection") {
         const target =
           (e.target as HTMLElement | null) ?? document.activeElement;
-        const inTerminal = !!(target as HTMLElement | null)?.closest?.(
-          ".xterm",
-        );
+        const inTerminal = isTerminalSurfaceTarget(target);
         if (!inTerminal) return false;
         const sel = captureActiveSelection();
-        return !sel || !sel.trim();
+        return !sel?.trim();
       }
       if (id === "terminal.clear") {
         // Only intercept ⌘K while a terminal is focused; elsewhere let the key
         // fall through (we never preventDefault when disabled).
         const target =
           (e.target as HTMLElement | null) ?? document.activeElement;
-        return !(target as HTMLElement | null)?.closest?.(".xterm");
+        return !isTerminalSurfaceTarget(target);
       }
       if (
         id === "terminal.toggleInput" ||
@@ -1062,9 +1089,7 @@ export default function App() {
         // sidebar. Ctrl+Shift+B (second binding) still toggles it from anywhere.
         const target =
           (e.target as HTMLElement | null) ?? document.activeElement;
-        const inTerminal = !!(target as HTMLElement | null)?.closest?.(
-          ".xterm",
-        );
+        const inTerminal = isTerminalSurfaceTarget(target);
         // Only defer the plain (no-shift) Ctrl/⌘+B binding; the Shift variant
         // is the always-on toggle and is never claimed by the terminal.
         return inTerminal && !e.shiftKey;
@@ -1554,8 +1579,9 @@ export default function App() {
                         }
                         activeFilePath={explorerActiveFilePath}
                         onOpenFile={handleOpenFile}
-                        onPathRenamed={handlePathRenamed}
-                        onPathDeleted={handlePathDeleted}
+                        onPathRenamed={handleExplorerPathRenamed}
+                        onPathsDeleted={handlePathsDeleted}
+                        canReplacePath={canReplaceExplorerPath}
                         onRevealInTerminal={cdInNewTab}
                         onOpenInSourceControl={
                           handleOpenRepositoryInSourceControl
@@ -1652,6 +1678,7 @@ export default function App() {
             activeId={activeId}
             onActivate={onActivateAgent}
           />
+          <WindowVibrancyBridge />
           <Toaster position="bottom-right" />
 
           {hasComposer ? (
