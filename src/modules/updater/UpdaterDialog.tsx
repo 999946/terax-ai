@@ -107,7 +107,7 @@ export function UpdaterDialog() {
                   : formatBytes(status.downloaded)
                 : manual
                   ? interpolate(t("updater.manualInstallGuide"), { version: manual.currentVersion })
-                  : update?.body || t("updater.newVersionReady")}
+                  : t("updater.newVersionReady")}
           </DialogDescription>
         </DialogHeader>
 

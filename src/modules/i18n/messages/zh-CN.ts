@@ -108,6 +108,7 @@ export const zhCN: Record<string, string> = {
   "update.downloading": "下载中……",
   "update.upToDate": "已是最新版本",
   "update.checkFailed": "检查失败，点击重试",
+  "update.checkFailedDetail": "无法检查更新，请检查网络连接后重试。",
   "update.installVersion": "安装 v{version}",
   "update.restartToInstall": "重启以完成安装",
   idle: "Idle",

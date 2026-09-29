@@ -154,8 +154,8 @@ export function AboutSection() {
           </Button>
         </div>
         {status.kind === "error" && (
-          <p className="font-mono text-[10.5px] break-all text-destructive/80">
-            {status.message}
+          <p className="text-[12px] text-destructive/80">
+            {t("update.checkFailedDetail")}
           </p>
         )}
         {downloading && status.contentLength ? (

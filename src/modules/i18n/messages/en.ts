@@ -220,6 +220,7 @@ export const en: Record<string, string> = {
   "update.downloading": "Downloading…",
   "update.upToDate": "You're up to date",
   "update.checkFailed": "Check failed — retry",
+  "update.checkFailedDetail": "We couldn't check for updates. Check your connection and try again.",
   "update.installVersion": "Install v{version}",
   "update.restartToInstall": "Restart to install",
   idle: "Idle",
