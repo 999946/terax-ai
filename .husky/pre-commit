@@ -1,1 +1,6 @@
 pnpm exec lint-staged
+
+# 增量单测：只跑与改动相关的测试（--changed 相对 HEAD），且仅当暂存含代码/测试文件时触发
+if git diff --cached --name-only | grep -qE '\.(ts|tsx|mjs|cjs|js|jsx)$'; then
+  pnpm exec vitest run --changed --passWithNoTests
+fi
