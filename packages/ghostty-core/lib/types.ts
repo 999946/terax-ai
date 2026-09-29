@@ -789,38 +789,6 @@ export interface IDisposable {
 }
 
 /**
- * Event emitter for custom events
- */
-export class EventEmitter<T> {
-  private listeners: Array<(data: T) => void> = [];
-
-  /** Subscribe to events */
-  public readonly event: IEvent<T> = (listener: (data: T) => void): IDisposable => {
-    this.listeners.push(listener);
-    return {
-      dispose: () => {
-        const index = this.listeners.indexOf(listener);
-        if (index !== -1) {
-          this.listeners.splice(index, 1);
-        }
-      },
-    };
-  };
-
-  /** Emit an event to all listeners */
-  public fire(data: T): void {
-    for (const listener of this.listeners) {
-      listener(data);
-    }
-  }
-
-  /** Remove all listeners */
-  public dispose(): void {
-    this.listeners = [];
-  }
-}
-
-/**
  * Terminal mode identifiers
  *
  * ANSI modes (use with is_ansi = true):

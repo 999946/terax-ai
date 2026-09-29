@@ -18,6 +18,7 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 - **发布流程改用 tauri-action**：dmg 构建自动生成并合并 `latest.json`，配合此前生成的签名私钥，解决历史版本发布缺失 latest.json、updater 签名不完整的异常；本次 v0.9.0-beta 发布产物（aarch64/x64 两款 dmg + `.sig` + `latest.json`）齐全
 - **CI 三处失败修复**：ubuntu clippy（macOS 专属 import 加 cfg 门控）、Windows nextest（不可执行文件测试按 Unix 语义门控；nvm 节点路径按 components 比较，规避 Windows 分隔符差异）、前端 Size budget（合并带入上游新代码，预算 1.5MB→1.65MB）；全部转绿
 - **清理 i18n 死键**：移除上游合并后遗留、源码零引用的 5 条词条（`settings.general.webglRenderer*`、`settings.shortcuts.groups.Spaces`），en 与 zh-CN 语言包同步删除以保持 key 对齐
+- **清理死代码**：删 9 个从未使用过的 shadcn 组件（`card`、`empty`、`item`、`menubar`、`radio-group`、`sheet`、`skeleton`、`toggle-group`、`toggle`）及 `ghostty-core/lib/interfaces.ts`（xterm 兼容层残余，xterm 已移除）；验证后保留 `CURSOR_STRUCT_SIZE`、`COLORS_STRUCT_SIZE`、`GhosttyResult` 等 WASM 契约枚举（删除收益极小、风险高）
 - **校验全绿**：`pnpm lint`、`pnpm check-types`、`pnpm test`（174 文件 / 1230 用例）、`cargo clippy -D warnings`、`cargo test`（全量）均通过
 
 ---
