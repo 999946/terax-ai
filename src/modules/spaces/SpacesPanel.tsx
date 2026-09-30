@@ -1,7 +1,10 @@
 import { useTranslation } from "react-i18next";
 import type { Tab } from "@/modules/tabs";
 import { useSpaces } from "./lib/useSpaces";
-import { useSpacesPanel, SPACES_PANEL_WIDTH, SPACES_PANEL_COLLAPSED_WIDTH } from "./lib/useSpacesPanel";
+import {
+  useSpacesPanel,
+  SPACES_PANEL_COLLAPSED_WIDTH,
+} from "./lib/useSpacesPanel";
 import { cn } from "@/lib/utils";
 import { SpaceAvatar } from "./SpaceAvatar";
 import { SpaceSwitcherContent } from "./SpaceSwitcherContent";
@@ -16,7 +19,11 @@ type Props = {
   onJumpTab: (id: number) => void;
   onCloseTab: (id: number) => void;
   onMoveTabToSpace: (tabId: number, spaceId: string) => void;
-  onReorderTab: (tabId: number, targetTabId: number, edge: "top" | "bottom") => void;
+  onReorderTab: (
+    tabId: number,
+    targetTabId: number,
+    edge: "top" | "bottom",
+  ) => void;
 };
 
 export function SpacesPanel({
@@ -32,8 +39,16 @@ export function SpacesPanel({
   onReorderTab,
 }: Props) {
   const { t } = useTranslation();
-  const { collapsed, expand, collapse, scheduleCollapse, pinned, togglePinned } =
-    useSpacesPanel();
+  const {
+    collapsed,
+    expand,
+    collapse,
+    scheduleCollapse,
+    pinned,
+    togglePinned,
+    width,
+    setWidth,
+  } = useSpacesPanel();
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
   const activeSpace = spaces.find((s) => s.id === activeId);
@@ -51,10 +66,33 @@ export function SpacesPanel({
     else collapse();
   };
 
+  // Drag the right-edge handle to resize the expanded panel width. Kept local
+  // (matching react-resizable-panels handles elsewhere): pointerdown records
+  // the start, document-level pointermove updates the persisted width within
+  // min/max bounds, pointerup tears everything down.
+  const handleResizePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    const onMove = (ev: PointerEvent) =>
+      setWidth(startWidth + (ev.clientX - startX));
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+  };
+
   return (
     <div
       className="relative shrink-0 border-r border-border/60 bg-card"
-      style={{ width: collapsed ? SPACES_PANEL_COLLAPSED_WIDTH : SPACES_PANEL_WIDTH }}
+      style={{ width: collapsed ? SPACES_PANEL_COLLAPSED_WIDTH : width }}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
@@ -73,79 +111,98 @@ export function SpacesPanel({
           )}
         </button>
       ) : (
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
-            <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-              {t("spaces.title")}
-            </span>
-            <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                aria-label={
-                  pinned
-                    ? t("spaces.unpinPanel", "Unpin spaces")
-                    : t("spaces.pinPanel", "Pin spaces open")
-                }
-                aria-pressed={pinned}
-                onClick={togglePinned}
-                className={cn(
-                  "rounded p-1 transition-colors hover:bg-accent",
-                  pinned
-                    ? "text-primary hover:text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {pinned ? (
-                    <>
-                      <rect x="3" y="11" width="18" height="11" rx="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </>
-                  ) : (
-                    <>
-                      <rect x="3" y="11" width="18" height="11" rx="2" />
-                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                    </>
+        <>
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border/60">
+              <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                {t("spaces.title")}
+              </span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  aria-label={
+                    pinned
+                      ? t("spaces.unpinPanel", "Unpin spaces")
+                      : t("spaces.pinPanel", "Pin spaces open")
+                  }
+                  aria-pressed={pinned}
+                  onClick={togglePinned}
+                  className={cn(
+                    "rounded p-1 transition-colors hover:bg-accent",
+                    pinned
+                      ? "text-primary hover:text-primary"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
-                </svg>
-              </button>
-              <button
-                type="button"
-                aria-label={t("spaces.collapsePanel", "Collapse spaces")}
-                aria-expanded={true}
-                onClick={collapse}
-              className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M7 3L4 6L7 9" />
-              </svg>
-            </button>
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {pinned ? (
+                      <>
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </>
+                    ) : (
+                      <>
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("spaces.collapsePanel", "Collapse spaces")}
+                  aria-expanded={true}
+                  onClick={collapse}
+                  className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  >
+                    <path d="M7 3L4 6L7 9" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <SpaceSwitcherContent
+                tabs={tabs}
+                onNewSpace={onNewSpace}
+                onDeleteSpace={onDeleteSpace}
+                onRenameSpace={onRenameSpace}
+                onNewTabInSpace={onNewTabInSpace}
+                onActivateSpace={onActivateSpace}
+                onJumpTab={onJumpTab}
+                onCloseTab={onCloseTab}
+                onMoveTabToSpace={onMoveTabToSpace}
+                onReorderTab={onReorderTab}
+              />
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <SpaceSwitcherContent
-              tabs={tabs}
-              onNewSpace={onNewSpace}
-              onDeleteSpace={onDeleteSpace}
-              onRenameSpace={onRenameSpace}
-              onNewTabInSpace={onNewTabInSpace}
-              onActivateSpace={onActivateSpace}
-              onJumpTab={onJumpTab}
-              onCloseTab={onCloseTab}
-              onMoveTabToSpace={onMoveTabToSpace}
-              onReorderTab={onReorderTab}
-            />
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t("spaces.resizePanel")}
+            onPointerDown={handleResizePointerDown}
+            className="group/space-resize absolute inset-y-0 right-0 z-20 flex w-px cursor-col-resize select-none items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-3 after:-translate-x-1/2 hover:after:bg-ring/40"
+          >
+            <div className="z-10 h-6 w-1 shrink-0 rounded-lg bg-border opacity-0 transition-opacity group-hover/space-resize:opacity-100" />
           </div>
-        </div>
+        </>
       )}
     </div>
   );

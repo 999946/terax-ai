@@ -124,6 +124,7 @@ function readPlaceholderKeys(path) {
  */
 const INTERPOLATION_EXEMPT_KEYS = new Set([
   "settings.editor.customCommandDescription",
+  "settings.editor.customCommandPlaceholder",
 ]);
 
 /** 递归收集 src 下待扫描的 .ts/.tsx（跳过测试文件与语言包本身）。 */

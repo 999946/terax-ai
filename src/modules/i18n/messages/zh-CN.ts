@@ -649,6 +649,7 @@ export const zhCN: Record<string, string> = {
   "settings.themes.import": "导入 .terax-theme",
   "spaces.collapsePanel": "收起工作空间面板",
   "spaces.expandPanel": "展开工作空间面板",
+  "spaces.resizePanel": "调整工作空间面板宽度",
   "explorer.open": "打开",
   "explorer.openInTerminal": "在终端中打开",
   "explorer.openInSourceControl": "在源代码管理中打开",

@@ -668,6 +668,7 @@ export const en: Record<string, string> = {
   "settings.themes.import": "Import .terax-theme",
   "spaces.collapsePanel": "Collapse Spaces panel",
   "spaces.expandPanel": "Expand Spaces panel",
+  "spaces.resizePanel": "Resize Spaces panel",
   "explorer.open": "Open",
   "explorer.openInTerminal": "Open in Terminal",
   "explorer.openInSourceControl": "Open in Source Control",

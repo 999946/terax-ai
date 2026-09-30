@@ -2,7 +2,16 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { labelFor, type Tab, TabIcon } from "@/modules/tabs";
-import { Add01Icon, ArrowDown01Icon, ArrowRight01Icon, Cancel01Icon, Delete02Icon, GitBranchIcon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Delete02Icon,
+  GitBranchIcon,
+  PencilEdit02Icon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AlertDialog,
@@ -100,8 +109,19 @@ function repoErrorMessage(e: unknown): string {
   return "Could not resolve repository.";
 }
 
+// Resolve git repo(s) for a space's root once per session and cache the result
+// keyed by root. Collapsing the spaces panel unmounts SpaceSwitcherContent (and
+// every SpaceRow with it), so without this cache re-expanding would refetch
+// every space's repos from scratch and flash a loading row. The cached state is
+// kept verbatim across remounts so collapse/expand is seamless.
+const repoStateCache = new Map<string, SpaceRepoState>();
+
 function useSpaceRepos(root: string | null): SpaceRepoState {
-  const [state, setState] = useState<SpaceRepoState>({ kind: "loading" });
+  const [state, setState] = useState<SpaceRepoState>(() => {
+    if (!root) return { kind: "ok", repos: [] };
+    return repoStateCache.get(root) ?? { kind: "loading" };
+  });
+
   useEffect(() => {
     let alive = true;
     if (!root) {
@@ -109,6 +129,10 @@ function useSpaceRepos(root: string | null): SpaceRepoState {
       setState({ kind: "ok", repos: [] });
       return;
     }
+    // A resolved result from a previous mount is kept as-is — no refetch, no
+    // loading flash. Each root resolves only once per session.
+    if (repoStateCache.has(root)) return;
+
     setState({ kind: "loading" });
     native
       .gitResolveRepo(root)
@@ -117,10 +141,17 @@ function useSpaceRepos(root: string | null): SpaceRepoState {
         // Root is inside a repo → show it; otherwise discover the repos under
         // the root (gitListRepos finds the next-level sub-directory repos too).
         const repos = repo ? [repo] : await native.gitListRepos(root);
-        if (alive) setState({ kind: "ok", repos });
+        const next: SpaceRepoState = { kind: "ok", repos };
+        repoStateCache.set(root, next);
+        if (alive) setState(next);
       })
       .catch((e) => {
-        if (alive) setState({ kind: "error", message: repoErrorMessage(e) });
+        const next: SpaceRepoState = {
+          kind: "error",
+          message: repoErrorMessage(e),
+        };
+        repoStateCache.set(root, next);
+        if (alive) setState(next);
       });
     return () => {
       alive = false;
@@ -151,7 +182,9 @@ export function SpaceSwitcherContent({
   const spaceInfo = usePluginStore((s) => s.spaceInfo);
   const spacesWithInfo = useMemo(
     () =>
-      spaces.map((s) => (spaceInfo[s.id] ? { ...s, info: spaceInfo[s.id] } : s)),
+      spaces.map((s) =>
+        spaceInfo[s.id] ? { ...s, info: spaceInfo[s.id] } : s,
+      ),
     [spaces, spaceInfo],
   );
   const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
@@ -250,7 +283,8 @@ export function SpaceSwitcherContent({
       return;
     }
     const rect = hit.getBoundingClientRect();
-    const edge: Edge = e.clientY < rect.top + rect.height / 2 ? "top" : "bottom";
+    const edge: Edge =
+      e.clientY < rect.top + rect.height / 2 ? "top" : "bottom";
     const kind = hit.getAttribute("data-drop");
     let next: DropTarget | null = null;
     if (kind === "tab") {
@@ -453,93 +487,96 @@ function SpaceRow({
                   : "hover:bg-accent/50",
             )}
           >
-        {showTabs && (
-          <button
-            type="button"
-            data-no-drag
-            aria-label={expanded ? "Collapse" : "Expand"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-            className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground"
-          >
-            <HugeiconsIcon
-              icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
-              size={13}
-              strokeWidth={2}
-            />
-          </button>
-        )}
-        <SpaceAvatar space={space} size="sm" active={isActive} />
-        {editing ? (
-          <InlineRename
-            initial={space.name}
-            onCommit={onCommitRename}
-            onCancel={onCancelRename}
-            className="ml-0.5"
-          />
-        ) : (
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="min-w-0 truncate text-xs font-medium text-foreground">
-              {space.name}
-            </span>
-            {info?.summary ? (
-              <span className="min-w-0 whitespace-pre-wrap break-words text-[10px] leading-tight text-foreground/80">
-                {info.summary}
-              </span>
-            ) : null}
-            {info ? (
-              <span className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-emerald-500">
-                {info.status}
-                {info.onlineAt ? (
-                  <span className="text-muted-foreground"> {info.onlineAt}</span>
+            {showTabs && (
+              <button
+                type="button"
+                data-no-drag
+                aria-label={expanded ? "Collapse" : "Expand"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle();
+                }}
+                className="flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground"
+              >
+                <HugeiconsIcon
+                  icon={expanded ? ArrowDown01Icon : ArrowRight01Icon}
+                  size={13}
+                  strokeWidth={2}
+                />
+              </button>
+            )}
+            <SpaceAvatar space={space} size="sm" active={isActive} />
+            {editing ? (
+              <InlineRename
+                initial={space.name}
+                onCommit={onCommitRename}
+                onCancel={onCancelRename}
+                className="ml-0.5"
+              />
+            ) : (
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="min-w-0 truncate text-xs font-medium text-foreground">
+                  {space.name}
+                </span>
+                {info?.summary ? (
+                  <span className="min-w-0 whitespace-pre-wrap break-words text-[10px] leading-tight text-foreground/80">
+                    {info.summary}
+                  </span>
+                ) : null}
+                {info ? (
+                  <span className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-emerald-500">
+                    {info.status}
+                    {info.onlineAt ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        {info.onlineAt}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+                {repoState.kind === "error" ? (
+                  <span
+                    className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-destructive"
+                    title={repoState.message}
+                  >
+                    {repoState.message}
+                  </span>
+                ) : repoState.kind === "ok" && repoState.repos.length > 0 ? (
+                  repoState.repos.map((repo) => (
+                    <span
+                      key={repo.repoRoot}
+                      className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground"
+                    >
+                      <HugeiconsIcon
+                        icon={GitBranchIcon}
+                        size={9}
+                        strokeWidth={2}
+                        className="shrink-0"
+                      />
+                      <span className="min-w-0 truncate font-medium text-foreground/75">
+                        {basename(repo.repoRoot)}
+                      </span>
+                      <span className="shrink-0">{repo.branch ?? "—"}</span>
+                      <MergeStatusIcons
+                        repoRoot={repo.repoRoot}
+                        branch={repo.branch ?? null}
+                        className="ml-0.5"
+                      />
+                    </span>
+                  ))
+                ) : repoState.kind === "ok" ? (
+                  <span className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/60">
+                    {t("spaces.noRepository")}
+                  </span>
                 ) : null}
               </span>
-            ) : null}
-            {repoState.kind === "error" ? (
-              <span
-                className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-destructive"
-                title={repoState.message}
-              >
-                {repoState.message}
+            )}
+            {!editing && (
+              <span className="shrink-0 px-1 text-[10px] tabular-nums text-muted-foreground/50">
+                {tabs.length}
               </span>
-            ) : repoState.kind === "ok" && repoState.repos.length > 0 ? (
-              repoState.repos.map((repo) => (
-                <span
-                  key={repo.repoRoot}
-                  className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground"
-                >
-                  <HugeiconsIcon
-                    icon={GitBranchIcon}
-                    size={9}
-                    strokeWidth={2}
-                    className="shrink-0"
-                  />
-                  <span className="min-w-0 truncate font-medium text-foreground/75">
-                    {basename(repo.repoRoot)}
-                  </span>
-                  <span className="shrink-0">{repo.branch ?? "—"}</span>
-                  <MergeStatusIcons
-                    repoRoot={repo.repoRoot}
-                    branch={repo.branch ?? null}
-                    className="ml-0.5"
-                  />
-                </span>
-              ))
-            ) : repoState.kind === "ok" ? (
-              <span className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/60">
-                {t("spaces.noRepository")}
-              </span>
-            ) : null}
-          </span>
-        )}
-        {!editing && (
-          <span className="shrink-0 px-1 text-[10px] tabular-nums text-muted-foreground/50">
-            {tabs.length}
-          </span>
-        )}
-        </div>
+            )}
+          </div>
         </ContextMenuTrigger>
         <ContextMenuContent
           className="min-w-40 p-1"
@@ -549,7 +586,11 @@ function SpaceRow({
             className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
             onSelect={() => onStartRename()}
           >
-            <HugeiconsIcon icon={PencilEdit02Icon} size={13} strokeWidth={1.75} />
+            <HugeiconsIcon
+              icon={PencilEdit02Icon}
+              size={13}
+              strokeWidth={1.75}
+            />
             <span className="flex-1">{t("spaces.rename")}</span>
           </ContextMenuItem>
           <ContextMenuItem
