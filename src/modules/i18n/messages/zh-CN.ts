@@ -335,6 +335,8 @@ export const zhCN: Record<string, string> = {
   "gitHistory.copySha": "复制 SHA",
   "gitHistory.loadingFiles": "正在加载文件…",
   "gitHistory.noFileChanges": "没有文件更改。",
+  "gitHistory.selectFileToPreview": "选择一个文件查看改动",
+  "gitHistory.openInEditor": "在编辑器中打开",
   "gitHistory.files": "文件",
   "gitHistory.binary": "二进制",
   "gitHistory.colSha": "SHA",
@@ -633,7 +635,7 @@ export const zhCN: Record<string, string> = {
     "在工作空间面板和切换器中显示每个工作空间下的标签页列表。",
   "settings.general.showSpaceInitials": "显示工作空间首字母图标",
   "settings.general.showSpaceInitialsDescription":
-    "用工作空间名称首字母作为其图标。关闭时改用纯色圆点。",
+    "用工作空间名称首字母作为其图标。关闭时完全隐藏该图标。",
   "settings.general.chooseSpacesRoot": "选择文件夹",
   "settings.general.clearSpacesRoot": "清除文件夹",
   "settings.general.spacesRootNotSet": "请先选择根目录，再创建工作空间。",

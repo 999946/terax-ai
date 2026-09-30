@@ -6,6 +6,7 @@ import {
   SPACES_PANEL_COLLAPSED_WIDTH,
 } from "./lib/useSpacesPanel";
 import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { PanelResizeHandle } from "@/components/ui/panel-resize-handle";
 import { SpaceAvatar } from "./SpaceAvatar";
 import { SpaceSwitcherContent } from "./SpaceSwitcherContent";
@@ -53,6 +54,9 @@ export function SpacesPanel({
   const spaces = useSpaces((s) => s.spaces);
   const activeId = useSpaces((s) => s.activeId);
   const activeSpace = spaces.find((s) => s.id === activeId);
+  // The collapsed trigger shows the active space's icon; when space initials
+  // are disabled (SpaceAvatar renders nothing) fall back to a generic "S".
+  const showSpaceInitials = usePreferencesStore((s) => s.showSpaceInitials);
 
   const handlePointerEnter = () => {
     expand();
@@ -82,7 +86,7 @@ export function SpacesPanel({
           onClick={handleTriggerClick}
           className="flex w-full items-center justify-center py-3 text-muted-foreground hover:text-foreground transition-colors"
         >
-          {activeSpace ? (
+          {activeSpace && showSpaceInitials ? (
             <SpaceAvatar space={activeSpace} size="sm" />
           ) : (
             <span className="text-[10px] font-medium">S</span>

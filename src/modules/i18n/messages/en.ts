@@ -166,6 +166,8 @@ export const en: Record<string, string> = {
   "gitHistory.copySha": "Copy SHA",
   "gitHistory.loadingFiles": "Loading files…",
   "gitHistory.noFileChanges": "No file changes.",
+  "gitHistory.selectFileToPreview": "Select a file to preview its diff",
+  "gitHistory.openInEditor": "Open in editor",
   "gitHistory.files": "Files",
   "gitHistory.binary": "binary",
   "gitHistory.colSha": "SHA",
@@ -651,7 +653,7 @@ export const en: Record<string, string> = {
     "Display the tab list under each Space in the Spaces panel and switcher.",
   "settings.general.showSpaceInitials": "Show space initials",
   "settings.general.showSpaceInitialsDescription":
-    "Display each Space's first letter as its icon. When off, a plain accent dot is shown instead.",
+    "Display each Space's first letter as its icon. When off, the icon is hidden entirely.",
   "settings.general.chooseSpacesRoot": "Choose folder",
   "settings.general.clearSpacesRoot": "Clear folder",
   "settings.general.spacesRootNotSet":

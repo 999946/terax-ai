@@ -19,9 +19,9 @@ type Props = {
 
 export function SpaceAvatar({ space, size = "sm", active, className }: Props) {
   const accent = accentFor(space);
-  // When the space-initials feature is off (default), show a plain accent dot
-  // instead of the name's first letter.
+  // When the space-initials feature is off (default), show nothing at all.
   const showInitial = usePreferencesStore((s) => s.showSpaceInitials);
+  if (!showInitial) return null;
   return (
     <span
       aria-hidden
@@ -38,23 +38,10 @@ export function SpaceAvatar({ space, size = "sm", active, className }: Props) {
               backgroundColor: `color-mix(in oklch, ${accent} 16%, transparent)`,
               boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${accent} 35%, transparent)`,
             }
-          : {
-              backgroundColor: `color-mix(in oklch, ${accent} 14%, transparent)`,
-            }
+          : undefined
       }
     >
-      {showInitial ? (
-        spaceInitial(space.name)
-      ) : (
-        <span
-          className="rounded-full"
-          style={{
-            width: "40%",
-            height: "40%",
-            backgroundColor: `color-mix(in oklch, ${accent} 60%, transparent)`,
-          }}
-        />
-      )}
+      {spaceInitial(space.name)}
     </span>
   );
 }
