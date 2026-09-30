@@ -458,16 +458,25 @@ pub fn commit(
     }
 
     let mut args: Vec<OsString> = vec!["commit".into()];
+    let mut have_message = false;
     if amend {
         args.push("--amend".into());
     }
     if !trimmed_subject.is_empty() {
         args.push("-m".into());
         args.push(trimmed_subject.into());
+        have_message = true;
     }
     if let Some(body) = trimmed_body {
         args.push("-m".into());
         args.push(body.into());
+        have_message = true;
+    }
+    // Amending with an empty message reuses the previous subject. Without a
+    // `-m` git wants to open $EDITOR to compose one, which fails in headless
+    // environments (CI) where EDITOR is unset — say so explicitly.
+    if amend && !have_message {
+        args.push("--no-edit".into());
     }
 
     let output = run_git(
