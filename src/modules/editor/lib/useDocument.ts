@@ -172,18 +172,24 @@ export function useDocument({ path, onDirtyChange }: Options) {
   }, [readFromDisk, adoptRead]);
 
   // Skipped while dirty: never clobber unsaved edits. Re-checked when the
-  // read resolves, since typing can start while it is in flight.
-  const reload = useCallback((): boolean => {
-    if (dirtyRef.current) return false;
-    void readFromDisk(forceRef.current)
-      .then((res) => {
-        if (!dirtyRef.current) adoptRead(res, true);
-      })
-      // Transient failures (e.g. ENOENT mid atomic-rename) must not replace
-      // a healthy buffer with an error screen.
-      .catch((e) => console.warn("[editor] reload failed", path, e));
-    return true;
-  }, [readFromDisk, adoptRead, path]);
+  // read resolves, since typing can start while it is in flight. Passing
+  // `force` bypasses the dirty guard and discards unsaved edits - used for an
+  // explicit git restore/revert where dropping those edits is the intent, never
+  // for incidental disk changes.
+  const reload = useCallback(
+    (force = false): boolean => {
+      if (!force && dirtyRef.current) return false;
+      void readFromDisk(forceRef.current)
+        .then((res) => {
+          if (force || !dirtyRef.current) adoptRead(res, true);
+        })
+        // Transient failures (e.g. ENOENT mid atomic-rename) must not replace
+        // a healthy buffer with an error screen.
+        .catch((e) => console.warn("[editor] reload failed", path, e));
+      return true;
+    },
+    [readFromDisk, adoptRead, path],
+  );
 
   const save = useCallback(async (): Promise<boolean> => {
     clearAutoSaveTimer();

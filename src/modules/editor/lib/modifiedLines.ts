@@ -154,9 +154,16 @@ const modifiedGutter = gutter({
 });
 
 const modifiedTheme = EditorView.theme({
-  // Left of the line numbers: a narrow, zero-padding slot.
+  // A fixed-width slot left of the line numbers. The marker bar is absolutely
+  // positioned, so without an explicit gutter width the slot would collapse to
+  // 0 and hide the indicators. Keep both the gutter and its elements at the
+  // bar's width so the coloured marks have room to render.
+  ".cm-ml-gutter": {
+    width: "3px",
+  },
   ".cm-ml-gutter .cm-gutterElement": {
     position: "relative",
+    width: "3px",
     padding: "0",
   },
   ".cm-ml-bar": {

@@ -83,8 +83,9 @@ export type EditorPaneHandle = {
   focus: () => void;
   getSelection: () => string | null;
   getPath: () => string;
-  /** Re-read the file from disk. Skips silently if the buffer is dirty. */
-  reload: () => boolean;
+  /** Re-read the file from disk. Skips silently if the buffer is dirty; pass
+   * `true` to discard unsaved edits (e.g. after a git restore/revert). */
+  reload: (force?: boolean) => boolean;
   /** Move the cursor to a 1-based line and center it, once content is ready. */
   gotoLine: (line: number, options?: { focus?: boolean }) => void;
   /** Apply CodeMirror's undo/redo commands. */
@@ -672,7 +673,7 @@ export const EditorPane = memo(
           return view.state.sliceDoc(from, to);
         },
         getPath: () => path,
-        reload: () => reloadRef.current(),
+        reload: (force?: boolean) => reloadRef.current(force),
         gotoLine: (line: number, options) => {
           pendingLineRef.current = {
             path,

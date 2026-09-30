@@ -132,6 +132,9 @@ type Props = {
   onRefresh?: () => void;
   /** Total changed files across all repositories (for the global badge). */
   allChangedCount?: number;
+  /** Invoked with the discarded paths after a discard succeeds on disk, so
+   * open editor tabs can reload the restored file content. */
+  onDiscarded?: (paths: string[]) => void;
 };
 
 /** Lightweight per-repo row for the repository strip. */
@@ -217,9 +220,15 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   focusedRoot,
   onFocusRepo,
   onRefresh: refreshRepositories,
+  onDiscarded,
 }: Props) {
   const { t } = useTranslation();
-  const scm = useSourceControlPanel(open, sourceControl, onOpenDiff);
+  const scm = useSourceControlPanel(
+    open,
+    sourceControl,
+    onOpenDiff,
+    onDiscarded,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);

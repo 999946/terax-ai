@@ -416,6 +416,9 @@ export function useSourceControlPanel(
         title?: string;
       }) => void)
     | null,
+  /** Called with the discarded paths after a discard succeeds on disk, so open
+   * editor tabs can reload the restored file content. */
+  onDiscarded?: (paths: string[]) => void,
 ): SourceControlPanelState {
   const { t } = useTranslation();
   const selectedModelId = useChatStore((state) => state.selectedModelId);
@@ -706,6 +709,7 @@ export function useSourceControlPanel(
       optimistic: ((status: GitStatusSnapshot) => GitStatusSnapshot) | null,
       ipc: () => Promise<void>,
       affected: string[],
+      onSuccess?: () => void,
     ) => {
       if (!repo || summary.busyAction) return;
       setLocalActionBusy(busyKey);
@@ -718,6 +722,7 @@ export function useSourceControlPanel(
       }
       try {
         await ipc();
+        onSuccess?.();
         scheduleReconcile();
       } catch (error) {
         setActionError(normalizeError(error, t("sourceControl.unknownError")));
@@ -798,8 +803,9 @@ export function useSourceControlPanel(
       (s) => optimisticDiscard(s, paths),
       () => native.gitDiscard(repo.repoRoot, entries),
       [...paths],
+      () => onDiscarded?.([...paths]),
     );
-  }, [pendingDiscard, repo, runMutation]);
+  }, [onDiscarded, pendingDiscard, repo, runMutation]);
 
   const stageAllEntries = useCallback(async () => {
     if (!repo || unstagedEntries.length === 0) return;

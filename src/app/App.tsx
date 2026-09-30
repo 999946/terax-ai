@@ -864,14 +864,14 @@ export default function App() {
     allChangedCount,
     refresh: refreshSourceControl,
   } = useSourceControlContext({
-      tabs,
-      explorerRoot,
-      spacesHydrated,
-      sidebarView,
-      repositoryTarget: sourceControlRepositoryTarget,
-      cycleSidebarView,
-      openCommitHistoryTab,
-    });
+    tabs,
+    explorerRoot,
+    spacesHydrated,
+    sidebarView,
+    repositoryTarget: sourceControlRepositoryTarget,
+    cycleSidebarView,
+    openCommitHistoryTab,
+  });
   const explorerGitDecorations = usePreferencesStore(
     (s) => s.explorerGitDecorations,
   );
@@ -963,7 +963,8 @@ export default function App() {
         ),
       "space.next": () => cycleSpace(1),
       "space.prev": () => cycleSpace(-1),
-      "space.overview": () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
+      "space.overview": () =>
+        useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
       "pane.splitRight": () => splitActivePaneInActiveTab("row"),
       "pane.splitDown": () => splitActivePaneInActiveTab("col"),
       "pane.focusNext": () => focusNextPaneInTab(activeId, 1),
@@ -1134,6 +1135,19 @@ export default function App() {
     [],
   );
 
+  // A git discard restores files on disk; force open editor tabs for those
+  // paths to reload. Discarding is the explicit intent to lose unsaved edits,
+  // so this bypasses the dirty guard (an incidental disk change never does).
+  const forceReloadEditors = useCallback((paths: string[]) => {
+    const set = new Set(paths.map((p) => p.replace(/\\/g, "/")));
+    for (const t of tabsRef.current) {
+      if (t.kind !== "editor") continue;
+      if (set.has(t.path.replace(/\\/g, "/"))) {
+        editorRefs.current.get(t.id)?.reload(true);
+      }
+    }
+  }, []);
+
   const handlePreviewUrl = useCallback(
     (id: number, url: string) => updateTab(id, { url }),
     [updateTab],
@@ -1242,7 +1256,9 @@ export default function App() {
     if (!spacesRoot || !name) return;
     setNewSpaceDialogOpen(false);
     try {
-      const { createSpaceFolder } = await import("@/modules/spaces/lib/filesystem");
+      const { createSpaceFolder } = await import(
+        "@/modules/spaces/lib/filesystem"
+      );
       const root = await createSpaceFolder(spacesRoot, name);
       const { create, setActive } = useSpaces.getState();
       const meta = create({ name, root, env: workspaceEnv });
@@ -1338,12 +1354,23 @@ export default function App() {
       onRenameSpace={(id, name) => {
         const space = useSpaces.getState().spaces.find((s) => s.id === id);
         if (!space?.root) return;
-        void import("@/modules/spaces/lib/filesystem").then(({ renameSpaceFolder }) => {
-          const oldName = space.root!.split(/[\\\\/]/).filter(Boolean).slice(-1)[0] ?? space.name;
-          return renameSpaceFolder(usePreferencesStore.getState().spacesRoot ?? "", oldName, name);
-        }).then((root) => {
-          useSpaces.getState().rename(id, name.trim(), root);
-        }).catch((error) => console.error("rename space failed", error));
+        void import("@/modules/spaces/lib/filesystem")
+          .then(({ renameSpaceFolder }) => {
+            const oldName =
+              space
+                .root!.split(/[\\\\/]/)
+                .filter(Boolean)
+                .slice(-1)[0] ?? space.name;
+            return renameSpaceFolder(
+              usePreferencesStore.getState().spacesRoot ?? "",
+              oldName,
+              name,
+            );
+          })
+          .then((root) => {
+            useSpaces.getState().rename(id, name.trim(), root);
+          })
+          .catch((error) => console.error("rename space failed", error));
       }}
       onNewTabInSpace={handleNewTabInSpace}
       onActivateSpace={activateSpace}
@@ -1378,8 +1405,8 @@ export default function App() {
             toggleSidebar,
             toggleHiddenFiles: () => {
               const preferences = usePreferencesStore.getState();
-              void import("@/modules/settings/store").then(({ setShowHidden }) =>
-                setShowHidden(!preferences.showHidden),
+              void import("@/modules/settings/store").then(
+                ({ setShowHidden }) => setShowHidden(!preferences.showHidden),
               );
             },
             toggleAi: togglePanelAndFocus,
@@ -1389,7 +1416,8 @@ export default function App() {
               useFloatingSettings.getState().openSettings("shortcuts"),
             spaces: useSpaces.getState().spaces,
             activeSpaceId,
-            openSpacesOverview: () => useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
+            openSpacesOverview: () =>
+              useSpaces.getState().setActive(activeSpaceId ?? DEFAULT_SPACE_ID),
             newSpace: () => void handleNewSpace(),
             switchSpace: (id) => useSpaces.getState().setActive(id),
           })
@@ -1526,7 +1554,9 @@ export default function App() {
               onOpenCommandPalette={() => openCommandPalette("commands")}
               onActivateAgent={onActivateAgent}
               onActivateLocalAgent={onActivateLocalAgent}
-              onOpenSettings={() => useFloatingSettings.getState().openSettings()}
+              onOpenSettings={() =>
+                useFloatingSettings.getState().openSettings()
+              }
               searchTarget={searchTarget}
               searchRef={searchInlineRef}
               onOverrideLanguage={setOverrideLanguage}
@@ -1606,6 +1636,7 @@ export default function App() {
                         onFocusRepo={focusRepo}
                         onRefresh={refreshSourceControl}
                         allChangedCount={allChangedCount}
+                        onDiscarded={forceReloadEditors}
                       />
                     )}
                   </div>
@@ -1649,7 +1680,9 @@ export default function App() {
                     hasComposer={hasComposer}
                     panelOpen={panelOpen}
                     keysLoaded={keysLoaded}
-                    onConnect={() => useFloatingSettings.getState().openSettings("models")}
+                    onConnect={() =>
+                      useFloatingSettings.getState().openSettings("models")
+                    }
                   />
                 </div>
               </ResizablePanel>
@@ -1724,7 +1757,10 @@ export default function App() {
             onCreated={(path) => openFileTab(path)}
           />
 
-          <AlertDialog open={newSpaceDialogOpen} onOpenChange={setNewSpaceDialogOpen}>
+          <AlertDialog
+            open={newSpaceDialogOpen}
+            onOpenChange={setNewSpaceDialogOpen}
+          >
             <AlertDialogContent className="max-w-sm">
               <AlertDialogHeader>
                 <AlertDialogTitle>{t("spaces.new")}</AlertDialogTitle>
