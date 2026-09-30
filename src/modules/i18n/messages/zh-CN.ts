@@ -631,6 +631,9 @@ export const zhCN: Record<string, string> = {
   "settings.general.showSpaceTabs": "显示工作空间中的标签页",
   "settings.general.showSpaceTabsDescription":
     "在工作空间面板和切换器中显示每个工作空间下的标签页列表。",
+  "settings.general.showSpaceInitials": "显示工作空间首字母图标",
+  "settings.general.showSpaceInitialsDescription":
+    "用工作空间名称首字母作为其图标。关闭时改用纯色圆点。",
   "settings.general.chooseSpacesRoot": "选择文件夹",
   "settings.general.clearSpacesRoot": "清除文件夹",
   "settings.general.spacesRootNotSet": "请先选择根目录，再创建工作空间。",
@@ -1007,6 +1010,7 @@ export const zhCN: Record<string, string> = {
   "sourceControl.pushing": "正在推送…",
   "sourceControl.push": "推送",
   "sourceControl.commitAndPush": "提交并推送",
+  "sourceControl.commitAndPushHint": "提交暂存改动并推送到远程。",
   "sourceControl.amend": "修订上次提交",
   "sourceControl.amendAria": "修订上次提交",
   "sourceControl.amendCommit": "修订提交",

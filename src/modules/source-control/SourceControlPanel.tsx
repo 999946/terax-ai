@@ -261,12 +261,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     ? t("sourceControl.commitShortcutHint", { shortcut: commitShortcut })
     : (commitDisabledReason ??
       t("sourceControl.commitShortcutHint", { shortcut: commitShortcut }));
-  const pushHint = scm.pushHint ?? t("sourceControl.pushUnavailable");
-  const pushDisabledReason = fixedTargetPending
-    ? t("sourceControl.waitRepoLoad")
-    : scm.actionBusy
-      ? t("sourceControl.waitActionFinish")
-      : pushHint;
   const stagedCount = scm.stagedEntries.length;
   const changedCount = scm.fileEntries.length;
   const pushStatusLabel = upstreamBadgeLabel(
@@ -762,80 +756,45 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               </label>
 
               <div className="grid w-full grid-cols-2 gap-1.5">
-                <div className="flex min-w-0 items-center gap-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="xs"
-                        className="h-7 flex-1 cursor-pointer text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
-                        disabled={!canCommit}
-                        onClick={() =>
-                          void scm.commit({ amend: scm.amendEnabled })
-                        }
-                      >
-                        {scm.actionBusy === "commit"
-                          ? t("sourceControl.committing")
-                          : scm.amendEnabled
-                            ? t("sourceControl.amendCommit")
-                            : t("sourceControl.commit")}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="bottom"
-                      className={cn(
-                        SOURCE_CONTROL_TOOLTIP_CLASS,
-                        "text-[10.5px]",
-                      )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="xs"
+                      className="h-7 w-full cursor-pointer text-[11.5px] font-semibold tracking-tight shadow-sm disabled:cursor-not-allowed disabled:shadow-none"
+                      disabled={!canCommit}
+                      onClick={() =>
+                        void scm.commit({ amend: scm.amendEnabled })
+                      }
                     >
-                      {commitHint}
-                    </TooltipContent>
-                  </Tooltip>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label={t("sourceControl.moreCommitActions")}
-                        disabled={!canCommit}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <HugeiconsIcon
-                          icon={MoreHorizontalIcon}
-                          size={13}
-                          strokeWidth={1.8}
-                        />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      className={COMPACT_CONTENT}
-                      align="start"
-                    >
-                      <DropdownMenuItem
-                        className={COMPACT_ITEM}
-                        disabled={!canCommit}
-                        onSelect={() => void scm.commit({ push: true })}
-                      >
-                        <span className="flex-1">
-                          {t("sourceControl.commitAndPush")}
-                        </span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                      {scm.actionBusy === "commit"
+                        ? t("sourceControl.committing")
+                        : scm.amendEnabled
+                          ? t("sourceControl.amendCommit")
+                          : t("sourceControl.commit")}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    className={cn(
+                      SOURCE_CONTROL_TOOLTIP_CLASS,
+                      "text-[10.5px]",
+                    )}
+                  >
+                    {commitHint}
+                  </TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       size="xs"
                       variant="secondary"
-                      className="h-7 cursor-pointer text-[11.5px] font-medium disabled:cursor-not-allowed"
-                      disabled={
-                        !scm.canPush || fixedTargetPending || !!scm.actionBusy
+                      className="h-7 w-full cursor-pointer text-[11.5px] font-medium disabled:cursor-not-allowed"
+                      disabled={!canCommit}
+                      onClick={() =>
+                        void scm.commit({ push: true, amend: scm.amendEnabled })
                       }
-                      onClick={() => void scm.push()}
                     >
-                      {scm.actionBusy === "push"
-                        ? t("sourceControl.pushing")
-                        : t("sourceControl.push")}
+                      {t("sourceControl.commitAndPush")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent
@@ -845,7 +804,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                       "max-w-64 text-[10.5px]",
                     )}
                   >
-                    {pushDisabledReason}
+                    {t("sourceControl.commitAndPushHint")}
                   </TooltipContent>
                 </Tooltip>
               </div>

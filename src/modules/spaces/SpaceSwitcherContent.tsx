@@ -542,28 +542,32 @@ function SpaceRow({
                     {repoState.message}
                   </span>
                 ) : repoState.kind === "ok" && repoState.repos.length > 0 ? (
-                  repoState.repos.map((repo) => (
-                    <span
-                      key={repo.repoRoot}
-                      className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-tight text-muted-foreground"
-                    >
-                      <HugeiconsIcon
-                        icon={GitBranchIcon}
-                        size={9}
-                        strokeWidth={2}
-                        className="shrink-0"
-                      />
-                      <span className="min-w-0 truncate font-medium text-foreground/75">
-                        {basename(repo.repoRoot)}
+                  <span className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[10px] leading-tight text-muted-foreground">
+                    {repoState.repos.map((repo) => (
+                      <span
+                        key={repo.repoRoot}
+                        className="flex min-w-0 flex-col"
+                      >
+                        <span className="flex min-w-0 items-center gap-1">
+                          <HugeiconsIcon
+                            icon={GitBranchIcon}
+                            size={9}
+                            strokeWidth={2}
+                            className="shrink-0"
+                          />
+                          <span className="min-w-0 truncate font-medium text-foreground/75">
+                            {basename(repo.repoRoot)}
+                          </span>
+                          <span className="shrink-0">{repo.branch ?? "—"}</span>
+                        </span>
+                        <MergeStatusIcons
+                          repoRoot={repo.repoRoot}
+                          branch={repo.branch ?? null}
+                          className="pl-[13px]"
+                        />
                       </span>
-                      <span className="shrink-0">{repo.branch ?? "—"}</span>
-                      <MergeStatusIcons
-                        repoRoot={repo.repoRoot}
-                        branch={repo.branch ?? null}
-                        className="ml-0.5"
-                      />
-                    </span>
-                  ))
+                    ))}
+                  </span>
                 ) : repoState.kind === "ok" ? (
                   <span className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/60">
                     {t("spaces.noRepository")}

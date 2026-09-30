@@ -180,6 +180,7 @@ export type Preferences = {
   defaultWorkspaceEnv: string;
   spacesRoot: string | null;
   showSpaceTabs: boolean;
+  showSpaceInitials: boolean;
   shortcuts: Record<ShortcutId, KeyBinding[]>;
   editorAutoSave: boolean;
   editorAutoSaveDelay: number;
@@ -281,6 +282,7 @@ const KEY_AGENT_LAUNCH_COMMANDS = "agentLaunchCommands";
 const KEY_DEFAULT_WORKSPACE_ENV = "defaultWorkspaceEnv";
 const KEY_SPACES_ROOT = "spacesRoot";
 const KEY_SHOW_SPACE_TABS = "showSpaceTabs";
+const KEY_SHOW_SPACE_INITIALS = "showSpaceInitials";
 const KEY_SHORTCUTS = "shortcuts";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
@@ -378,6 +380,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   defaultWorkspaceEnv: "local",
   spacesRoot: null,
   showSpaceTabs: false,
+  showSpaceInitials: false,
   shortcuts: {} as Record<ShortcutId, KeyBinding[]>,
   editorAutoSave: false,
   editorAutoSaveDelay: 1000,
@@ -523,7 +526,8 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_EXPLORER_GIT_DECORATIONS) ??
       DEFAULT_PREFERENCES.explorerGitDecorations,
     gitTargetBranches:
-      get<string[]>(KEY_GIT_TARGET_BRANCHES) ?? DEFAULT_PREFERENCES.gitTargetBranches,
+      get<string[]>(KEY_GIT_TARGET_BRANCHES) ??
+      DEFAULT_PREFERENCES.gitTargetBranches,
     terminalRenderer:
       get<string>(KEY_TERMINAL_RENDERER) === "webgl" ? "webgl" : "auto",
     terminalScreenReader: get<boolean>(KEY_TERMINAL_SCREEN_READER) === true,
@@ -577,6 +581,9 @@ export async function loadPreferences(): Promise<Preferences> {
     })(),
     showSpaceTabs:
       get<boolean>(KEY_SHOW_SPACE_TABS) ?? DEFAULT_PREFERENCES.showSpaceTabs,
+    showSpaceInitials:
+      get<boolean>(KEY_SHOW_SPACE_INITIALS) ??
+      DEFAULT_PREFERENCES.showSpaceInitials,
     shortcuts:
       get<Record<ShortcutId, KeyBinding[]>>(KEY_SHORTCUTS) ??
       DEFAULT_PREFERENCES.shortcuts,
@@ -994,6 +1001,10 @@ export async function setShowSpaceTabs(value: boolean): Promise<void> {
   await writePref(KEY_SHOW_SPACE_TABS, value);
 }
 
+export async function setShowSpaceInitials(value: boolean): Promise<void> {
+  await writePref(KEY_SHOW_SPACE_INITIALS, value);
+}
+
 export async function setShortcuts(
   value: Record<ShortcutId, KeyBinding[]> | {},
 ): Promise<void> {
@@ -1070,6 +1081,7 @@ export async function onPreferencesChange(
     [KEY_DEFAULT_WORKSPACE_ENV]: "defaultWorkspaceEnv",
     [KEY_SPACES_ROOT]: "spacesRoot",
     [KEY_SHOW_SPACE_TABS]: "showSpaceTabs",
+    [KEY_SHOW_SPACE_INITIALS]: "showSpaceInitials",
     [KEY_SHORTCUTS]: "shortcuts",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
     [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",

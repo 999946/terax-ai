@@ -649,6 +649,9 @@ export const en: Record<string, string> = {
   "settings.general.showSpaceTabs": "Show tabs in Spaces",
   "settings.general.showSpaceTabsDescription":
     "Display the tab list under each Space in the Spaces panel and switcher.",
+  "settings.general.showSpaceInitials": "Show space initials",
+  "settings.general.showSpaceInitialsDescription":
+    "Display each Space's first letter as its icon. When off, a plain accent dot is shown instead.",
   "settings.general.chooseSpacesRoot": "Choose folder",
   "settings.general.clearSpacesRoot": "Clear folder",
   "settings.general.spacesRootNotSet":
@@ -1041,6 +1044,7 @@ export const en: Record<string, string> = {
   "sourceControl.pushing": "Pushing…",
   "sourceControl.push": "Push",
   "sourceControl.commitAndPush": "Commit and Push",
+  "sourceControl.commitAndPushHint": "Commit the staged changes and push them.",
   "sourceControl.amend": "Amend previous commit",
   "sourceControl.amendAria": "Amend previous commit",
   "sourceControl.amendCommit": "Amend Commit",

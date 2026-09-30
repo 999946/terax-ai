@@ -30,6 +30,7 @@ import {
   setRestoreWindowState,
   setShowHidden,
   setShowSpaceTabs,
+  setShowSpaceInitials,
   setTerminalCursorBlink,
   setTerminalCursorStyle,
   setTerminalFontFamily,
@@ -126,6 +127,7 @@ export function GeneralSection() {
   const defaultWorkspaceEnv = usePreferencesStore((s) => s.defaultWorkspaceEnv);
   const spacesRoot = usePreferencesStore((s) => s.spacesRoot);
   const showSpaceTabs = usePreferencesStore((s) => s.showSpaceTabs);
+  const showSpaceInitials = usePreferencesStore((s) => s.showSpaceInitials);
   const terminalLetterSpacing = usePreferencesStore(
     (s) => s.terminalLetterSpacing,
   );
@@ -276,7 +278,10 @@ export function GeneralSection() {
           description={t("settings.general.spacesRootDescription")}
         >
           <div className="flex max-w-80 items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={spacesRoot ?? undefined}>
+            <span
+              className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground"
+              title={spacesRoot ?? undefined}
+            >
               {spacesRoot ?? t("settings.general.spacesRootNotSet")}
             </span>
             <Button
@@ -313,6 +318,15 @@ export function GeneralSection() {
           <Switch
             checked={showSpaceTabs}
             onCheckedChange={(v) => void setShowSpaceTabs(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.general.showSpaceInitials")}
+          description={t("settings.general.showSpaceInitialsDescription")}
+        >
+          <Switch
+            checked={showSpaceInitials}
+            onCheckedChange={(v) => void setShowSpaceInitials(v)}
           />
         </SettingRow>
       </div>
@@ -529,7 +543,9 @@ export function GeneralSection() {
                       value={defaultWorkspaceEnv}
                       className="text-[12px]"
                     >
-                      {t("settings.general.unavailableEnvironment", { environment: defaultWorkspaceEnv.slice("wsl:".length) })}
+                      {t("settings.general.unavailableEnvironment", {
+                        environment: defaultWorkspaceEnv.slice("wsl:".length),
+                      })}
                     </SelectItem>
                   )}
               </SelectContent>
@@ -689,7 +705,10 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function notificationTestLabel(status: NotificationTestState, t: (key: string) => string): string {
+function notificationTestLabel(
+  status: NotificationTestState,
+  t: (key: string) => string,
+): string {
   switch (status) {
     case "waiting":
       return t("settings.general.switchApps");
@@ -706,7 +725,10 @@ function notificationTestLabel(status: NotificationTestState, t: (key: string) =
   }
 }
 
-function notificationTestTitle(status: NotificationTestState, t: (key: string) => string): string {
+function notificationTestTitle(
+  status: NotificationTestState,
+  t: (key: string) => string,
+): string {
   switch (status) {
     case "waiting":
       return t("settings.general.switchAppsTitle");
