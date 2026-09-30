@@ -6,6 +6,7 @@ import {
   SPACES_PANEL_COLLAPSED_WIDTH,
 } from "./lib/useSpacesPanel";
 import { cn } from "@/lib/utils";
+import { PanelResizeHandle } from "@/components/ui/panel-resize-handle";
 import { SpaceAvatar } from "./SpaceAvatar";
 import { SpaceSwitcherContent } from "./SpaceSwitcherContent";
 
@@ -64,29 +65,6 @@ export function SpacesPanel({
   const handleTriggerClick = () => {
     if (collapsed) expand();
     else collapse();
-  };
-
-  // Drag the right-edge handle to resize the expanded panel width. Kept local
-  // (matching react-resizable-panels handles elsewhere): pointerdown records
-  // the start, document-level pointermove updates the persisted width within
-  // min/max bounds, pointerup tears everything down.
-  const handleResizePointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = width;
-    const onMove = (ev: PointerEvent) =>
-      setWidth(startWidth + (ev.clientX - startX));
-    const onUp = () => {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "col-resize";
   };
 
   return (
@@ -193,15 +171,13 @@ export function SpacesPanel({
               />
             </div>
           </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={t("spaces.resizePanel")}
-            onPointerDown={handleResizePointerDown}
-            className="group/space-resize absolute inset-y-0 right-0 z-20 flex w-px cursor-col-resize select-none items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-3 after:-translate-x-1/2 hover:after:bg-ring/40"
-          >
-            <div className="z-10 h-6 w-1 shrink-0 rounded-lg bg-border opacity-0 transition-opacity group-hover/space-resize:opacity-100" />
-          </div>
+          <PanelResizeHandle
+            ariaLabel={t("spaces.resizePanel")}
+            value={width}
+            onChange={setWidth}
+            onResizeStart={expand}
+            className="absolute inset-y-0 right-0"
+          />
         </>
       )}
     </div>
