@@ -529,6 +529,12 @@ export function GitHistoryPane({
     [commits, detailSha],
   );
 
+  // Only show the right-hand diff split once the commit's files are known to be
+  // non-empty; while loading/error/empty, CommitDetail spans the full bottom
+  // panel width (its file list renders the spinner / error / "no changes").
+  const detailHasFiles =
+    openFilesEntry?.state === "loaded" && openFilesEntry.files.length > 0;
+
   const openSelectedInEditor = useCallback(() => {
     if (!detailCommit || !selectedFile) return;
     onOpenCommitFile({
@@ -684,56 +690,59 @@ export function GitHistoryPane({
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={42} minSize={20}>
-                  <ResizablePanelGroup
-                    orientation="horizontal"
-                    className="h-full"
-                  >
-                    <ResizablePanel defaultSize={40} minSize={24}>
-                      <CommitDetail
-                        commit={detailCommit}
-                        filesEntry={openFilesEntry}
-                        remoteWeb={remoteWeb}
-                        onCopySha={copyToClipboard}
-                        onOpenFile={handleFileOpen}
-                        onRetryFiles={() => void fetchFiles(detailSha)}
-                        selectedFile={selectedFile}
-                        onOpenInEditor={openSelectedInEditor}
-                      />
-                    </ResizablePanel>
-                    <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={60} minSize={30}>
-                      <div className="flex h-full min-h-0 flex-col">
-                        {selectedFile ? (
-                          <GitDiffPane
-                            key={selectedFile.path}
-                            source={{
-                              kind: "commit",
-                              repoRoot,
-                              sha: detailSha,
-                              path: selectedFile.path,
-                              originalPath: selectedFile.originalPath,
-                            }}
-                            chipLabel={detailCommit.shortSha}
-                            active
+                  {detailHasFiles ? (
+                    <>
+                      <ResizablePanelGroup
+                        orientation="horizontal"
+                        className="h-full"
+                      >
+                        <ResizablePanel defaultSize={40} minSize={24}>
+                          <CommitDetail
+                            commit={detailCommit}
+                            filesEntry={openFilesEntry}
+                            remoteWeb={remoteWeb}
+                            onCopySha={copyToClipboard}
+                            onOpenFile={handleFileOpen}
+                            onRetryFiles={() => void fetchFiles(detailSha)}
+                            selectedFile={selectedFile}
+                            onOpenInEditor={openSelectedInEditor}
                           />
-                        ) : (
-                          <div className="flex h-full min-h-0 items-center justify-center px-6 text-center text-[11.5px] text-muted-foreground">
-                            {openFilesEntry?.state === "loading" ? (
-                              <span className="flex items-center gap-2">
-                                <Spinner className="size-3" />
-                                {t("gitHistory.loadingFiles")}
-                              </span>
-                            ) : openFilesEntry?.state === "loaded" &&
-                              openFilesEntry.files.length === 0 ? (
-                              t("gitHistory.noFileChanges")
-                            ) : (
-                              t("gitHistory.selectFileToPreview")
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
+                        </ResizablePanel>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={60} minSize={30}>
+                          {selectedFile ? (
+                            <GitDiffPane
+                              key={selectedFile.path}
+                              source={{
+                                kind: "commit",
+                                repoRoot,
+                                sha: detailSha,
+                                path: selectedFile.path,
+                                originalPath: selectedFile.originalPath,
+                              }}
+                              chipLabel={detailCommit.shortSha}
+                              active
+                            />
+                          ) : (
+                            <div className="flex h-full min-h-0 items-center justify-center px-6 text-center text-[11.5px] text-muted-foreground">
+                              {t("gitHistory.selectFileToPreview")}
+                            </div>
+                          )}
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
+                    </>
+                  ) : (
+                    <CommitDetail
+                      commit={detailCommit}
+                      filesEntry={openFilesEntry}
+                      remoteWeb={remoteWeb}
+                      onCopySha={copyToClipboard}
+                      onOpenFile={handleFileOpen}
+                      onRetryFiles={() => void fetchFiles(detailSha)}
+                      selectedFile={selectedFile}
+                      onOpenInEditor={openSelectedInEditor}
+                    />
+                  )}
                 </ResizablePanel>
               </>
             ) : null}
