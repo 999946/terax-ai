@@ -44,6 +44,21 @@ impl GitRepoFixture {
         run_git_in(&self.repo_path, args);
     }
 
+    /// Run git and return stdout (trimmed), for reading revs/shas back out.
+    pub fn git_output(&self, args: &[&str]) -> String {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(&self.repo_path)
+            .output()
+            .expect("git on PATH");
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
     pub fn write_file(&self, rel: &str, content: &str) {
         let p = self.repo_path.join(rel);
         if let Some(parent) = p.parent() {

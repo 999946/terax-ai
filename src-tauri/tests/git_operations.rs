@@ -470,32 +470,48 @@ fn show_commit_diff_rejects_invalid_sha() {
 }
 
 #[test]
-fn log_paginates_with_before_sha_cursor() {
+fn log_resumes_from_multiple_continuation_heads() {
     if skip_if_no_git() {
         return;
     }
     let fx = GitRepoFixture::new();
-    for i in 0..3 {
-        fx.write_file(&format!("f{i}.txt"), &format!("v{i}\n"));
-        fx.run_git(&["add", &format!("f{i}.txt")]);
-        fx.run_git(&["commit", "-q", "-m", &format!("c{i}")]);
-    }
+    // main: c0 -> c1 (tip).
+    fx.write_file("f.txt", "0\n");
+    fx.run_git(&["add", "f.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "c0"]);
+    fx.write_file("f.txt", "1\n");
+    fx.run_git(&["add", "f.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "c1"]);
+    let c1 = fx.git_output(&["rev-parse", "HEAD"]);
+    // feat: branched off c0 with a commit fa of its own.
+    fx.run_git(&["checkout", "-q", "-b", "feat", "HEAD~1"]);
+    fx.write_file("a.txt", "a\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "fa"]);
+    let fa = fx.git_output(&["rev-parse", "HEAD"]);
+    // Back on main: a fresh page with no continuation starts from HEAD (c1).
+    fx.run_git(&["checkout", "-q", "main"]);
 
     let first_page = operations::log(&fx.registry, &fx.repo_str(), 1, None, None, &fx.workspace).unwrap();
     assert_eq!(first_page.len(), 1);
-    let cursor = first_page[0].sha.clone();
+    assert_eq!(first_page[0].sha, c1);
 
-    let second_page = operations::log(
+    // Resuming passes every unwalked lane head (here the main tip + the feat
+    // tip) as the continuation. With --topo-order the result is the deduped
+    // ancestor closure of all heads — both tips and their shared c0 — so no
+    // branch lane is left behind.
+    let page = operations::log(
         &fx.registry,
         &fx.repo_str(),
         10,
-        Some(&cursor),
+        Some(&[c1.clone(), fa.clone()]),
         None,
         &fx.workspace,
     )
     .unwrap();
-    assert!(second_page.iter().all(|e| e.sha != cursor));
-    assert_eq!(second_page.len(), 2);
+    assert_eq!(page.len(), 3, "both heads + shared ancestor");
+    assert!(page.iter().any(|e| e.sha == c1), "main head present");
+    assert!(page.iter().any(|e| e.sha == fa), "feat head present");
 }
 
 #[test]
@@ -512,7 +528,7 @@ fn log_with_invalid_cursor_sha_errors() {
         &fx.registry,
         &fx.repo_str(),
         10,
-        Some("not-hex"),
+        Some(&["not-hex".to_string()]),
         None,
         &fx.workspace,
     ) {
