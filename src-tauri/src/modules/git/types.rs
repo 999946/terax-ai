@@ -63,6 +63,7 @@ pub struct GitCommitInput {
     pub subject: String,
     pub body: Option<String>,
     pub amend: bool,
+    pub no_verify: bool,
 }
 
 #[derive(Serialize)]

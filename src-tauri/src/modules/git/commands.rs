@@ -169,21 +169,9 @@ pub async fn git_commit(
             input.body.as_deref(),
             input.amend,
             &workspace,
+            !input.no_verify,
         )
         .map_err(Into::into)
-    })
-    .await
-}
-
-#[tauri::command]
-pub async fn git_diff_cached_check(
-    repo_root: String,
-    workspace: Option<WorkspaceEnv>,
-    app: AppHandle,
-) -> Result<Option<String>, String> {
-    let workspace = WorkspaceEnv::from_option(workspace);
-    blocking(app, move |r| {
-        operations::diff_cached_check(r, &repo_root, &workspace).map_err(Into::into)
     })
     .await
 }

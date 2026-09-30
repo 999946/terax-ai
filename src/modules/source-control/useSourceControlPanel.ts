@@ -116,7 +116,7 @@ type SourceControlPanelState = {
   selected: DiffSelection | null;
   subject: string;
   amendEnabled: boolean;
-  beforeCommitCheck: boolean;
+  skipHooks: boolean;
   actionBusy: string | null;
   statusError: string | null;
   actionError: string | null;
@@ -137,7 +137,7 @@ type SourceControlPanelState = {
   pendingDiscard: PendingDiscard | null;
   setSubject: (value: string) => void;
   setAmendEnabled: (value: boolean) => void;
-  setBeforeCommitCheck: (value: boolean) => void;
+  setSkipHooks: (value: boolean) => void;
   refresh: () => Promise<void>;
   selectEntry: (entry: SourceControlEntry) => Promise<void>;
   selectFile: (entry: SourceControlFileEntry) => Promise<void>;
@@ -445,7 +445,7 @@ export function useSourceControlPanel(
   const [selected, setSelected] = useState<DiffSelection | null>(null);
   const [subject, setSubject] = useState("");
   const [amendEnabled, setAmendEnabled] = useState(false);
-  const [beforeCommitCheck, setBeforeCommitCheck] = useState(false);
+  const [skipHooks, setSkipHooks] = useState(false);
   const [localActionBusy, setLocalActionBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -1025,20 +1025,11 @@ export function useSourceControlPanel(
       setActionMessage(null);
       setActionError(null);
       try {
-        if (beforeCommitCheck) {
-          const errors = await native.gitDiffCachedCheck(repo.repoRoot);
-          if (errors) {
-            setActionError(
-              `${t("sourceControl.whitespaceCheckFailed")}\n${errors}`,
-            );
-            return;
-          }
-        }
         const result = await native.gitCommit(
           repo.repoRoot,
           subject.trim(),
           null,
-          { amend: opts?.amend ?? false },
+          { amend: opts?.amend ?? false, noVerify: skipHooks },
         );
         setSubject("");
         let pushError: string | null = null;
@@ -1061,7 +1052,7 @@ export function useSourceControlPanel(
         setLocalActionBusy(null);
       }
     },
-    [beforeCommitCheck, repo, subject, summary, t],
+    [skipHooks, repo, subject, summary, t],
   );
 
   const push = useCallback(async () => {
@@ -1114,7 +1105,7 @@ export function useSourceControlPanel(
     selected,
     subject,
     amendEnabled,
-    beforeCommitCheck,
+    skipHooks,
     actionBusy: localActionBusy ?? summary.busyAction,
     statusError: summary.localError,
     actionError,
@@ -1135,7 +1126,7 @@ export function useSourceControlPanel(
     pendingDiscard: pendingDiscardView,
     setSubject,
     setAmendEnabled,
-    setBeforeCommitCheck,
+    setSkipHooks,
     refresh,
     selectEntry,
     selectFile,

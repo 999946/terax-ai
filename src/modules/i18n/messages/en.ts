@@ -1051,11 +1051,9 @@ export const en: Record<string, string> = {
   "sourceControl.amendAria": "Amend previous commit",
   "sourceControl.amendCommit": "Amend Commit",
   "sourceControl.moreCommitActions": "More commit actions",
-  "sourceControl.beforeCommitCheck":
-    "Check staged files for whitespace errors before committing",
-  "sourceControl.beforeCommitCheckAria": "Check staged files before committing",
-  "sourceControl.whitespaceCheckFailed":
-    "Cannot commit: whitespace errors in staged changes.",
+  "sourceControl.skipHooksAria": "Skip git hooks for this commit",
+  "sourceControl.skipHooks":
+    "Skip git hooks (do not run pre-commit and similar checks)",
   "sourceControl.updateBranch": "Update Branch",
   "sourceControl.deleteBranch": "Delete Branch",
   "sourceControl.deleteBranchConfirmTitle": "Delete branch?",

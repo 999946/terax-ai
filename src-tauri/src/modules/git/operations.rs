@@ -446,6 +446,7 @@ pub fn commit(
     body: Option<&str>,
     amend: bool,
     workspace: &WorkspaceEnv,
+    verify: bool,
 ) -> Result<GitCommitResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
@@ -458,6 +459,12 @@ pub fn commit(
     }
 
     let mut args: Vec<OsString> = vec!["commit".into()];
+    // Skipping hooks (pre-commit, commit-msg) is an explicit user choice, not
+    // the default: hooks are the repo's own guardrails, so a verification
+    // failure should surface rather than be silently bypassed.
+    if !verify {
+        args.push("--no-verify".into());
+    }
     let mut have_message = false;
     if amend {
         args.push("--amend".into());
@@ -505,41 +512,6 @@ pub fn commit(
         commit_sha: sha,
         summary,
     })
-}
-
-/// Whitespace-check only the staged changes (read-only). Returns None when clean,
-/// or the `git diff --cached --check` error text when whitespace errors are found.
-pub fn diff_cached_check(
-    registry: &WorkspaceRegistry,
-    repo_root: &str,
-    workspace: &WorkspaceEnv,
-) -> Result<Option<String>> {
-    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
-    ensure_git_available(&repo_root.workspace)?;
-    let output = run_git(
-        &repo_root.workspace,
-        Some(&repo_root.git_path),
-        ["diff", "--cached", "--check"],
-        DEFAULT_TIMEOUT_SECS,
-    )?;
-    if output.exit_code == Some(0) {
-        return Ok(None);
-    }
-    let mut message = String::new();
-    for chunk in [output.stdout, output.stderr] {
-        let text = String::from_utf8_lossy(&chunk).trim().to_string();
-        if text.is_empty() {
-            continue;
-        }
-        if !message.is_empty() {
-            message.push('\n');
-        }
-        message.push_str(&text);
-    }
-    if message.is_empty() {
-        message = "staged changes contain whitespace errors".into();
-    }
-    Ok(Some(message))
 }
 
 pub fn push(
