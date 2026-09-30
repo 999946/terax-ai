@@ -234,10 +234,6 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
   useEffect(() => clearAutoSaveTimer, [path, clearAutoSaveTimer]);
 
-  // Read-only access to the saved baseline text (LF-normalized), for the
-  // editor's unsaved-change gutter. Stable identity: reads a ref, never re-renders.
-  const getSavedBaseline = useCallback(() => savedRef.current, []);
-
   return {
     doc,
     dirty,
@@ -246,6 +242,5 @@ export function useDocument({ path, onDirtyChange }: Options) {
     reload,
     adoptDiskText,
     openAnyway,
-    getSavedBaseline,
   };
 }

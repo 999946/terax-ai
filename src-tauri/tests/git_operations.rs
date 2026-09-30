@@ -124,6 +124,7 @@ fn stage_then_commit_produces_log_entry() {
         None,
         false,
         &fx.workspace,
+        true,
     )
     .expect("commit");
     assert_eq!(commit.summary, "add a");
@@ -188,6 +189,7 @@ fn commit_with_empty_message_is_rejected() {
         None,
         false,
         &fx.workspace,
+        true,
     ) {
         Err(GitError::EmptyCommitMessage) => {}
         Err(other) => panic!("expected EmptyCommitMessage, got {other}"),
@@ -211,6 +213,7 @@ fn commit_with_subject_and_body_produces_full_message() {
         Some("Body paragraph."),
         false,
         &fx.workspace,
+        true,
     )
     .expect("commit");
 
@@ -240,6 +243,7 @@ fn amend_keeps_previous_message_when_fields_empty() {
         None,
         false,
         &fx.workspace,
+        true,
     )
     .expect("initial commit");
 
@@ -254,58 +258,11 @@ fn amend_keeps_previous_message_when_fields_empty() {
         None,
         true,
         &fx.workspace,
+        true,
     )
     .expect("amend");
 
     assert_eq!(amended.summary, "first");
-}
-
-#[test]
-fn diff_cached_check_is_clean_when_staged_changes_have_no_whitespace_errors() {
-    if skip_if_no_git() {
-        return;
-    }
-    let fx = GitRepoFixture::new();
-    fx.write_file("a.txt", "alpha\n");
-    fx.run_git(&["add", "a.txt"]);
-
-    let result = operations::diff_cached_check(&fx.registry, &fx.repo_str(), &fx.workspace)
-        .expect("diff_cached_check");
-    assert!(result.is_none(), "clean staged diff should report no errors");
-}
-
-#[test]
-fn diff_cached_check_reports_trailing_whitespace() {
-    if skip_if_no_git() {
-        return;
-    }
-    let fx = GitRepoFixture::new();
-    fx.write_file("a.txt", "alpha \n"); // trailing space
-    fx.run_git(&["add", "a.txt"]);
-
-    let result = operations::diff_cached_check(&fx.registry, &fx.repo_str(), &fx.workspace)
-        .expect("diff_cached_check");
-    let message = result.expect("trailing whitespace should be reported");
-    assert!(message.to_lowercase().contains("whitespace") || message.contains("trailing"));
-}
-
-#[test]
-fn diff_cached_check_ignores_worktree_only_changes() {
-    if skip_if_no_git() {
-        return;
-    }
-    let fx = GitRepoFixture::new();
-    fx.write_file("a.txt", "clean\n");
-    fx.run_git(&["add", "a.txt"]);
-    fx.run_git(&["commit", "-q", "-m", "seed"]);
-
-    // Add a trailing-space change to the worktree but do NOT stage it:
-    // `--cached --check` only inspects the index, so it must stay clean.
-    fx.write_file("a.txt", "clean \n");
-
-    let result = operations::diff_cached_check(&fx.registry, &fx.repo_str(), &fx.workspace)
-        .expect("diff_cached_check");
-    assert!(result.is_none(), "unstaged whitespace must not block commit");
 }
 
 #[test]
@@ -352,6 +309,58 @@ fn diff_staged_only_shows_index_change() {
         .expect("staged diff");
     assert!(staged.diff_text.contains("+beta"));
     assert!(!staged.diff_text.contains("+gamma"));
+}
+
+#[test]
+fn head_content_returns_committed_text() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "alpha\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "init"]);
+
+    // A staged-but-uncommitted edit must still yield the committed content.
+    fx.write_file("a.txt", "alpha\nbeta\n");
+    fx.run_git(&["add", "a.txt"]);
+
+    let content = operations::head_content(&fx.registry, &fx.repo_str(), "a.txt", &fx.workspace)
+        .expect("head_content");
+    assert_eq!(content, "alpha\n", "HEAD baseline is immune to staged edits");
+}
+
+#[test]
+fn head_content_follows_new_commit() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "one\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "first"]);
+
+    fx.write_file("a.txt", "two\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "second"]);
+
+    let content = operations::head_content(&fx.registry, &fx.repo_str(), "a.txt", &fx.workspace)
+        .expect("head_content");
+    assert_eq!(content, "two\n", "baseline advances with each commit");
+}
+
+#[test]
+fn head_content_is_empty_for_untracked_file() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    // Never staged nor committed: an empty HEAD baseline means "all lines added".
+    fx.write_file("new.txt", "fresh\n");
+
+    let content = operations::head_content(&fx.registry, &fx.repo_str(), "new.txt", &fx.workspace)
+        .expect("head_content");
+    assert_eq!(content, "", "untracked file has no HEAD version");
 }
 
 #[test]

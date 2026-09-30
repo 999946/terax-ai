@@ -50,6 +50,7 @@ import {
   useEditorFileSync,
 } from "@/modules/editor";
 import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
+import { invalidateGitBaselinesForPaths } from "@/modules/editor/lib/gitBaselineCache";
 import type { GitHistorySearchHandle } from "@/modules/git-history";
 import {
   Header,
@@ -1148,6 +1149,22 @@ export default function App() {
     }
   }, []);
 
+  // A commit advances HEAD, so an open editor's git change markers may now be
+  // stale (a file in the commit should no longer show as "changed"). Drop the
+  // cached baselines and re-pull them for every open editor; committing is
+  // infrequent and a redundant re-fetch is cheap.
+  const refreshEditorGitBaselines = useCallback(() => {
+    const paths = tabsRef.current
+      .filter((t) => t.kind === "editor")
+      .map((t) => t.path);
+    invalidateGitBaselinesForPaths(paths);
+    for (const t of tabsRef.current) {
+      if (t.kind === "editor") {
+        editorRefs.current.get(t.id)?.refreshGitBaseline();
+      }
+    }
+  }, []);
+
   const handlePreviewUrl = useCallback(
     (id: number, url: string) => updateTab(id, { url }),
     [updateTab],
@@ -1637,6 +1654,7 @@ export default function App() {
                         onRefresh={refreshSourceControl}
                         allChangedCount={allChangedCount}
                         onDiscarded={forceReloadEditors}
+                        onCommitted={refreshEditorGitBaselines}
                       />
                     )}
                   </div>

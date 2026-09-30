@@ -48,6 +48,7 @@ import { useDiagnosticsStore } from "./lib/diagnosticsStore";
 import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
 import { setBaselineEffect } from "./lib/modifiedLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
+import { fetchGitBaseline } from "./lib/gitBaselineCache";
 import {
   buildSharedExtensions,
   DEFAULT_INDENT,
@@ -86,6 +87,8 @@ export type EditorPaneHandle = {
   /** Re-read the file from disk. Skips silently if the buffer is dirty; pass
    * `true` to discard unsaved edits (e.g. after a git restore/revert). */
   reload: (force?: boolean) => boolean;
+  /** Re-pull the git HEAD change-marker baseline (called after a commit). */
+  refreshGitBaseline: () => void;
   /** Move the cursor to a 1-based line and center it, once content is ready. */
   gotoLine: (line: number, options?: { focus?: boolean }) => void;
   /** Apply CodeMirror's undo/redo commands. */
@@ -140,19 +143,11 @@ export const EditorPane = memo(
     } = props;
     const { t } = useTranslation();
 
-    const {
-      doc,
-      dirty,
-      onChange,
-      save,
-      reload,
-      adoptDiskText,
-      openAnyway,
-      getSavedBaseline,
-    } = useDocument({
-      path,
-      onDirtyChange,
-    });
+    const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
+      useDocument({
+        path,
+        onDirtyChange,
+      });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const adoptDiskTextRef = useRef(adoptDiskText);
@@ -559,18 +554,54 @@ export const EditorPane = memo(
       };
     }, [path, onOpenCommitHistory]);
 
-    // Unsaved-change gutter baseline: sync the saved text into the field
-    // whenever the doc loads/reloads or the buffer flips between clean and
-    // dirty (i.e. on save). Reading the baseline fresh from the ref means this
-    // always reflects the version just persisted, so markers clear after save.
+    // Git change-marker baseline: the gutter highlights lines that differ from
+    // the file's committed (HEAD) text - markers persist across save and clear
+    // on commit/revert. Resolve the repo, fetch the HEAD baseline, and feed it
+    // into the field. A non-git or large file gets no markers (empty diff),
+    // keeping the baseline cost away from big buffers.
+    const docStatus = doc.status;
+    const docSize = doc.status === "ready" ? doc.size : 0;
+    const fetchAndApplyBaseline = useCallback(
+      (isCancelled: () => boolean): void => {
+        const filePath = pathRef.current;
+        const view = cmRef.current?.view;
+        if (docStatus !== "ready" || !view) return;
+        if (docSize > SYNTAX_MAX_BYTES) {
+          view.dispatch({ effects: setBaselineEffect.of({ text: "" }) });
+          return;
+        }
+        void (async () => {
+          const repo = await native.gitResolveRepo(filePath);
+          if (isCancelled()) return;
+          const text = await fetchGitBaseline(
+            repo?.repoRoot ?? filePath,
+            filePath,
+          );
+          if (isCancelled()) return;
+          // The buffer may have switched to another file while the fetch was in
+          // flight - never feed one file's baseline into another's view.
+          if (cmRef.current?.view !== view) return;
+          if (pathRef.current !== filePath) return;
+          view.dispatch({ effects: setBaselineEffect.of({ text }) });
+        })();
+      },
+      [docStatus, docSize],
+    );
+
     useEffect(() => {
-      if (doc.status !== "ready") return;
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: setBaselineEffect.of({ text: getSavedBaseline() }),
-      });
-    }, [doc, dirty, getSavedBaseline]);
+      let cancelled = false;
+      fetchAndApplyBaseline(() => cancelled);
+      return () => {
+        cancelled = true;
+      };
+    }, [fetchAndApplyBaseline, path]);
+
+    // Imperative repull after a commit advances HEAD: the cached baseline is
+    // invalidated first (see App.refreshEditorGitBaselines), so this refetches
+    // the new HEAD text and clears the markers without touching the buffer.
+    const refreshGitBaseline = useCallback(() => {
+      fetchAndApplyBaseline(() => false);
+    }, [fetchAndApplyBaseline]);
 
     const lspExt = useLspExtension(path, langId, doc.status === "ready");
     useEffect(() => {
@@ -674,6 +705,7 @@ export const EditorPane = memo(
         },
         getPath: () => path,
         reload: (force?: boolean) => reloadRef.current(force),
+        refreshGitBaseline,
         gotoLine: (line: number, options) => {
           pendingLineRef.current = {
             path,
@@ -702,7 +734,7 @@ export const EditorPane = memo(
           startCompletion(view);
         },
       }),
-      [path, applyPendingFocus, applyPendingGoto],
+      [path, applyPendingFocus, applyPendingGoto, refreshGitBaseline],
     );
 
     if (doc.status === "loading") {

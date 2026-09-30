@@ -113,6 +113,20 @@ pub async fn git_diff_content(
 }
 
 #[tauri::command]
+pub async fn git_head_content(
+    repo_root: String,
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        operations::head_content(r, &repo_root, &path, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn git_stage(
     repo_root: String,
     paths: Vec<String>,

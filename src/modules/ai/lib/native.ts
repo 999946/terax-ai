@@ -331,6 +331,12 @@ export const native = {
       originalPath: originalPath ?? null,
       workspace: currentWorkspaceEnv(),
     }),
+  gitHeadContent: (repoRoot: string, path: string) =>
+    invoke<string>("git_head_content", {
+      repoRoot,
+      path,
+      workspace: currentWorkspaceEnv(),
+    }),
   gitStage: (repoRoot: string, paths: string[]) =>
     invoke<void>("git_stage", {
       repoRoot,

@@ -311,6 +311,27 @@ pub fn diff_content(
     })
 }
 
+/// The file's committed (HEAD) text, for the editor's git change markers.
+/// Untracked/new files resolve to an empty string, matching an "all lines are
+/// additions" baseline; binary files decode to empty text as well.
+pub fn head_content(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    path: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<String> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let worktree_path = resolve_within_repo(&repo_root.local_path, path)?;
+    let rel_path = pathspec(&repo_root.local_path, &worktree_path);
+    let source = git_show_text(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        &format!("HEAD:{rel_path}"),
+    )?;
+    Ok(source.into_text())
+}
+
 pub fn stage(
     registry: &WorkspaceRegistry,
     repo_root: &str,

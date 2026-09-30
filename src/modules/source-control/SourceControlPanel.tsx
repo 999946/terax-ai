@@ -135,6 +135,9 @@ type Props = {
   /** Invoked with the discarded paths after a discard succeeds on disk, so
    * open editor tabs can reload the restored file content. */
   onDiscarded?: (paths: string[]) => void;
+  /** Invoked after a commit advances HEAD, so open editor tabs can re-pull their
+   * git change-marker baselines. */
+  onCommitted?: () => void;
 };
 
 /** Lightweight per-repo row for the repository strip. */
@@ -221,6 +224,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
   onFocusRepo,
   onRefresh: refreshRepositories,
   onDiscarded,
+  onCommitted,
 }: Props) {
   const { t } = useTranslation();
   const scm = useSourceControlPanel(
@@ -228,6 +232,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
     sourceControl,
     onOpenDiff,
     onDiscarded,
+    onCommitted,
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

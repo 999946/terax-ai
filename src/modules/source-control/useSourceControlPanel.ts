@@ -419,6 +419,9 @@ export function useSourceControlPanel(
   /** Called with the discarded paths after a discard succeeds on disk, so open
    * editor tabs can reload the restored file content. */
   onDiscarded?: (paths: string[]) => void,
+  /** Called after a commit advances HEAD, so open editor tabs can re-pull their
+   * git change-marker baselines (markers on committed files should disappear). */
+  onCommitted?: () => void,
 ): SourceControlPanelState {
   const { t } = useTranslation();
   const selectedModelId = useChatStore((state) => state.selectedModelId);
@@ -1039,6 +1042,7 @@ export function useSourceControlPanel(
         }
         invalidateRepoDiffs(repo.repoRoot);
         await summary.refresh({ remote: "never" });
+        onCommitted?.();
         if (pushError) {
           setActionError(pushError);
         } else {
@@ -1052,7 +1056,7 @@ export function useSourceControlPanel(
         setLocalActionBusy(null);
       }
     },
-    [skipHooks, repo, subject, summary, t],
+    [skipHooks, repo, subject, summary, t, onCommitted],
   );
 
   const push = useCallback(async () => {
