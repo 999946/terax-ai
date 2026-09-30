@@ -89,7 +89,10 @@ export function useDocument({ path, onDirtyChange }: Options) {
         toast.warning(t("editor.fileChangedOnDisk"), {
           id: `save-conflict:${path}`,
           description: t("editor.fileChangedOnDiskDescription", { name }),
-          action: { label: t("editor.overwrite"), onClick: () => void writeToDisk() },
+          action: {
+            label: t("editor.overwrite"),
+            onClick: () => void writeToDisk(),
+          },
         });
         return false;
       }
@@ -225,5 +228,18 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
   useEffect(() => clearAutoSaveTimer, [path, clearAutoSaveTimer]);
 
-  return { doc, dirty, onChange, save, reload, adoptDiskText, openAnyway };
+  // Read-only access to the saved baseline text (LF-normalized), for the
+  // editor's unsaved-change gutter. Stable identity: reads a ref, never re-renders.
+  const getSavedBaseline = useCallback(() => savedRef.current, []);
+
+  return {
+    doc,
+    dirty,
+    onChange,
+    save,
+    reload,
+    adoptDiskText,
+    openAnyway,
+    getSavedBaseline,
+  };
 }

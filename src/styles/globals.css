@@ -64,6 +64,10 @@
     --added: #15803d;
     --modified: #2563eb;
     --deleted: #6b7280;
+    /* Editor unsaved-change gutter: green added / orange modified / red deleted. */
+    --ml-added: #15803d;
+    --ml-modified: #b45309;
+    --ml-deleted: #dc2626;
     --card-foreground: #111111;
     --popover: #ffffff;
     --popover-foreground: #111111;
@@ -102,6 +106,10 @@
     --added: #4ade80;
     --modified: #60a5fa;
     --deleted: #9ca3af;
+    /* Editor unsaved-change gutter (dark): green added / orange modified / red deleted. */
+    --ml-added: #4ade80;
+    --ml-modified: #f59e0b;
+    --ml-deleted: #f87171;
     --card-foreground: #f7f7f7;
     --popover: #1d1d1d;
     --popover-foreground: #f7f7f7;

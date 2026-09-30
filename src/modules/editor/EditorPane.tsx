@@ -46,6 +46,7 @@ import {
 import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
 import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
+import { setBaselineEffect } from "./lib/modifiedLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
 import {
   buildSharedExtensions,
@@ -127,15 +128,30 @@ function formatBytes(n: number): string {
 // skip re-rendering entirely when App re-renders (terminal events, tab churn).
 export const EditorPane = memo(
   forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
-    const { path, overrideLanguage, onDirtyChange, onSaved, onClose, onOpenFileHistory, onOpenCommitHistory } =
-      props;
+    const {
+      path,
+      overrideLanguage,
+      onDirtyChange,
+      onSaved,
+      onClose,
+      onOpenFileHistory,
+      onOpenCommitHistory,
+    } = props;
     const { t } = useTranslation();
 
-    const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
-      useDocument({
-        path,
-        onDirtyChange,
-      });
+    const {
+      doc,
+      dirty,
+      onChange,
+      save,
+      reload,
+      adoptDiskText,
+      openAnyway,
+      getSavedBaseline,
+    } = useDocument({
+      path,
+      onDirtyChange,
+    });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const adoptDiskTextRef = useRef(adoptDiskText);
@@ -223,8 +239,7 @@ export const EditorPane = memo(
           if (res === "unsupported" && !warnedNoFormatRef.current) {
             warnedNoFormatRef.current = true;
             toast.warning(t("editor.formatOnSaveSkipped"), {
-              description:
-                t("editor.noFormatterInLanguageServer"),
+              description: t("editor.noFormatterInLanguageServer"),
             });
           }
         } else if (!warnedNoLspRef.current) {
@@ -543,6 +558,19 @@ export const EditorPane = memo(
       };
     }, [path, onOpenCommitHistory]);
 
+    // Unsaved-change gutter baseline: sync the saved text into the field
+    // whenever the doc loads/reloads or the buffer flips between clean and
+    // dirty (i.e. on save). Reading the baseline fresh from the ref means this
+    // always reflects the version just persisted, so markers clear after save.
+    useEffect(() => {
+      if (doc.status !== "ready") return;
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: setBaselineEffect.of({ text: getSavedBaseline() }),
+      });
+    }, [doc, dirty, getSavedBaseline]);
+
     const lspExt = useLspExtension(path, langId, doc.status === "ready");
     useEffect(() => {
       lspActiveRef.current = lspExt !== null;
@@ -752,7 +780,8 @@ export const EditorPane = memo(
         );
       }
 
-      const canForce = doc.status === "toolarge" && doc.size <= FORCE_READ_LIMIT;
+      const canForce =
+        doc.status === "toolarge" && doc.size <= FORCE_READ_LIMIT;
       return (
         <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
           <div className="text-sm text-foreground">

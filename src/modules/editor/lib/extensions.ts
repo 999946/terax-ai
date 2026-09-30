@@ -6,6 +6,7 @@ import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { blameBadge } from "./blameBadge";
 import { chromeTheme } from "./chromeTheme";
+import { modifiedLines } from "./modifiedLines";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
 export const languageCompartment = new Compartment();
@@ -57,6 +58,7 @@ const SHARED_EXTENSIONS: readonly Extension[] = Object.freeze([
   search({ top: true }),
   lintGutter(),
   blameBadge(),
+  modifiedLines(),
   chromeTheme(),
   EditorView.theme({
     "&, &.cm-editor, &.cm-editor.cm-focused": {
