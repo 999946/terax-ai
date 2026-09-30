@@ -115,7 +115,6 @@ type SourceControlPanelState = {
   status: GitStatusSnapshot | null;
   selected: DiffSelection | null;
   subject: string;
-  body: string;
   amendEnabled: boolean;
   beforeCommitCheck: boolean;
   actionBusy: string | null;
@@ -137,7 +136,6 @@ type SourceControlPanelState = {
   unstagedEmptyText: string;
   pendingDiscard: PendingDiscard | null;
   setSubject: (value: string) => void;
-  setBody: (value: string) => void;
   setAmendEnabled: (value: boolean) => void;
   setBeforeCommitCheck: (value: boolean) => void;
   refresh: () => Promise<void>;
@@ -255,25 +253,6 @@ function cleanCommitMessage(raw: string): string {
 
 function isValidCommitMessage(message: string): boolean {
   return CONVENTIONAL_PREFIX.test(message);
-}
-
-/** Split a full commit message into a subject line and a body at the first blank line. */
-export function splitCommitMessage(text: string): {
-  subject: string;
-  body: string;
-} {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
-  const blank = normalized.search(/\n[ \t]*\n/);
-  if (blank === -1) {
-    return { subject: normalized, body: "" };
-  }
-  return {
-    subject: normalized.slice(0, blank).trim(),
-    body: normalized
-      .slice(blank)
-      .replace(/\n[ \t]*\n/, "\n\n")
-      .trim(),
-  };
 }
 
 function buildCommitMessagePrompt(
@@ -462,7 +441,6 @@ export function useSourceControlPanel(
   const [status, setStatus] = useState<GitStatusSnapshot | null>(null);
   const [selected, setSelected] = useState<DiffSelection | null>(null);
   const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
   const [amendEnabled, setAmendEnabled] = useState(false);
   const [beforeCommitCheck, setBeforeCommitCheck] = useState(false);
   const [localActionBusy, setLocalActionBusy] = useState<string | null>(null);
@@ -1011,9 +989,7 @@ export function useSourceControlPanel(
       if (!isValidCommitMessage(message)) {
         throw new Error(t("sourceControl.invalidAiMessage"));
       }
-      const split = splitCommitMessage(message);
-      setSubject(split.subject);
-      setBody(split.body);
+      setSubject(message);
       setActionMessage(null);
     } catch (error) {
       setActionError(normalizeError(error, t("sourceControl.unknownError")));
@@ -1055,11 +1031,10 @@ export function useSourceControlPanel(
         const result = await native.gitCommit(
           repo.repoRoot,
           subject.trim(),
-          body.trim() || null,
+          null,
           { amend: opts?.amend ?? false },
         );
         setSubject("");
-        setBody("");
         let pushError: string | null = null;
         if (opts?.push) {
           const pushResult = await summary.runRemoteAction("push");
@@ -1080,7 +1055,7 @@ export function useSourceControlPanel(
         setLocalActionBusy(null);
       }
     },
-    [beforeCommitCheck, body, repo, subject, summary, t],
+    [beforeCommitCheck, repo, subject, summary, t],
   );
 
   const push = useCallback(async () => {
@@ -1132,7 +1107,6 @@ export function useSourceControlPanel(
     status,
     selected,
     subject,
-    body,
     amendEnabled,
     beforeCommitCheck,
     actionBusy: localActionBusy ?? summary.busyAction,
@@ -1154,7 +1128,6 @@ export function useSourceControlPanel(
     unstagedEmptyText,
     pendingDiscard: pendingDiscardView,
     setSubject,
-    setBody,
     setAmendEnabled,
     setBeforeCommitCheck,
     refresh,

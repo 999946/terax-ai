@@ -21,19 +21,3 @@ export function statusColor(code: string): string {
       return "text-muted-foreground";
   }
 }
-
-/** File status → accent-bar background token on the row's leading edge. */
-export function statusAccent(code: string): string {
-  switch (code) {
-    case "A":
-    case "U":
-      return "bg-added";
-    case "M":
-    case "R":
-      return "bg-modified";
-    case "D":
-      return "bg-deleted";
-    default:
-      return "bg-muted-foreground/40";
-  }
-}

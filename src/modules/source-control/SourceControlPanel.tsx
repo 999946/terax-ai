@@ -106,7 +106,7 @@ import {
   type SourceControlFileEntry,
 } from "./useSourceControlPanel";
 import { MergeStatusIcons } from "./MergeStatusIcons";
-import { statusAccent, statusColor } from "./statusTokens";
+import { statusColor } from "./statusTokens";
 
 type Props = {
   open: boolean;
@@ -697,32 +697,25 @@ export const SourceControlPanel = memo(function SourceControlPanel({
               <div
                 className={cn(
                   "relative rounded-lg border bg-background/95 shadow-sm transition-colors",
-                  scm.subject.length > 0 || scm.body.length > 0
+                  scm.subject.length > 0
                     ? "border-border/70"
                     : "border-border/45",
                   "focus-within:border-primary/45 focus-within:shadow-md focus-within:shadow-primary/5",
                 )}
               >
-                <Input
+                <Textarea
                   value={scm.subject}
                   onChange={(event) => scm.setSubject(event.target.value)}
                   onKeyDown={handleCommitShortcut}
-                  placeholder={t("sourceControl.subjectPlaceholder")}
-                  className="h-8 rounded-none border-0 border-b border-border/30 bg-transparent px-3 text-[12.5px] font-medium leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus-visible:border-0"
-                />
-                <Textarea
-                  value={scm.body}
-                  onChange={(event) => scm.setBody(event.target.value)}
-                  onKeyDown={handleCommitShortcut}
-                  placeholder={t("sourceControl.bodyPlaceholder")}
+                  placeholder={t("sourceControl.commitMessagePlaceholder")}
                   rows={2}
                   className="min-h-[52px] resize-none rounded-none border-0 bg-transparent px-3 pb-7 pt-2 text-[12.5px] leading-snug shadow-none placeholder:text-muted-foreground/65 focus-visible:ring-0 focus-visible:border-0"
                 />
                 <div className="pointer-events-none absolute inset-x-3 bottom-1.5 flex items-center justify-between p-1 gap-2 text-[10px] tabular-nums text-muted-foreground/55">
-                  {scm.subject.length + scm.body.length > 0 ? (
+                  {scm.subject.length > 0 ? (
                     <span>
                       {t("sourceControl.charCount", {
-                        count: scm.subject.length + scm.body.length,
+                        count: scm.subject.length,
                       })}
                     </span>
                   ) : (
@@ -1250,16 +1243,6 @@ const EntryRow = memo(function EntryRow({
             paddingLeft: TREE_INDENT_BASE + row.depth * TREE_INDENT_STEP,
           }}
         >
-          <span
-            className={cn(
-              "pointer-events-none absolute inset-y-1 left-0 w-[2px] rounded-full transition-opacity",
-              statusAccent(entry.statusCode),
-              isSelected || focused
-                ? "opacity-100"
-                : "opacity-55 group-hover:opacity-95",
-            )}
-            aria-hidden
-          />
           <span className="flex size-5 shrink-0 items-center justify-center">
             {isStageBusy ? (
               <Spinner className="size-3" />
