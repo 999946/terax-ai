@@ -8,7 +8,6 @@ import {
   ArrowRight01Icon,
   Cancel01Icon,
   Delete02Icon,
-  GitBranchIcon,
   PencilEdit02Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
@@ -31,9 +30,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { native, type GitRepoInfo } from "@/modules/ai/lib/native";
 import { InlineRename } from "./components/InlineRename";
-import { MergeStatusIcons } from "@/modules/source-control/MergeStatusIcons";
 import type { SpaceMeta } from "./lib/store";
 import { useSpaces } from "./lib/useSpaces";
 import { usePluginStore } from "@/modules/plugin";
@@ -83,81 +80,6 @@ function subtitleFor(tab: Tab): string | null {
     return segs.slice(-2, -1)[0] ?? null;
   }
   return null;
-}
-
-/** Last path segment (repo name from a repoRoot) with trailing slashes removed. */
-function basename(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
-
-/**
- * Resolve the git repo(s) for a space's bound folder. When the root is itself
- * inside a single repo, that repo is shown. When the root is a container
- * folder (not inside any repo — e.g. a workspace root holding several repos
- * in its sub-directories), the repos found below it are listed instead. Each
- * repo drives its own merge-status icon row.
- */
-type SpaceRepoState =
-  | { kind: "loading" }
-  | { kind: "ok"; repos: GitRepoInfo[] }
-  | { kind: "error"; message: string };
-
-function repoErrorMessage(e: unknown): string {
-  if (typeof e === "string") return e;
-  if (e instanceof Error && e.message) return e.message;
-  return "Could not resolve repository.";
-}
-
-// Resolve git repo(s) for a space's root once per session and cache the result
-// keyed by root. Collapsing the spaces panel unmounts SpaceSwitcherContent (and
-// every SpaceRow with it), so without this cache re-expanding would refetch
-// every space's repos from scratch and flash a loading row. The cached state is
-// kept verbatim across remounts so collapse/expand is seamless.
-const repoStateCache = new Map<string, SpaceRepoState>();
-
-function useSpaceRepos(root: string | null): SpaceRepoState {
-  const [state, setState] = useState<SpaceRepoState>(() => {
-    if (!root) return { kind: "ok", repos: [] };
-    return repoStateCache.get(root) ?? { kind: "loading" };
-  });
-
-  useEffect(() => {
-    let alive = true;
-    if (!root) {
-      // No bound folder at all → no repository, but not an error.
-      setState({ kind: "ok", repos: [] });
-      return;
-    }
-    // A resolved result from a previous mount is kept as-is — no refetch, no
-    // loading flash. Each root resolves only once per session.
-    if (repoStateCache.has(root)) return;
-
-    setState({ kind: "loading" });
-    native
-      .gitResolveRepo(root)
-      .then(async (repo) => {
-        if (!alive) return;
-        // Root is inside a repo → show it; otherwise discover the repos under
-        // the root (gitListRepos finds the next-level sub-directory repos too).
-        const repos = repo ? [repo] : await native.gitListRepos(root);
-        const next: SpaceRepoState = { kind: "ok", repos };
-        repoStateCache.set(root, next);
-        if (alive) setState(next);
-      })
-      .catch((e) => {
-        const next: SpaceRepoState = {
-          kind: "error",
-          message: repoErrorMessage(e),
-        };
-        repoStateCache.set(root, next);
-        if (alive) setState(next);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [root]);
-  return state;
 }
 
 export function SpaceSwitcherContent({
@@ -459,7 +381,6 @@ function SpaceRow({
   const { t } = useTranslation();
   const moveTarget = drop?.kind === "into-space" && drop.spaceId === space.id;
   const info = space.info;
-  const repoState = useSpaceRepos(space.root);
 
   return (
     <div className="relative">
@@ -532,45 +453,6 @@ function SpaceRow({
                         {info.onlineAt}
                       </span>
                     ) : null}
-                  </span>
-                ) : null}
-                {repoState.kind === "error" ? (
-                  <span
-                    className="mt-0.5 min-w-0 truncate text-[10px] leading-tight text-destructive"
-                    title={repoState.message}
-                  >
-                    {repoState.message}
-                  </span>
-                ) : repoState.kind === "ok" && repoState.repos.length > 0 ? (
-                  <span className="mt-0.5 flex min-w-0 flex-col gap-0.5 text-[10px] leading-tight text-muted-foreground">
-                    {repoState.repos.map((repo) => (
-                      <span
-                        key={repo.repoRoot}
-                        className="flex min-w-0 flex-col"
-                      >
-                        <span className="flex min-w-0 items-center gap-1">
-                          <HugeiconsIcon
-                            icon={GitBranchIcon}
-                            size={9}
-                            strokeWidth={2}
-                            className="shrink-0"
-                          />
-                          <span className="min-w-0 truncate font-medium text-foreground/75">
-                            {basename(repo.repoRoot)}
-                          </span>
-                          <span className="shrink-0">{repo.branch ?? "—"}</span>
-                        </span>
-                        <MergeStatusIcons
-                          repoRoot={repo.repoRoot}
-                          branch={repo.branch ?? null}
-                          className="pl-[13px]"
-                        />
-                      </span>
-                    ))}
-                  </span>
-                ) : repoState.kind === "ok" ? (
-                  <span className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/60">
-                    {t("spaces.noRepository")}
                   </span>
                 ) : null}
               </span>

@@ -52,7 +52,6 @@ export const en: Record<string, string> = {
     "This will remove the space and permanently delete its folder and all contents from disk. This cannot be undone.",
   "spaces.newTab": "New tab",
   "spaces.noTabs": "No tabs",
-  "spaces.noRepository": "No repository",
   "commandPalette.title": "Command Palette",
   "commandPalette.group.General": "General",
   "commandPalette.group.Spaces": "Spaces",
