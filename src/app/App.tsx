@@ -1169,6 +1169,16 @@ export default function App() {
     }
   }, []);
 
+  /** A hunk was staged/unstaged from a diff pane: refresh the source-control
+   * panel (checkbox states) and open editor change-marker baselines. */
+  const handleHunkStaged = useCallback(
+    (_repoRoot: string, _path: string) => {
+      void refreshSourceControl();
+      refreshEditorGitBaselines();
+    },
+    [refreshSourceControl, refreshEditorGitBaselines],
+  );
+
   const handlePreviewUrl = useCallback(
     (id: number, url: string) => updateTab(id, { url }),
     [updateTab],
@@ -1673,6 +1683,7 @@ export default function App() {
                       tabs={tabs}
                       activeId={activeId}
                       activeTab={activeTab}
+                      onHunkStaged={handleHunkStaged}
                       registerTerminalHandle={registerTerminalHandle}
                       onSearchReady={handleSearchReady}
                       onCwd={handleTerminalCwd}

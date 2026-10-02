@@ -768,3 +768,185 @@ fn run_git_in_test(cwd: &std::path::Path, args: &[&str]) {
         .unwrap();
     assert!(output.status.success(), "git {args:?} failed");
 }
+
+#[test]
+fn stage_hunks_stages_only_selected_hunk() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    // A gap wide enough that two far-apart edits form two separate hunks even
+    // with the default 3-line context (gap of 10 unchanged lines > 2*3).
+    let body = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nline12\n";
+    fx.write_file("a.txt", body);
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+
+    fx.write_file(
+        "a.txt",
+        "MOD1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nMOD2\n",
+    );
+    // Stage only hunk index 0.
+    operations::stage_hunks(&fx.registry, &fx.repo_str(), "a.txt", &[0], &fx.workspace)
+        .expect("stage hunk 0");
+
+    let snap = operations::status(&fx.registry, &fx.repo_str(), &fx.workspace).unwrap();
+    let entry = snap.changed_files.iter().find(|f| f.path == "a.txt").unwrap();
+    assert!(entry.staged, "hunk 0 staged");
+    assert!(entry.unstaged, "hunk 1 left unstaged -> partially staged");
+
+    let staged = operations::diff(&fx.registry, &fx.repo_str(), Some("a.txt"), true, &fx.workspace)
+        .expect("staged diff");
+    assert!(staged.diff_text.contains("MOD1"), "staged diff has hunk 0");
+    assert!(!staged.diff_text.contains("MOD2"), "staged diff excludes hunk 1");
+}
+
+#[test]
+fn reset_hunks_unstages_only_selected_hunk() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    let body = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nline12\n";
+    fx.write_file("a.txt", body);
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+    fx.write_file(
+        "a.txt",
+        "MOD1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nMOD2\n",
+    );
+    // Stage the whole file, then unstage only hunk 1.
+    operations::stage(&fx.registry, &fx.repo_str(), &["a.txt".into()], &fx.workspace).unwrap();
+    operations::reset_hunks(&fx.registry, &fx.repo_str(), "a.txt", &[1], &fx.workspace)
+        .expect("reset hunk 1");
+
+    let staged = operations::diff(&fx.registry, &fx.repo_str(), Some("a.txt"), true, &fx.workspace)
+        .expect("staged diff");
+    assert!(!staged.diff_text.contains("MOD2"), "hunk 1 unstaged");
+    assert!(staged.diff_text.contains("MOD1"), "hunk 0 still staged");
+}
+
+#[test]
+fn conflict_files_reports_ours_theirs() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "base\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "base"]);
+
+    fx.run_git(&["checkout", "-q", "-b", "feature"]);
+    fx.write_file("a.txt", "feature\n");
+    fx.run_git(&["commit", "-q", "-am", "feature change"]);
+
+    fx.run_git(&["checkout", "-q", "main"]);
+    fx.write_file("a.txt", "main\n");
+    fx.run_git(&["commit", "-q", "-am", "main change"]);
+
+    // Merge feature into main -> conflict (run git directly; expected to fail).
+    let merge = std::process::Command::new("git")
+        .args(["merge", "feature"])
+        .current_dir(&fx.repo_path)
+        .output()
+        .expect("git on PATH");
+    assert!(!merge.status.success(), "merge feature should conflict");
+
+    let files = operations::conflict_files(&fx.registry, &fx.repo_str(), &fx.workspace)
+        .expect("conflict files");
+    let f = files.iter().find(|f| f.path == "a.txt").expect("a.txt conflicted");
+    assert_eq!(f.ours.as_deref(), Some("main\n"));
+    assert_eq!(f.theirs.as_deref(), Some("feature\n"));
+    assert!(!f.is_binary);
+    // Abort the merge to leave the fixture repo in a clean state.
+    fx.run_git(&["merge", "--abort"]);
+}
+
+#[test]
+fn cherry_pick_clean_applies_commit_without_conflict() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "base\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "base"]);
+    fx.run_git(&["checkout", "-q", "-b", "feature"]);
+    fx.write_file("a.txt", "feature\n");
+    fx.run_git(&["commit", "-q", "-am", "feature change"]);
+    let sha = fx.git_output(&["rev-parse", "HEAD"]);
+    fx.run_git(&["checkout", "-q", "main"]);
+
+    let result = operations::cherry_pick(&fx.registry, &fx.repo_str(), &sha, &fx.workspace)
+        .expect("cherry-pick");
+    assert!(!result.conflicted);
+    assert!(result.files.is_empty());
+    assert_eq!(fx.git_output(&["show", "HEAD:a.txt"]), "feature");
+}
+
+#[test]
+fn rebase_conflict_reports_files_and_abort_restores() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "base\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "base"]);
+    fx.run_git(&["checkout", "-q", "-b", "feature"]);
+    fx.write_file("a.txt", "feature\n");
+    fx.run_git(&["commit", "-q", "-am", "feature"]);
+    fx.run_git(&["checkout", "-q", "main"]);
+    fx.write_file("a.txt", "main\n");
+    fx.run_git(&["commit", "-q", "-am", "main"]);
+
+    fx.run_git(&["checkout", "-q", "feature"]);
+    let result = operations::rebase_branch(&fx.registry, &fx.repo_str(), "main", &fx.workspace)
+        .expect("rebase");
+    assert!(result.conflicted);
+    assert!(result.files.iter().any(|f| f.path == "a.txt"));
+
+    operations::rebase_abort(&fx.registry, &fx.repo_str(), &fx.workspace).expect("rebase abort");
+    // Aborting returns us to the pre-rebase commit (feature still points at it).
+    assert_eq!(fx.git_output(&["rev-parse", "HEAD"]), fx.git_output(&["rev-parse", "feature"]));
+}
+
+#[test]
+fn remote_add_list_set_url_and_remove() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    operations::remote_add(
+        &fx.registry,
+        &fx.repo_str(),
+        "upstream",
+        "https://example.com/x.git",
+        &fx.workspace,
+    )
+    .expect("add remote");
+
+    let list = operations::remote_list(&fx.registry, &fx.repo_str(), &fx.workspace).unwrap();
+    assert!(list.iter().any(|r| r.name == "upstream" && r.url == "https://example.com/x.git"));
+
+    operations::remote_set_url(
+        &fx.registry,
+        &fx.repo_str(),
+        "upstream",
+        "https://new.example.com/y.git",
+        &fx.workspace,
+    )
+    .expect("set-url");
+    let list = operations::remote_list(&fx.registry, &fx.repo_str(), &fx.workspace).unwrap();
+    assert!(list.iter().any(|r| r.name == "upstream" && r.url == "https://new.example.com/y.git"));
+
+    operations::remote_remove(&fx.registry, &fx.repo_str(), "upstream", &fx.workspace)
+        .expect("remove remote");
+    let list = operations::remote_list(&fx.registry, &fx.repo_str(), &fx.workspace).unwrap();
+    assert!(!list.iter().any(|r| r.name == "upstream"));
+
+    // A name with a space is rejected.
+    assert!(
+        operations::remote_add(&fx.registry, &fx.repo_str(), "bad name", "x", &fx.workspace).is_err()
+    );
+}

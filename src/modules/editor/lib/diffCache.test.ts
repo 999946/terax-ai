@@ -3,6 +3,8 @@
 const nativeMock = vi.hoisted(() => ({
   gitDiffContent: vi.fn(),
   gitCommitFileDiff: vi.fn(),
+  gitConflictFiles: vi.fn(),
+  gitDiff: vi.fn(),
 }));
 
 vi.mock("@/modules/ai/lib/native", () => ({ native: nativeMock }));
@@ -34,6 +36,8 @@ describe("git diff content cache", () => {
     vi.resetModules();
     nativeMock.gitDiffContent.mockReset();
     nativeMock.gitCommitFileDiff.mockReset();
+    nativeMock.gitConflictFiles.mockReset();
+    nativeMock.gitDiff.mockReset();
     workspaceMock.currentWorkspaceScopeKey.mockClear();
     workspaceMock.currentWorkspaceScopeKey.mockReturnValue("scope");
   });
@@ -88,8 +92,12 @@ describe("git diff content cache", () => {
     }
     await mod.fetchWorkingDiff("/repo", "new.ts", "-", null);
 
-    expect(mod.getCachedDiff(mod.workingDiffKey("/repo", "f0.ts", "-"))).toBeUndefined();
-    expect(mod.getCachedDiff(mod.workingDiffKey("/repo", "f1.ts", "-"))).toBeDefined();
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "f0.ts", "-")),
+    ).toBeUndefined();
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "f1.ts", "-")),
+    ).toBeDefined();
   });
 
   it("keeps an entry that was just read when the limit overflows", async () => {
@@ -106,7 +114,9 @@ describe("git diff content cache", () => {
     await fetchWorkingDiff("/repo", "new.ts", "-", null);
 
     expect(getCachedDiff(workingDiffKey("/repo", "f0.ts", "-"))).toBeDefined();
-    expect(getCachedDiff(workingDiffKey("/repo", "f1.ts", "-"))).toBeUndefined();
+    expect(
+      getCachedDiff(workingDiffKey("/repo", "f1.ts", "-")),
+    ).toBeUndefined();
   });
 
   it("does not retry or cache a failed backend call", async () => {
@@ -140,7 +150,9 @@ describe("git diff content cache", () => {
     const { invalidateRepoDiffs } = mod;
     invalidateRepoDiffs("/repo-a");
 
-    expect(getCachedDiff(workingDiffKey("/repo-a", "x.ts", "-"))).toBeUndefined();
+    expect(
+      getCachedDiff(workingDiffKey("/repo-a", "x.ts", "-")),
+    ).toBeUndefined();
 
     workspaceMock.currentWorkspaceScopeKey.mockReturnValue("other");
     expect(getCachedDiff(workingDiffKey("/repo-a", "x.ts", "-"))).toBeDefined();
@@ -161,5 +173,107 @@ describe("git diff content cache", () => {
       "a.ts",
       null,
     );
+  });
+
+  it("builds ours/theirs from the matched conflict file", async () => {
+    const mod = await loadModule();
+    nativeMock.gitConflictFiles.mockResolvedValue([
+      {
+        path: "a.ts",
+        ours: "ours\n",
+        theirs: "theirs\n",
+        base: "base\n",
+        isBinary: false,
+      },
+    ]);
+
+    const res = await mod.fetchConflictDiff("/repo", "a.ts");
+
+    expect(nativeMock.gitConflictFiles).toHaveBeenCalledWith("/repo");
+    expect(res.originalContent).toBe("ours\n");
+    expect(res.modifiedContent).toBe("theirs\n");
+    expect(res.isBinary).toBe(false);
+  });
+
+  it("caches conflict diffs by path", async () => {
+    const mod = await loadModule();
+    nativeMock.gitConflictFiles.mockResolvedValue([
+      { path: "a.ts", ours: "o", theirs: "t", base: null, isBinary: false },
+    ]);
+
+    await mod.fetchConflictDiff("/repo", "a.ts");
+    await mod.fetchConflictDiff("/repo", "a.ts");
+
+    expect(nativeMock.gitConflictFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks a missing or binary conflict file as binary fallback", async () => {
+    const mod = await loadModule();
+    nativeMock.gitConflictFiles.mockResolvedValue([
+      { path: "a.ts", ours: null, theirs: null, base: null, isBinary: true },
+    ]);
+
+    const res = await mod.fetchConflictDiff("/repo", "a.ts");
+
+    expect(res.isBinary).toBe(true);
+  });
+
+  it("parses hunks from git diff and caches by path + staged flag", async () => {
+    const mod = await loadModule();
+    nativeMock.gitDiff.mockResolvedValue({
+      diffText: "…",
+      truncated: false,
+      hunks: [
+        {
+          oldStart: 1,
+          oldCount: 2,
+          newStart: 3,
+          newCount: 4,
+          header: "@@",
+          lines: [],
+        },
+        {
+          oldStart: 8,
+          oldCount: 1,
+          newStart: 9,
+          newCount: 1,
+          header: "@@",
+          lines: [],
+        },
+      ],
+    });
+
+    const h1 = await mod.fetchWorkingHunks("/repo", "a.ts", true);
+    const h2 = await mod.fetchWorkingHunks("/repo", "a.ts", true);
+    const h3 = await mod.fetchWorkingHunks("/repo", "a.ts", false);
+
+    expect(h1).toHaveLength(2);
+    expect(nativeMock.gitDiff).toHaveBeenCalledTimes(2); // staged + unstaged once each
+    expect(nativeMock.gitDiff).toHaveBeenCalledWith("/repo", "a.ts", true);
+    expect(nativeMock.gitDiff).toHaveBeenCalledWith("/repo", "a.ts", false);
+    expect(h2).toBe(h1); // served from cache
+    expect(h3).toHaveLength(2);
+  });
+
+  it("invalidates content and hunk caches for a path on hunk mutation", async () => {
+    const mod = await loadModule();
+    nativeMock.gitDiffContent.mockResolvedValue(result("work"));
+    nativeMock.gitDiff.mockResolvedValue({
+      diffText: "…",
+      truncated: false,
+      hunks: [],
+    });
+
+    await mod.fetchWorkingDiff("/repo", "a.ts", "-", null);
+    await mod.fetchWorkingHunks("/repo", "a.ts", false);
+
+    mod.invalidateWorkingDiff("/repo", "a.ts");
+
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "a.ts", "-")),
+    ).toBeUndefined();
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "a.ts", "+")),
+    ).toBeUndefined();
   });
 });

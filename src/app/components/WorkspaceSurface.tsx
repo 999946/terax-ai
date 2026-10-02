@@ -16,6 +16,7 @@ type Props = {
   tabs: Tab[];
   activeId: number;
   activeTab: Tab | undefined;
+  onHunkStaged?: (repoRoot: string, path: string) => void;
   registerTerminalHandle: TerminalStackProps["registerHandle"];
   onSearchReady: TerminalStackProps["onSearchReady"];
   onCwd: TerminalStackProps["onCwd"];
@@ -49,6 +50,7 @@ export function WorkspaceSurface({
   tabs,
   activeId,
   activeTab,
+  onHunkStaged,
   registerTerminalHandle,
   onSearchReady,
   onCwd,
@@ -136,7 +138,11 @@ export function WorkspaceSurface({
         className={cn(LAYER, !isGitDiffTab && "invisible pointer-events-none")}
         aria-hidden={!isGitDiffTab}
       >
-        <GitDiffStack tabs={tabs} activeId={activeId} />
+        <GitDiffStack
+          tabs={tabs}
+          activeId={activeId}
+          onHunkStaged={onHunkStaged}
+        />
       </div>
       <div
         className={cn(

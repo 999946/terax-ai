@@ -2,17 +2,17 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
 use crate::modules::git::errors::{GitError, Result};
-use crate::modules::git::parser::parse_porcelain_v2;
+use crate::modules::git::parser::{build_hunk_patch, parse_porcelain_v2, parse_unified_hunks};
 use crate::modules::git::process::{
     ensure_git_available, ensure_success, git_show_text, git_stdout_line_opt, git_stdout_lines,
-    read_text_file, run_git,
+    read_text_file, run_git, run_git_with_stdin,
 };
 use crate::modules::git::types::{
     DiscardEntry, GitBlameEntry, GitBlameResult, GitBranchEntry, GitBranchListResult,
-    GitCommitFileChange, GitCommitResult, GitDiffContentResult, GitDiffResult, GitLogEntry,
-    GitMergeStatusEntry, GitMergeStatusResult, GitOutput, GitPanelSnapshot, GitPushResult,
-    GitRepoInfo, GitStashEntry, GitStashListResult, GitStatusSnapshot, TextSource,
-    DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    GitCommitFileChange, GitCommitResult, GitConflictFile, GitConflictResult, GitDiffContentResult,
+    GitDiffResult, GitLogEntry, GitMergeStatusEntry, GitMergeStatusResult, GitOutput, GitPanelSnapshot,
+    GitPushResult, GitRemote, GitRepoInfo, GitStashEntry, GitStashListResult, GitStatusSnapshot,
+    TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
     authorized_repo_root, canonical_dir, nearest_existing_dir, resolve_within_repo, split_upstream,
@@ -224,7 +224,7 @@ fn diff_inner(
     path: Option<&str>,
     staged: bool,
 ) -> Result<GitDiffResult> {
-    let mut args: Vec<OsString> = vec!["diff".into(), "--no-ext-diff".into()];
+    let mut args: Vec<OsString> = vec!["diff".into(), "--no-ext-diff".into(), "--unified=3".into()];
     if staged {
         args.push("--cached".into());
     }
@@ -248,9 +248,11 @@ fn diff_inner(
         Ok(text) => text,
         Err(e) => String::from_utf8_lossy(&e.into_bytes()).into_owned(),
     };
+    let hunks = parse_unified_hunks(&diff_text);
     Ok(GitDiffResult {
         diff_text,
         truncated: output.truncated,
+        hunks,
     })
 }
 
@@ -404,6 +406,160 @@ fn looks_like_no_head(output: &GitOutput) -> bool {
         || stderr.contains("unknown revision")
         || stderr.contains("does not have any commits yet")
         || stderr.contains("bad revision 'head'")
+}
+
+/// Stage only the given hunks (0-based indices into the worktree diff) of a
+/// file, leaving the rest unstaged. Staging all hunks (or staging with an empty
+/// selection is a no-op) falls back to a whole-file `git add`.
+///
+/// Mechanism: diff worktree→index for the path, rebuild a patch with only the
+/// selected hunks, and feed it to `git apply --cached` (preimage = index).
+pub fn stage_hunks(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    path: &str,
+    hunks: &[u32],
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let worktree_path = resolve_within_repo(&repo_root.local_path, path)?;
+    let rel = pathspec(&repo_root.local_path, &worktree_path);
+
+    if hunks.is_empty() {
+        return Ok(());
+    }
+    let selected: Vec<usize> = hunks.iter().map(|&h| h as usize).collect();
+    let diff = diff_inner(&repo_root, Some(&rel), false)?;
+    if selected.len() >= diff.hunks.len() {
+        // Selecting every hunk is equivalent to staging the whole file.
+        return stage(registry, &repo_root.git_path, &[path.into()], workspace);
+    }
+    let patch = build_hunk_patch(&diff.diff_text, &selected);
+    if patch.is_empty() {
+        return Err(GitError::command("git stage-hunks", "no hunks to stage"));
+    }
+    let output = run_git_with_stdin(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["apply", "--cached", "-"],
+        patch.as_bytes(),
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git apply --cached failed")
+}
+
+/// Unstage only the given hunks (0-based indices into the staged diff) of a
+/// file. Unstaging all hunks falls back to a whole-file unstage. Reverse-applies
+/// the selected staged diff back to the index.
+pub fn reset_hunks(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    path: &str,
+    hunks: &[u32],
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let worktree_path = resolve_within_repo(&repo_root.local_path, path)?;
+    let rel = pathspec(&repo_root.local_path, &worktree_path);
+
+    if hunks.is_empty() {
+        return Ok(());
+    }
+    let selected: Vec<usize> = hunks.iter().map(|&h| h as usize).collect();
+    let diff = diff_inner(&repo_root, Some(&rel), true)?;
+    if selected.len() >= diff.hunks.len() {
+        return unstage(registry, &repo_root.git_path, &[path.into()], workspace);
+    }
+    let patch = build_hunk_patch(&diff.diff_text, &selected);
+    if patch.is_empty() {
+        return Err(GitError::command("git reset-hunks", "no hunks to unstage"));
+    }
+    let output = run_git_with_stdin(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["apply", "--cached", "-R", "-"],
+        patch.as_bytes(),
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git apply --cached -R failed")
+}
+
+/// List files currently involved in a merge/rebase/cherry-pick conflict, each
+/// with the ours / theirs (and base) staged blobs decoded.
+pub fn conflict_files(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<GitConflictFile>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    conflict_files_inner(&repo_root)
+}
+
+/// Decode the staged blob for `:stage:path`. Returns `(text, is_binary)`.
+fn fetch_conflict_blob(
+    repo_root: &ResolvedGitDirectory,
+    path: &str,
+    stage: u32,
+) -> (Option<String>, bool) {
+    let spec = format!(":{stage}:{path}");
+    match git_show_text(&repo_root.workspace, &repo_root.git_path, &spec) {
+        Ok(TextSource::Text(t)) => (Some(t), false),
+        Ok(TextSource::Binary) => (None, true),
+        Ok(TextSource::Missing) => (None, false),
+        Err(_) => (None, false),
+    }
+}
+
+fn conflict_files_inner(repo_root: &ResolvedGitDirectory) -> Result<Vec<GitConflictFile>> {
+    // `git ls-files -u` emits one line per staged stage entry:
+    //   `<mode> <object> <stage>\t<path>`. Group by path, then decode the
+    //   stage blobs. Paths come from git's own output (trusted, repo-relative).
+    let lines = git_stdout_lines(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["ls-files", "-u"],
+    )?;
+    let mut by_path: std::collections::BTreeMap<String, Vec<u32>> = Default::default();
+    for line in lines {
+        let Some((head, path)) = line.split_once('\t') else {
+            continue;
+        };
+        let mut cols = head.split_ascii_whitespace();
+        let _mode = cols.next();
+        let _object = cols.next();
+        let Some(stage) = cols.next().and_then(|s| s.parse::<u32>().ok()) else {
+            continue;
+        };
+        if stage == 0 {
+            continue;
+        }
+        by_path.entry(path.to_string()).or_default().push(stage);
+    }
+
+    let mut files = Vec::with_capacity(by_path.len());
+    for (path, mut stages) in by_path {
+        stages.sort_unstable();
+        let (ours, ours_bin) = fetch_conflict_blob(repo_root, &path, 2);
+        let (theirs, theirs_bin) = fetch_conflict_blob(repo_root, &path, 3);
+        let (base, base_bin) = fetch_conflict_blob(repo_root, &path, 1);
+        let (ours, theirs, base, is_binary) =
+            if ours_bin || theirs_bin || base_bin {
+                (None, None, None, true)
+            } else {
+                (ours, theirs, base, false)
+            };
+        files.push(GitConflictFile {
+            path,
+            ours,
+            theirs,
+            base,
+            is_binary,
+        });
+    }
+    Ok(files)
 }
 
 pub fn discard(
@@ -733,6 +889,7 @@ pub fn show_commit_diff(
     Ok(GitDiffResult {
         diff_text,
         truncated: output.truncated,
+        hunks: vec![],
     })
 }
 
@@ -1181,6 +1338,104 @@ pub fn remote_url(
 
 fn is_remote_name_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'
+}
+
+fn validate_remote_name(name: &str) -> Result<()> {
+    if name.is_empty() || name.len() > 64 || !name.chars().all(is_remote_name_char) {
+        return Err(GitError::InvalidPath(name.into()));
+    }
+    Ok(())
+}
+
+/// List remotes as `(name, fetch-url)` pairs from `git remote -v`.
+pub fn remote_list(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<GitRemote>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let lines = git_stdout_lines(&repo_root.workspace, &repo_root.git_path, ["remote", "-v"])?;
+    let mut by_name: std::collections::BTreeMap<String, String> = Default::default();
+    for line in lines {
+        // `name<TAB>url (fetch)` / `name<TAB>url (push)`.
+        let Some((name, rest)) = line.split_once('\t') else {
+            continue;
+        };
+        let Some((url, _kind)) = rest.rsplit_once(' ') else {
+            continue;
+        };
+        by_name.entry(name.to_string()).or_insert_with(|| url.to_string());
+    }
+    Ok(by_name
+        .into_iter()
+        .map(|(name, url)| GitRemote { name, url })
+        .collect())
+}
+
+/// Add a named remote. The URL is treated as opaque (any URL is legal).
+pub fn remote_add(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    name: &str,
+    url: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    validate_remote_name(name)?;
+    if url.is_empty() {
+        return Err(GitError::InvalidPath(url.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["remote", "add", name, url],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git remote add failed")
+}
+
+/// Remove a named remote.
+pub fn remote_remove(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    name: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    validate_remote_name(name)?;
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["remote", "remove", name],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git remote remove failed")
+}
+
+/// Set the fetch URL of a named remote.
+pub fn remote_set_url(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    name: &str,
+    url: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    validate_remote_name(name)?;
+    if url.is_empty() {
+        return Err(GitError::InvalidPath(url.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["remote", "set-url", name, url],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git remote set-url failed")
 }
 
 fn parse_diff_tree_name_status(bytes: &[u8]) -> Vec<GitCommitFileChange> {
@@ -1734,6 +1989,103 @@ pub fn merge_into_branch(
         ));
     }
     Ok(())
+}
+
+/// Rebase the current branch onto `branch`. On a clean result returns
+/// `conflicted: false`; on a conflicting rebase (which `git rebase` leaves
+/// in-progress) returns `conflicted: true` with the unmerged files decoded.
+pub fn rebase_branch(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitConflictResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if branch.starts_with('-') || branch.is_empty() {
+        return Err(GitError::InvalidPath(branch.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["rebase", branch],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if output.exit_code == Some(0) {
+        return Ok(GitConflictResult {
+            conflicted: false,
+            files: vec![],
+        });
+    }
+    Ok(GitConflictResult {
+        conflicted: true,
+        files: conflict_files_inner(&repo_root)?,
+    })
+}
+
+/// Abort an in-progress rebase, returning to the pre-rebase state.
+pub fn rebase_abort(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["rebase", "--abort"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git rebase --abort failed")
+}
+
+/// Cherry-pick `commit` onto the current HEAD. A conflicting pick leaves the
+/// pick in-progress and reports the unmerged files.
+pub fn cherry_pick(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    commit: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<GitConflictResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    if commit.starts_with('-') || commit.is_empty() {
+        return Err(GitError::InvalidPath(commit.into()));
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["cherry-pick", commit],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    if output.exit_code == Some(0) {
+        return Ok(GitConflictResult {
+            conflicted: false,
+            files: vec![],
+        });
+    }
+    Ok(GitConflictResult {
+        conflicted: true,
+        files: conflict_files_inner(&repo_root)?,
+    })
+}
+
+/// Abort an in-progress cherry-pick.
+pub fn cherry_pick_abort(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["cherry-pick", "--abort"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git cherry-pick --abort failed")
 }
 
 /// Best-effort single-line stderr summary for an error message.

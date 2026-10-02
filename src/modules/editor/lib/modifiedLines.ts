@@ -9,6 +9,7 @@ import {
   Text,
 } from "@codemirror/state";
 import { GutterMarker, EditorView, gutter } from "@codemirror/view";
+import { conflictField } from "./conflictLines";
 
 /**
  * Unsaved-change markers in the editor gutter: a thin colored bar to the left
@@ -118,7 +119,7 @@ const modifiedField = StateField.define<ModifiedState>({
 
 /** A single gutter indicator. `"spacer"` renders an invisible bar to pin width. */
 class ChangeMarker extends GutterMarker {
-  constructor(readonly kind: LineKind | "spacer") {
+  constructor(readonly kind: LineKind | "spacer" | "conflict") {
     super();
   }
 
@@ -136,13 +137,37 @@ class ChangeMarker extends GutterMarker {
 
 function buildMarkers(view: EditorView): RangeSet<GutterMarker> {
   const state = view.state.field(modifiedField, false);
+  const conflict = view.state.field(conflictField, false);
+  const hasConflict = !!conflict && conflict.size > 0;
+  if (
+    hasConflict &&
+    (!state || state.base == null || state.chunks.length === 0)
+  ) {
+    const markers: Range<GutterMarker>[] = [];
+    for (const line of conflict.keys()) {
+      markers.push(
+        new ChangeMarker("conflict").range(view.state.doc.line(line).from),
+      );
+    }
+    return RangeSet.of(markers);
+  }
   if (!state || state.base == null || state.chunks.length === 0) {
     return RangeSet.empty;
   }
   const lines = changedLines(state.chunks, view.state.doc);
   const markers: Range<GutterMarker>[] = [];
   for (const [line, kind] of lines) {
-    markers.push(new ChangeMarker(kind).range(view.state.doc.line(line).from));
+    // A conflict overrides the change indicator on the same line — the file is
+    // mid-merge, so the red conflict bar is the more important signal.
+    if (hasConflict && conflict.has(line)) {
+      markers.push(
+        new ChangeMarker("conflict").range(view.state.doc.line(line).from),
+      );
+    } else {
+      markers.push(
+        new ChangeMarker(kind).range(view.state.doc.line(line).from),
+      );
+    }
   }
   return RangeSet.of(markers);
 }
@@ -177,6 +202,7 @@ const modifiedTheme = EditorView.theme({
   ".cm-ml--modified": { backgroundColor: "var(--ml-modified)" },
   // Deletions take no space in B; a red top edge on the line above the gap.
   ".cm-ml--deleted": { boxShadow: "inset 0 2px 0 0 var(--ml-deleted)" },
+  ".cm-ml--conflict": { backgroundColor: "var(--ml-conflict)" },
 });
 
 /** Wire the baseline field, the change gutter, and its styling into an editor. */

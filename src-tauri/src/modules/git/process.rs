@@ -91,7 +91,7 @@ pub fn ensure_git_available(workspace: &WorkspaceEnv) -> Result<()> {
 }
 
 fn check_git_availability(workspace: &WorkspaceEnv) -> Availability {
-    let output = match run_git_uncached(workspace, None, ["--version"], 10) {
+    let output = match run_git_impl(workspace, None, ["--version"], 10, None) {
         Ok(o) => o,
         Err(_) => return Availability::NotInstalled,
     };
@@ -231,14 +231,32 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    run_git_uncached(workspace, cwd, args, timeout_secs)
+    run_git_impl(workspace, cwd, args, timeout_secs, None)
 }
 
-fn run_git_uncached<I, S>(
+/// Like `run_git`, but pipes `stdin` bytes into the child. Used for commands
+/// that read a patch from stdin (`git apply --cached -`). The env template
+/// (no prompts, no terminal) matches `run_git` exactly.
+pub fn run_git_with_stdin<I, S>(
+    workspace: &WorkspaceEnv,
+    cwd: Option<&str>,
+    args: I,
+    stdin: &[u8],
+    timeout_secs: u64,
+) -> Result<GitOutput>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    run_git_impl(workspace, cwd, args, timeout_secs, Some(stdin))
+}
+
+fn run_git_impl<I, S>(
     workspace: &WorkspaceEnv,
     cwd: Option<&str>,
     args: I,
     timeout_secs: u64,
+    stdin: Option<&[u8]>,
 ) -> Result<GitOutput>
 where
     I: IntoIterator<Item = S>,
@@ -257,12 +275,25 @@ where
         .env("GCM_INTERACTIVE", "Never")
         .env("GCM_PROVIDER", "")
         .env("LC_ALL", "C")
-        .stdin(Stdio::null())
+        .stdin(if stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     crate::modules::proc::hide_console(&mut cmd);
 
     let child = Arc::new(SharedChild::spawn(&mut cmd).map_err(|e| GitError::Spawn(e.to_string()))?);
+    if let Some(bytes) = stdin {
+        // Write the payload, then drop the handle to close stdin so git sees EOF.
+        let mut stdin_pipe = child
+            .take_stdin()
+            .ok_or_else(|| GitError::Spawn("no stdin pipe".into()))?;
+        use std::io::Write;
+        let _ = stdin_pipe.write_all(bytes);
+        drop(stdin_pipe);
+    }
     let mut stdout_pipe = child
         .take_stdout()
         .ok_or_else(|| GitError::Spawn("no stdout pipe".into()))?;

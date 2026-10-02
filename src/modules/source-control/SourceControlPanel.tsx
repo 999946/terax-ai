@@ -41,6 +41,7 @@ import { IS_MAC } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
   type GitBranchEntry,
+  type GitRemote,
   type GitStashEntry,
   native,
 } from "@/modules/ai/lib/native";
@@ -71,6 +72,7 @@ import {
   FolderGitTwoIcon,
   GitBranchIcon,
   GitMergeIcon,
+  Link03Icon,
   MoreHorizontalIcon,
   PlusSignIcon,
   UndoIcon,
@@ -118,6 +120,7 @@ type Props = {
     mode: "+" | "-";
     originalPath: string | null;
     title?: string;
+    conflict?: boolean;
   }) => void;
   onOpenFile?: (absolutePath: string) => void;
   onNavigateToPath?: (path: string) => void;
@@ -366,6 +369,20 @@ export const SourceControlPanel = memo(function SourceControlPanel({
       return next;
     });
   }, []);
+
+  /** Open an unmerged file's conflict-resolution diff (ours vs theirs). */
+  const openConflict = useCallback(
+    (entry: SourceControlFileEntry) => {
+      onOpenDiff({
+        path: entry.path,
+        repoRoot: scm.repo?.repoRoot ?? "",
+        mode: "+",
+        originalPath: entry.originalPath,
+        conflict: true,
+      });
+    },
+    [onOpenDiff, scm.repo],
+  );
 
   const rows = useMemo<RowDescriptor[]>(() => {
     const result: RowDescriptor[] = [];
@@ -879,6 +896,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                             onToggleStageFile={scm.toggleStageFile}
                             onDiscardFile={scm.requestDiscardFile}
                             onOpenFile={onOpenFile}
+                            onOpenConflict={openConflict}
                             onToggleDir={toggleDir}
                             dirInfo={dirInfo}
                             onToggleStageDir={scm.toggleStageDir}
@@ -988,6 +1006,7 @@ type RowRendererProps = {
   onToggleStageFile: (entry: SourceControlFileEntry) => Promise<void>;
   onDiscardFile: (entry: SourceControlFileEntry) => void;
   onOpenFile?: (absolutePath: string) => void;
+  onOpenConflict: (entry: SourceControlFileEntry) => void;
   onToggleDir: (path: string) => void;
   dirInfo: Map<string, DirInfo>;
   onToggleStageDir: (dir: string, paths: string[]) => Promise<void> | void;
@@ -1170,6 +1189,7 @@ const EntryRow = memo(function EntryRow({
   onToggleStageFile,
   onDiscardFile,
   onOpenFile,
+  onOpenConflict,
 }: RowRendererProps & {
   row: Extract<RowDescriptor, { kind: "file" }>;
 }) {
@@ -1180,6 +1200,7 @@ const EntryRow = memo(function EntryRow({
   const iconUrl = fileIconUrl(fileName);
   const pathLabel = entryPathLabel(entry);
   const showDiscard = entry.unstaged;
+  const isConflict = entry.statusLabel === "Unmerged";
   const isStageBusy =
     actionBusy === `stage:${entry.path}` ||
     actionBusy === `unstage:${entry.path}`;
@@ -1248,7 +1269,9 @@ const EntryRow = memo(function EntryRow({
               <span
                 className={cn(
                   "truncate text-[12px] leading-tight",
-                  statusColor(entry.statusCode),
+                  isConflict
+                    ? "font-semibold text-rose-600 dark:text-rose-400"
+                    : statusColor(entry.statusCode),
                   isSelected || focused ? "font-semibold" : "font-medium",
                   pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
                 )}
@@ -1272,6 +1295,20 @@ const EntryRow = memo(function EntryRow({
                 onClick={() => onOpenFile(absolutePath)}
               >
                 <HugeiconsIcon icon={File01Icon} size={11} strokeWidth={1.9} />
+              </IconActionButton>
+            ) : null}
+            {isConflict ? (
+              <IconActionButton
+                label={t("sourceControl.resolveConflict")}
+                disabled={disabled}
+                side="top"
+                onClick={() => onOpenConflict(entry)}
+              >
+                <HugeiconsIcon
+                  icon={GitMergeIcon}
+                  size={11}
+                  strokeWidth={1.9}
+                />
               </IconActionButton>
             ) : null}
             {showDiscard ? (
@@ -1309,6 +1346,14 @@ const EntryRow = memo(function EntryRow({
             onSelect={() => onOpenFile(absolutePath)}
           >
             {t("sourceControl.openFile")}
+          </ContextMenuItem>
+        ) : null}
+        {isConflict ? (
+          <ContextMenuItem
+            className={COMPACT_ITEM}
+            onSelect={() => onOpenConflict(entry)}
+          >
+            {t("sourceControl.resolveConflict")}
           </ContextMenuItem>
         ) : null}
 
@@ -1395,6 +1440,21 @@ function RepoRowItem({
   const [stashIncludeUntracked, setStashIncludeUntracked] = useState(false);
   const [stashDropTarget, setStashDropTarget] = useState<string | null>(null);
   const [pushAfterCreate, setPushAfterCreate] = useState(false);
+  // Rebase / cherry-pick target awaiting confirmation (Block C).
+  const [historyAction, setHistoryAction] = useState<{
+    mode: "rebase" | "cherry-pick";
+    target: string;
+  } | null>(null);
+  // Remote management dialog state (Block D).
+  const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
+  const [remotes, setRemotes] = useState<GitRemote[]>([]);
+  const [newRemoteName, setNewRemoteName] = useState("");
+  const [newRemoteUrl, setNewRemoteUrl] = useState("");
+  const [remoteDeleteTarget, setRemoteDeleteTarget] = useState<string | null>(
+    null,
+  );
+  /** In-progress URL edits per remote, seeded on load and committed on blur. */
+  const [remoteDrafts, setRemoteDrafts] = useState<Record<string, string>>({});
   const loadRef = useRef(0);
 
   const loadBranches = useCallback(async () => {
@@ -1558,6 +1618,120 @@ function RepoRowItem({
       }
     },
     [repository],
+  );
+
+  /** Run the confirmed rebase / cherry-pick. `conflicted` guides to conflict UI. */
+  const runHistoryAction = useCallback(async () => {
+    const action = historyAction;
+    if (!action) return;
+    setBusy(action.mode === "rebase" ? "rebase" : "cherry-pick");
+    try {
+      const result =
+        action.mode === "rebase"
+          ? await native.gitRebaseBranch(repository.repoRoot, action.target)
+          : await native.gitCherryPick(repository.repoRoot, action.target);
+      await repository.refresh();
+      setHistoryAction(null);
+      if (result.conflicted) {
+        toast.warning(
+          t(
+            action.mode === "rebase"
+              ? "sourceControl.rebaseConflict"
+              : "sourceControl.cherryPickConflict",
+            { target: action.target },
+          ),
+        );
+      }
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [historyAction, repository, t]);
+
+  const handleRebaseAbort = useCallback(async () => {
+    setBusy("rebase");
+    try {
+      await native.gitRebaseAbort(repository.repoRoot);
+      await repository.refresh();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [repository]);
+
+  const handleCherryPickAbort = useCallback(async () => {
+    setBusy("cherry-pick");
+    try {
+      await native.gitCherryPickAbort(repository.repoRoot);
+      await repository.refresh();
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [repository]);
+
+  const loadRemotes = useCallback(async () => {
+    try {
+      const list = await native.gitRemoteList(repository.repoRoot);
+      setRemotes(list);
+      setRemoteDrafts(Object.fromEntries(list.map((r) => [r.name, r.url])));
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }, [repository.repoRoot]);
+
+  const handleRemoteAdd = useCallback(async () => {
+    const name = newRemoteName.trim();
+    const url = newRemoteUrl.trim();
+    if (!name || !url) return;
+    setBusy("remote-add");
+    try {
+      await native.gitRemoteAdd(repository.repoRoot, name, url);
+      await loadRemotes();
+      setNewRemoteName("");
+      setNewRemoteUrl("");
+      toast.success(t("sourceControl.remoteAdded"));
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [newRemoteName, newRemoteUrl, repository.repoRoot, loadRemotes, t]);
+
+  const handleRemoteRemove = useCallback(async () => {
+    const name = remoteDeleteTarget;
+    if (!name) return;
+    setBusy("remote-remove");
+    try {
+      await native.gitRemoteRemove(repository.repoRoot, name);
+      setRemoteDeleteTarget(null);
+      await loadRemotes();
+      toast.success(t("sourceControl.remoteRemoved"));
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [remoteDeleteTarget, repository.repoRoot, loadRemotes, t]);
+
+  const handleRemoteSetUrl = useCallback(
+    async (name: string, url: string) => {
+      const next = url.trim();
+      if (!next) return;
+      setBusy("remote-set-url");
+      try {
+        await native.gitRemoteSetUrl(repository.repoRoot, name, next);
+        await loadRemotes();
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [repository.repoRoot, loadRemotes],
   );
 
   const handleUpdateBranch = useCallback(
@@ -1823,6 +1997,44 @@ function RepoRowItem({
                                 />
                                 <span className="flex-1">
                                   {t("sourceControl.mergeBranch")}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy || b.isHead}
+                                onSelect={() =>
+                                  setHistoryAction({
+                                    mode: "rebase",
+                                    target: b.name,
+                                  })
+                                }
+                              >
+                                <HugeiconsIcon
+                                  icon={GitMergeIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.rebaseOnto")}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={COMPACT_ITEM}
+                                disabled={branchBusy || b.isHead}
+                                onSelect={() =>
+                                  setHistoryAction({
+                                    mode: "cherry-pick",
+                                    target: b.name,
+                                  })
+                                }
+                              >
+                                <HugeiconsIcon
+                                  icon={GitMergeIcon}
+                                  size={13}
+                                  strokeWidth={1.8}
+                                />
+                                <span className="flex-1">
+                                  {t("sourceControl.cherryPick")}
                                 </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
@@ -2195,6 +2407,42 @@ function RepoRowItem({
 
             <DropdownMenuSeparator />
 
+            {/* Remote management */}
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => {
+                setRemoteDialogOpen(true);
+                void loadRemotes();
+              }}
+            >
+              <HugeiconsIcon icon={Link03Icon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">{t("sourceControl.manageRemotes")}</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* Abort an in-progress rebase / cherry-pick */}
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              disabled={busy === "rebase"}
+              onSelect={() => void handleRebaseAbort()}
+            >
+              <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">{t("sourceControl.abortRebase")}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={COMPACT_ITEM}
+              disabled={busy === "cherry-pick"}
+              onSelect={() => void handleCherryPickAbort()}
+            >
+              <HugeiconsIcon icon={UndoIcon} size={13} strokeWidth={1.8} />
+              <span className="flex-1">
+                {t("sourceControl.abortCherryPick")}
+              </span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
             {/* Copy / reveal */}
             <DropdownMenuItem
               className={COMPACT_ITEM}
@@ -2383,6 +2631,205 @@ function RepoRowItem({
               {busy === "stash-drop"
                 ? t("sourceControl.droppingStash")
                 : t("sourceControl.dropStash")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Rebase / cherry-pick confirmation */}
+      <AlertDialog
+        open={historyAction !== null}
+        onOpenChange={(o) => {
+          if (!o) setHistoryAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                historyAction?.mode === "rebase"
+                  ? "sourceControl.rebaseTitle"
+                  : "sourceControl.cherryPickTitle",
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {historyAction
+                ? t(
+                    historyAction.mode === "rebase"
+                      ? "sourceControl.rebaseBody"
+                      : "sourceControl.cherryPickBody",
+                    { target: historyAction.target },
+                  )
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setHistoryAction(null)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy === "rebase" || busy === "cherry-pick"}
+              onClick={() => void runHistoryAction()}
+            >
+              {t(
+                historyAction?.mode === "rebase"
+                  ? "sourceControl.rebase"
+                  : "sourceControl.cherryPick",
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remote management */}
+      <AlertDialog
+        open={remoteDialogOpen}
+        onOpenChange={(o) => {
+          setRemoteDialogOpen(o);
+          if (!o) setNewRemoteName("");
+          if (!o) setNewRemoteUrl("");
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("sourceControl.manageRemotes")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("sourceControl.manageRemotesBody")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex max-h-[40vh] flex-col gap-2 overflow-y-auto px-1">
+            {remotes.length === 0 ? (
+              <div className="px-0.5 py-1 text-[11px] text-muted-foreground">
+                {t("sourceControl.noRemotes")}
+              </div>
+            ) : (
+              remotes.map((r) => (
+                <div key={r.name} className="flex items-center gap-1.5">
+                  <span className="w-24 shrink-0 truncate font-mono text-[11.5px] text-foreground">
+                    {r.name}
+                  </span>
+                  <Input
+                    value={remoteDrafts[r.name] ?? r.url}
+                    onChange={(e) =>
+                      setRemoteDrafts((d) => ({
+                        ...d,
+                        [r.name]: e.target.value,
+                      }))
+                    }
+                    onBlur={() => {
+                      const next = remoteDrafts[r.name] ?? r.url;
+                      if (next.trim() && next.trim() !== r.url) {
+                        void handleRemoteSetUrl(r.name, next);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    className="h-7 flex-1 min-w-0 font-mono text-[11.5px]"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label={t("sourceControl.deleteRemote")}
+                    onClick={() => setRemoteDeleteTarget(r.name)}
+                  >
+                    <HugeiconsIcon
+                      icon={UndoIcon}
+                      size={13}
+                      strokeWidth={1.8}
+                    />
+                  </Button>
+                </div>
+              ))
+            )}
+            <div className="mt-1 flex items-center gap-1.5 border-t border-border/60 pt-2">
+              <Input
+                value={newRemoteName}
+                onChange={(e) => setNewRemoteName(e.target.value)}
+                placeholder={t("sourceControl.remoteNamePlaceholder")}
+                className="h-7 w-24 shrink-0 font-mono text-[11.5px]"
+              />
+              <Input
+                value={newRemoteUrl}
+                onChange={(e) => setNewRemoteUrl(e.target.value)}
+                placeholder={t("sourceControl.remoteUrlPlaceholder")}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter" &&
+                    newRemoteName.trim() &&
+                    newRemoteUrl.trim()
+                  ) {
+                    e.preventDefault();
+                    void handleRemoteAdd();
+                  }
+                }}
+                className="h-7 flex-1 min-w-0 font-mono text-[11.5px]"
+              />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-7 shrink-0"
+                disabled={
+                  busy === "remote-add" ||
+                  !newRemoteName.trim() ||
+                  !newRemoteUrl.trim()
+                }
+                aria-label={t("sourceControl.addRemote")}
+                onClick={() => void handleRemoteAdd()}
+              >
+                <HugeiconsIcon
+                  icon={PlusSignIcon}
+                  size={13}
+                  strokeWidth={1.8}
+                />
+              </Button>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRemoteDialogOpen(false)}>
+              {t("common.close")}
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remote delete confirmation */}
+      <AlertDialog
+        open={remoteDeleteTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setRemoteDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("sourceControl.deleteRemoteConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {remoteDeleteTarget
+                ? t("sourceControl.deleteRemoteConfirmBody", {
+                    remote: remoteDeleteTarget,
+                  })
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRemoteDeleteTarget(null)}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy === "remote-remove"}
+              onClick={() => void handleRemoteRemove()}
+            >
+              {busy === "remote-remove"
+                ? t("sourceControl.deletingRemote")
+                : t("sourceControl.deleteRemote")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

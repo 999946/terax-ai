@@ -70,6 +70,40 @@ export type GitStatusSnapshot = {
 export type GitDiffResult = {
   diffText: string;
   truncated: boolean;
+  /** Typed hunks for a worktree/staged per-path diff; absent for commit diffs. */
+  hunks?: GitHunk[];
+};
+
+export type GitHunkLine = {
+  kind: "ctx" | "add" | "del";
+  content: string;
+};
+
+export type GitHunk = {
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+  header: string;
+  lines: GitHunkLine[];
+};
+
+export type GitConflictFile = {
+  path: string;
+  ours: string | null;
+  theirs: string | null;
+  base: string | null;
+  isBinary: boolean;
+};
+
+export type GitConflictResult = {
+  conflicted: boolean;
+  files: GitConflictFile[];
+};
+
+export type GitRemote = {
+  name: string;
+  url: string;
 };
 
 export type GitDiffContentResult = {
@@ -519,6 +553,72 @@ export const native = {
     invoke<void>("git_stash_drop", {
       repoRoot,
       index,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitStageHunks: (repoRoot: string, path: string, hunks: number[]) =>
+    invoke<void>("git_stage_hunks", {
+      repoRoot,
+      path,
+      hunks,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitResetHunks: (repoRoot: string, path: string, hunks: number[]) =>
+    invoke<void>("git_reset_hunks", {
+      repoRoot,
+      path,
+      hunks,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitConflictFiles: (repoRoot: string) =>
+    invoke<GitConflictFile[]>("git_conflict_files", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitRebaseBranch: (repoRoot: string, branch: string) =>
+    invoke<GitConflictResult>("git_rebase_branch", {
+      repoRoot,
+      branch,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitRebaseAbort: (repoRoot: string) =>
+    invoke<void>("git_rebase_abort", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitCherryPick: (repoRoot: string, commit: string) =>
+    invoke<GitConflictResult>("git_cherry_pick", {
+      repoRoot,
+      commit,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitCherryPickAbort: (repoRoot: string) =>
+    invoke<void>("git_cherry_pick_abort", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitRemoteList: (repoRoot: string) =>
+    invoke<GitRemote[]>("git_remote_list", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitRemoteAdd: (repoRoot: string, name: string, url: string) =>
+    invoke<void>("git_remote_add", {
+      repoRoot,
+      name,
+      url,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitRemoteRemove: (repoRoot: string, name: string) =>
+    invoke<void>("git_remote_remove", {
+      repoRoot,
+      name,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitRemoteSetUrl: (repoRoot: string, name: string, url: string) =>
+    invoke<void>("git_remote_set_url", {
+      repoRoot,
+      name,
+      url,
       workspace: currentWorkspaceEnv(),
     }),
 };

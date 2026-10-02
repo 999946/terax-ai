@@ -138,4 +138,55 @@ describe("planGitDiffOpen", () => {
       path: "new.ts",
     });
   });
+
+  it("labels a conflict tab with the conflict suffix", () => {
+    const result = planGitDiffOpen(
+      [],
+      { ...input("merge.ts"), conflict: true },
+      "default",
+      false,
+      () => 1,
+    );
+
+    expect(result.tabs[0]).toMatchObject({
+      id: 1,
+      kind: "git-diff",
+      path: "merge.ts",
+      conflict: true,
+      title: "merge.ts (conflict)",
+    });
+  });
+
+  it("allows a conflict and a plain diff of the same path to coexist", () => {
+    const plain = gitDiff(2, "merge.ts", false);
+    const result = planGitDiffOpen(
+      [plain],
+      { ...input("merge.ts"), conflict: true },
+      "default",
+      false,
+      () => 3,
+    );
+
+    // A different slot: the plain diff does not match the conflict open.
+    expect(result.tabs).toHaveLength(2);
+    expect(result.tabs[1]).toMatchObject({
+      id: 3,
+      path: "merge.ts",
+      conflict: true,
+    });
+  });
+
+  it("dedupes a conflict open against an existing conflict tab", () => {
+    const conflict = gitDiff(2, "merge.ts", false);
+    const result = planGitDiffOpen(
+      [{ ...conflict, conflict: true }],
+      { ...input("merge.ts"), conflict: true },
+      "default",
+      false,
+      () => 9,
+    );
+
+    expect(result.targetId).toBe(2);
+    expect(result.tabs).toHaveLength(1);
+  });
 });

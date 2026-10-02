@@ -56,6 +56,7 @@ import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
 import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
 import { setBaselineEffect } from "./lib/modifiedLines";
+import { setConflictEffect } from "./lib/conflictLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
 import { fetchGitBaseline } from "./lib/gitBaselineCache";
 import {
@@ -577,6 +578,11 @@ export const EditorPane = memo(
           indentExtension(detectIndentUnit(doc.content)),
         ),
       });
+      // Merge-conflict markers read the live buffer (not git state), so a scan
+      // on load covers both a freshly opened conflicted file and a file that
+      // was edited into a conflicted state and reopened. Subsequent edits are
+      // handled by the field itself.
+      view.dispatch({ effects: setConflictEffect.of({ text: doc.content }) });
     }, [doc]);
 
     // Keep the editor status bar in sync with out-of-band changes: dirty flag,

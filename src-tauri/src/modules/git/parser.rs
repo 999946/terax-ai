@@ -1,4 +1,4 @@
-use crate::modules::git::types::GitChangedFile;
+use crate::modules::git::types::{GitChangedFile, GitHunk, GitHunkLine};
 
 #[derive(Default)]
 pub struct PorcelainV2 {
@@ -145,6 +145,122 @@ fn status_label(index_status: char, worktree_status: char) -> String {
     }
 }
 
+/// Parse the hunk header body between the two `@@` markers, e.g. `-1,3 +1,4`,
+/// into `(old_start, old_count, new_start, new_count)`. A single number means a
+/// count of 1. Trailing context text after `@@` (the section heading) is ignored.
+fn parse_hunk_header(body: &str) -> Option<(u32, u32, u32, u32)> {
+    let mut parts = body.split_whitespace();
+    let old = parts.next()?.strip_prefix('-')?;
+    let new = parts.next()?.strip_prefix('+')?;
+    let (old_start, old_count) = parse_range_piece(old)?;
+    let (new_start, new_count) = parse_range_piece(new)?;
+    Some((old_start, old_count, new_start, new_count))
+}
+
+fn parse_range_piece(piece: &str) -> Option<(u32, u32)> {
+    let (start, count) = match piece.split_once(',') {
+        Some((s, c)) => (s, Some(c)),
+        None => (piece, None),
+    };
+    let start = start.parse::<u32>().ok()?;
+    let count = count.unwrap_or("1").parse::<u32>().ok()?;
+    Some((start, count))
+}
+
+/// Parse a unified diff into typed hunks. Each `@@ -o[,n] +m[,k] @@` header
+/// opens a hunk; following lines are classified by their marker (`+` add, `-`
+/// del, ` ` context). `\ No newline at end of file` markers are skipped (not a
+/// content line). Self-contained and deterministic — no git invocation.
+pub fn parse_unified_hunks(diff_text: &str) -> Vec<GitHunk> {
+    let raw: Vec<&str> = diff_text.lines().collect();
+    let mut hunks = Vec::new();
+    let mut i = 0;
+    while i < raw.len() {
+        let Some(body) = raw[i].strip_prefix("@@") else {
+            i += 1;
+            continue;
+        };
+        let Some(end_rel) = body.find("@@") else {
+            i += 1;
+            continue;
+        };
+        let Some((old_start, old_count, new_start, new_count)) =
+            parse_hunk_header(body[..end_rel].trim())
+        else {
+            i += 1;
+            continue;
+        };
+        let header_line = raw[i].to_string();
+        let mut lines: Vec<GitHunkLine> = Vec::new();
+        i += 1;
+        while i < raw.len() && !raw[i].starts_with("@@") {
+            let l = raw[i];
+            if let Some(content) = l.strip_prefix('+') {
+                lines.push(GitHunkLine {
+                    kind: "add".into(),
+                    content: content.to_string(),
+                });
+            } else if let Some(content) = l.strip_prefix('-') {
+                lines.push(GitHunkLine {
+                    kind: "del".into(),
+                    content: content.to_string(),
+                });
+            } else if let Some(content) = l.strip_prefix(' ') {
+                lines.push(GitHunkLine {
+                    kind: "ctx".into(),
+                    content: content.to_string(),
+                });
+            } else if l.starts_with('\\') {
+                // "No newline at end of file" marker — carry it as nothing.
+            } else {
+                // Unexpected content (blank line between sections) — end hunk.
+                break;
+            }
+            i += 1;
+        }
+        hunks.push(GitHunk {
+            old_start,
+            old_count,
+            new_start,
+            new_count,
+            header: header_line,
+            lines,
+        });
+    }
+    hunks
+}
+
+/// Rebuild a unified diff containing only the hunk blocks whose (0-based) index
+/// is in `selected`, keeping the file header (`diff --git` / `---` / `+++`).
+/// Assumes a single-file diff (the callers pass per-path hunks). `selected` is
+/// interpreted relative to `parse_unified_hunks`'s hunk ordering.
+pub fn build_hunk_patch(diff_text: &str, selected: &[usize]) -> String {
+    let lines: Vec<&str> = diff_text.lines().collect();
+    let Some(first) = lines.iter().position(|l| l.starts_with("@@")) else {
+        return String::new();
+    };
+    // Hunk body boundaries: each `@@` line starts a hunk; a `diff ` line closes
+    // the current section (multi-file safety). EOF sentinel closes the last.
+    let mut bounds: Vec<usize> = Vec::new();
+    for (i, l) in lines.iter().enumerate().skip(first) {
+        if l.starts_with("@@") || (i != first && l.starts_with("diff ")) {
+            bounds.push(i);
+        }
+    }
+    bounds.push(lines.len());
+
+    let mut out: Vec<&str> = Vec::new();
+    out.extend_from_slice(&lines[..first]);
+    for (idx, pair) in bounds.windows(2).enumerate() {
+        if selected.contains(&idx) {
+            out.extend_from_slice(&lines[pair[0]..pair[1]]);
+        }
+    }
+    let mut s = out.join("\n");
+    s.push('\n');
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +404,106 @@ mod tests {
         assert_eq!((ok.ahead, ok.behind), (5, 3));
         let garbage = parse_porcelain_v2("# branch.ab +x -y\0");
         assert_eq!((garbage.ahead, garbage.behind), (0, 0));
+    }
+
+    #[test]
+    fn parses_single_hunk_with_typed_lines() {
+        let diff = concat!(
+            "diff --git a/a.txt b/a.txt\n",
+            "index 111..222 100644\n",
+            "--- a/a.txt\n",
+            "+++ b/a.txt\n",
+            "@@ -1,3 +1,4 @@ fn x\n",
+            " one\n",
+            "-old\n",
+            "+new\n",
+            " two\n",
+        );
+        let hunks = parse_unified_hunks(diff);
+        assert_eq!(hunks.len(), 1);
+        let h = &hunks[0];
+        assert_eq!((h.old_start, h.old_count, h.new_start, h.new_count), (1, 3, 1, 4));
+        assert_eq!(h.header, "@@ -1,3 +1,4 @@ fn x");
+        assert_eq!(
+            h.lines,
+            vec![
+                GitHunkLine { kind: "ctx".into(), content: "one".into() },
+                GitHunkLine { kind: "del".into(), content: "old".into() },
+                GitHunkLine { kind: "add".into(), content: "new".into() },
+                GitHunkLine { kind: "ctx".into(), content: "two".into() },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_multiple_hunks_and_single_number_ranges() {
+        let diff = concat!(
+            "@@ -1 +1 @@\n",
+            " one\n",
+            "-old\n",
+            " two\n",
+            "@@ -10,4 +10,4 @@ fn y\n",
+            "+added here\n",
+        );
+        let hunks = parse_unified_hunks(diff);
+        assert_eq!(hunks.len(), 2);
+        assert_eq!(
+            (hunks[0].old_start, hunks[0].old_count, hunks[0].new_start, hunks[0].new_count),
+            (1, 1, 1, 1),
+            "single number defaults count to 1"
+        );
+        assert_eq!(
+            (hunks[1].old_start, hunks[1].old_count, hunks[1].new_start, hunks[1].new_count),
+            (10, 4, 10, 4)
+        );
+        assert_eq!(hunks[0].lines.len(), 3);
+        assert_eq!(hunks[1].lines.len(), 1);
+    }
+
+    #[test]
+    fn no_newline_marker_is_skipped_not_a_line() {
+        let diff = concat!(
+            "@@ -1 +1 @@\n",
+            "-one\n",
+            "\\ No newline at end of file\n",
+            "+one\n",
+        );
+        let hunks = parse_unified_hunks(diff);
+        assert_eq!(hunks[0].lines.len(), 2);
+        assert!(hunks[0].lines.iter().all(|l| l.content != "No newline at end of file"));
+    }
+
+    #[test]
+    fn empty_and_hunkless_diffs_yield_no_hunks() {
+        assert!(parse_unified_hunks("").is_empty());
+        assert!(parse_unified_hunks("diff --git a/x b/x\n--- a/x\n+++ b/x\n").is_empty());
+    }
+
+    #[test]
+    fn build_patch_keeps_header_and_selected_hunks() {
+        let diff = concat!(
+            "diff --git a/x b/x\n",
+            "index 111..222 100644\n",
+            "--- a/x\n",
+            "+++ b/x\n",
+            "@@ -1,2 +1,3 @@ h0\n",
+            " a0\n",
+            "+b0\n",
+            "@@ -10,2 +10,3 @@ h1\n",
+            " a1\n",
+            "+b1\n",
+            "@@ -20,2 +20,3 @@ h2\n",
+            " a2\n",
+            "+b2\n",
+        );
+        let selected = build_hunk_patch(diff, &[1]);
+        assert!(selected.starts_with("diff --git a/x b/x\nindex 111..222 100644\n--- a/x\n+++ b/x\n"));
+        assert!(!selected.contains("h0"), "hunk 0 excluded");
+        assert!(selected.contains("@@ -10,2 +10,3 @@ h1\n a1\n+b1"));
+        assert!(!selected.contains("h2"), "hunk 2 excluded");
+        // Selecting nothing yields just the header.
+        let none = build_hunk_patch(diff, &[]);
+        assert!(!none.contains("@@") || none == "", "no hunk bodies kept");
+        assert!(none.starts_with("diff --git"));
     }
 }

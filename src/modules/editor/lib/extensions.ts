@@ -11,6 +11,7 @@ import {
 } from "@codemirror/view";
 import { blameBadge } from "./blameBadge";
 import { chromeTheme } from "./chromeTheme";
+import { conflictLines } from "./conflictLines";
 import { modifiedLines } from "./modifiedLines";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
@@ -85,6 +86,7 @@ const SHARED_EXTENSIONS: readonly Extension[] = Object.freeze([
   lintGutter(),
   blameBadge(),
   modifiedLines(),
+  conflictLines(),
   chromeTheme(),
   EditorView.theme({
     "&, &.cm-editor, &.cm-editor.cm-focused": {

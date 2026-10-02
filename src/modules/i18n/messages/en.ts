@@ -975,6 +975,12 @@ export const en: Record<string, string> = {
   "editor.saveToPreview": "Save to preview",
   "editor.diffPreviewUnavailable":
     "Diff preview is not available for this file.",
+  "editor.conflictUnresolved": "Unresolved conflict",
+  "editor.conflictHint":
+    "Resolve the conflict below, then stage and commit. Left (ours) / right (theirs).",
+  "editor.hunkCount": "Hunks",
+  "editor.stageAll": "Stage all",
+  "editor.unstageAll": "Unstage all",
   "commandPalette.description":
     "Run a command, switch theme, or search your workspace.",
   "commandPalette.themes": "Themes",
@@ -996,6 +1002,34 @@ export const en: Record<string, string> = {
   "sourceControl.copyRepoPath": "Copy Repository Path",
   "sourceControl.createBranch": "Create Branch",
   "sourceControl.mergeBranch": "Merge Branch",
+  "sourceControl.rebaseOnto": "Rebase onto",
+  "sourceControl.rebase": "Rebase",
+  "sourceControl.rebaseTitle": "Rebase onto branch",
+  "sourceControl.rebaseBody": 'Rebase the current branch onto "{target}"?',
+  "sourceControl.rebaseConflict":
+    "Rebase conflicted with {target}. Resolve the conflicts, then continue or abort.",
+  "sourceControl.abortRebase": "Abort Rebase",
+  "sourceControl.cherryPick": "Cherry-pick",
+  "sourceControl.cherryPickTitle": "Cherry-pick commit",
+  "sourceControl.cherryPickBody":
+    'Cherry-pick "{target}" onto the current branch?',
+  "sourceControl.cherryPickConflict":
+    "Cherry-pick conflicted with {target}. Resolve the conflicts, then continue or abort.",
+  "sourceControl.abortCherryPick": "Abort Cherry-pick",
+  "sourceControl.manageRemotes": "Manage Remotes",
+  "sourceControl.manageRemotesBody":
+    "Add, edit, or remove Git remotes for this repository.",
+  "sourceControl.noRemotes": "No remotes configured.",
+  "sourceControl.addRemote": "Add Remote",
+  "sourceControl.deleteRemote": "Delete Remote",
+  "sourceControl.deletingRemote": "Deleting…",
+  "sourceControl.deleteRemoteConfirmTitle": "Remove remote?",
+  "sourceControl.deleteRemoteConfirmBody":
+    'Remove the "{remote}" remote? This can be undone by adding it again.',
+  "sourceControl.remoteNamePlaceholder": "name",
+  "sourceControl.remoteUrlPlaceholder": "https://host/repo.git",
+  "sourceControl.remoteAdded": "Remote added.",
+  "sourceControl.remoteRemoved": "Remote removed.",
   "sourceControl.createBranchPlaceholder": "Enter new branch name…",
   "sourceControl.createBranchTitle": "Create Branch",
   "sourceControl.createBranchBody": "Create a new branch from {branch}:",
@@ -1094,6 +1128,7 @@ export const en: Record<string, string> = {
   "sourceControl.onBranch": "on {branch}",
   "sourceControl.divergedFromUpstream": "Diverged from upstream",
   "sourceControl.resolveInTerminal": "— resolve in terminal",
+  "sourceControl.resolveConflict": "Resolve Conflict",
   "sourceControl.changes": "Changes",
   "sourceControl.all": "All",
   "sourceControl.stageAllAria": "Stage all changes",

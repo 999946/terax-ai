@@ -4,9 +4,12 @@ import { GitDiffPane } from "./GitDiffPane";
 type Props = {
   tabs: Tab[];
   activeId: number;
+  /** Called after a hunk-level stage/discard, so the source-control panel and
+   * open editor baselines can refresh. */
+  onHunkStaged?: (repoRoot: string, path: string) => void;
 };
 
-export function GitDiffStack({ tabs, activeId }: Props) {
+export function GitDiffStack({ tabs, activeId, onHunkStaged }: Props) {
   const active = tabs.find(
     (t): t is GitDiffTab | GitCommitFileDiffTab =>
       (t.kind === "git-diff" || t.kind === "git-commit-file") &&
@@ -25,7 +28,9 @@ export function GitDiffStack({ tabs, activeId }: Props) {
             path: active.path,
             mode: active.mode,
             originalPath: active.originalPath,
+            conflict: active.conflict ?? false,
           }}
+          onHunkStaged={onHunkStaged}
         />
       </div>
     );

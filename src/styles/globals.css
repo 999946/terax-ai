@@ -68,6 +68,7 @@
     --ml-added: #15803d;
     --ml-modified: #b45309;
     --ml-deleted: #dc2626;
+    --ml-conflict: #b91c1c;
     --card-foreground: #111111;
     --popover: #ffffff;
     --popover-foreground: #111111;
@@ -110,6 +111,7 @@
     --ml-added: #4ade80;
     --ml-modified: #f59e0b;
     --ml-deleted: #f87171;
+    --ml-conflict: #f94c4c;
     --card-foreground: #f7f7f7;
     --popover: #1d1d1d;
     --popover-foreground: #f7f7f7;

@@ -106,6 +106,8 @@ export type GitDiffTab = TabBase & {
   mode: "-" | "+";
   originalPath: string | null;
   preview: boolean;
+  /** True for an unmerged (conflicted) file: the diff shows ours vs theirs. */
+  conflict?: boolean;
 };
 
 export type GitHistoryTab = TabBase & {
@@ -157,6 +159,8 @@ export type GitDiffOpenInput = {
   mode: "-" | "+";
   originalPath?: string | null;
   title?: string;
+  /** True for an unmerged (conflicted) file: show ours vs theirs. */
+  conflict?: boolean;
 };
 
 export type OpenFileTabOptions = {
@@ -461,14 +465,20 @@ export function planGitDiffOpen(
   pin: boolean,
   allocId: () => number,
 ): { tabs: Tab[]; targetId: number } {
-  const title = input.title ?? `${basename(input.path)} (${input.mode})`;
+  const conflict = input.conflict ?? false;
+  const title =
+    input.title ??
+    (conflict
+      ? `${basename(input.path)} (conflict)`
+      : `${basename(input.path)} (${input.mode})`);
   const originalPath = input.originalPath ?? null;
   const matches = (tab: Tab): tab is GitDiffTab =>
     tab.kind === "git-diff" &&
     tab.spaceId === spaceId &&
     tab.repoRoot === input.repoRoot &&
     tab.path === input.path &&
-    tab.mode === input.mode;
+    tab.mode === input.mode &&
+    (tab.conflict ?? false) === conflict;
   const matchingTabs = tabs.filter(matches);
   const existing = matchingTabs.find((tab) => !tab.preview) ?? matchingTabs[0];
 
@@ -502,6 +512,7 @@ export function planGitDiffOpen(
     mode: input.mode,
     originalPath,
     preview: !pin,
+    ...(conflict ? { conflict: true } : {}),
   } satisfies GitDiffTab;
 
   if (pin) return { tabs: [...tabs, tab], targetId: id };
@@ -1055,21 +1066,18 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     );
   }, []);
 
-  const setMarkdownView = useCallback(
-    (id: number, mode: MarkdownViewMode) => {
-      setTabs((curr) =>
-        curr.map((t) => {
-          if (t.id !== id || t.kind !== "editor") return t;
-          if (!isMarkdownPath(t.path)) return t;
-          // Can't drop the unsaved source to show a stale rendered preview.
-          if (mode !== "raw" && t.dirty) return t;
-          if (t.viewMode === mode) return t;
-          return { ...t, viewMode: mode };
-        }),
-      );
-    },
-    [],
-  );
+  const setMarkdownView = useCallback((id: number, mode: MarkdownViewMode) => {
+    setTabs((curr) =>
+      curr.map((t) => {
+        if (t.id !== id || t.kind !== "editor") return t;
+        if (!isMarkdownPath(t.path)) return t;
+        // Can't drop the unsaved source to show a stale rendered preview.
+        if (mode !== "raw" && t.dirty) return t;
+        if (t.viewMode === mode) return t;
+        return { ...t, viewMode: mode };
+      }),
+    );
+  }, []);
 
   const openGitDiffTab = useCallback((input: GitDiffOpenInput, pin = false) => {
     const curr = tabsRef.current;
@@ -1187,7 +1195,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     for (const lid of toDispose) disposeSession(lid);
   }, []);
 
-    const closeTabs = useCallback(
+  const closeTabs = useCallback(
     (anchorId: number, plan: CloseTabsPlan): number[] => {
       const result = applyCloseTabsPlan(tabsRef.current, anchorId, plan);
       if (!result) return [];
@@ -1201,28 +1209,25 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     [],
   );
 
-  const closeAllInSpace = useCallback(
-    (spaceId: string): number[] => {
-      const closed: number[] = [];
-      const toDispose: number[] = [];
-      setTabs((curr) => {
-        const spaceTabs = curr.filter((t) => t.spaceId === spaceId);
-        if (spaceTabs.length === 0) return curr;
-        const closing = new Set(spaceTabs.map((t) => t.id));
-        closed.push(...spaceTabs.map((t) => t.id));
-        for (const t of spaceTabs) {
-          if (t.kind === "terminal") toDispose.push(...leafIds(t.paneTree));
-        }
-        const next = curr.filter((t) => !closing.has(t.id));
-        // -1 represents an empty active space when its last tab is closed.
-        setActiveId((active) => (closing.has(active) ? -1 : active));
-        return next;
-      });
-      for (const lid of toDispose) disposeSession(lid);
-      return closed;
-    },
-    [],
-  );
+  const closeAllInSpace = useCallback((spaceId: string): number[] => {
+    const closed: number[] = [];
+    const toDispose: number[] = [];
+    setTabs((curr) => {
+      const spaceTabs = curr.filter((t) => t.spaceId === spaceId);
+      if (spaceTabs.length === 0) return curr;
+      const closing = new Set(spaceTabs.map((t) => t.id));
+      closed.push(...spaceTabs.map((t) => t.id));
+      for (const t of spaceTabs) {
+        if (t.kind === "terminal") toDispose.push(...leafIds(t.paneTree));
+      }
+      const next = curr.filter((t) => !closing.has(t.id));
+      // -1 represents an empty active space when its last tab is closed.
+      setActiveId((active) => (closing.has(active) ? -1 : active));
+      return next;
+    });
+    for (const lid of toDispose) disposeSession(lid);
+    return closed;
+  }, []);
 
   const updateTab = useCallback((id: number, patch: TabPatch) => {
     setTabs((t) =>
@@ -1384,7 +1389,9 @@ export function useTabs(initial?: Partial<TerminalTab>) {
         // actually be dismissed and the emptiness persists across restart.
         const fallback = nextActiveInSpace(curr, tab.id);
         const next = curr.filter((x) => x.id !== tab.id);
-        setActiveId((active) => (active === tab.id ? (fallback ?? -1) : active));
+        setActiveId((active) =>
+          active === tab.id ? (fallback ?? -1) : active,
+        );
         didRemove = true;
         return next;
       }

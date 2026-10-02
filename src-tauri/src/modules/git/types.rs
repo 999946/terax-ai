@@ -71,6 +71,60 @@ pub struct GitCommitInput {
 pub struct GitDiffResult {
     pub diff_text: String,
     pub truncated: bool,
+    pub hunks: Vec<GitHunk>,
+}
+
+/// One line inside a parsed unified-diff hunk.
+#[derive(Serialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHunkLine {
+    /// "ctx" | "add" | "del"
+    pub kind: String,
+    /// Line content without the leading ` `/`+`/`-` prefix.
+    pub content: String,
+}
+
+/// A parsed unified-diff hunk: range info + typed lines. Positions are
+/// 1-based line numbers from the `@@ -o[,n] +m[,k] @@` header.
+#[derive(Serialize, Clone, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHunk {
+    pub old_start: u32,
+    pub old_count: u32,
+    pub new_start: u32,
+    pub new_count: u32,
+    /// The original header line text, e.g. `@@ -1,3 +1,4 @@ fn foo`.
+    pub header: String,
+    pub lines: Vec<GitHunkLine>,
+}
+
+/// A file currently involved in a merge/rebase conflict, with the ours / theirs
+/// (and base) staged blobs decoded. Binary files report `is_binary` with no text.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitConflictFile {
+    pub path: String,
+    pub ours: Option<String>,
+    pub theirs: Option<String>,
+    pub base: Option<String>,
+    pub is_binary: bool,
+}
+
+/// Result of a merge-like operation: `conflicted` distinguishes a clean result
+/// from one that left unmerged files behind, which the UI should surface.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitConflictResult {
+    pub conflicted: bool,
+    pub files: Vec<GitConflictFile>,
+}
+
+/// A named remote and its fetch URL, from `git remote -v`.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRemote {
+    pub name: String,
+    pub url: String,
 }
 
 #[derive(Serialize)]
@@ -327,6 +381,73 @@ mod serde_shape_tests {
         ] {
             assert!(json.get(key).is_some(), "missing key {key}");
         }
+    }
+
+    #[test]
+    fn diff_result_serializes_hunks_field() {
+        let diff = GitDiffResult {
+            diff_text: "--- a/x\n+++ b/x\n@@ -1 +1 @@\n".into(),
+            truncated: false,
+            hunks: vec![GitHunk {
+                old_start: 1,
+                old_count: 1,
+                new_start: 1,
+                new_count: 1,
+                header: "@@ -1 +1 @@".into(),
+                lines: vec![GitHunkLine {
+                    kind: "add".into(),
+                    content: "+hi".into(),
+                }],
+            }],
+        };
+        let json = serde_json::to_value(&diff).unwrap();
+        assert!(json.get("diffText").is_some());
+        assert_eq!(json["truncated"], serde_json::json!(false));
+        assert_eq!(json["hunks"][0]["oldStart"], serde_json::json!(1));
+        assert_eq!(json["hunks"][0]["newCount"], serde_json::json!(1));
+        assert_eq!(json["hunks"][0]["lines"][0]["kind"], serde_json::json!("add"));
+    }
+
+    #[test]
+    fn conflict_file_and_result_serialize_as_named() {
+        let file = GitConflictFile {
+            path: "a.rs".into(),
+            ours: Some("ours".into()),
+            theirs: Some("theirs".into()),
+            base: None,
+            is_binary: false,
+        };
+        let json = serde_json::to_value(&file).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "path": "a.rs",
+                "ours": "ours",
+                "theirs": "theirs",
+                "base": null,
+                "isBinary": false,
+            })
+        );
+
+        let result = GitConflictResult {
+            conflicted: true,
+            files: vec![file],
+        };
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["conflicted"], serde_json::json!(true));
+        assert_eq!(json["files"][0]["path"], serde_json::json!("a.rs"));
+    }
+
+    #[test]
+    fn remote_serializes_camel_case() {
+        let remote = GitRemote {
+            name: "origin".into(),
+            url: "https://github.com/x/y.git".into(),
+        };
+        assert_eq!(
+            serde_json::to_value(&remote).unwrap(),
+            serde_json::json!({ "name": "origin", "url": "https://github.com/x/y.git" })
+        );
     }
 
     #[test]
