@@ -67,6 +67,12 @@ import {
   runExternalFormatter,
 } from "./lib/externalFormat";
 import { detectIndentUnit } from "./lib/indent";
+import {
+  editorStatus,
+  type EditorStatusInfo,
+  type EditorStatusExtra,
+} from "./lib/editorStatus";
+import { detectEol } from "./lib/eol";
 import { type LanguageResult, resolveLanguage } from "./lib/languageResolver";
 import { FORCE_READ_LIMIT, useDocument } from "./lib/useDocument";
 import { useEditorThemeExt } from "./lib/useEditorThemeExt";
@@ -143,7 +149,7 @@ export const EditorPane = memo(
     } = props;
     const { t } = useTranslation();
 
-    const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
+    const { doc, dirty, onChange, save, reload, adoptDiskText, openAnyway } =
       useDocument({
         path,
         onDirtyChange,
@@ -161,6 +167,14 @@ export const EditorPane = memo(
     const languageRef = useRef<string | null>(null);
     const [langId, setLangId] = useState<string | null>(null);
     const apiKeyRef = useRef<string | null>(null);
+    const statusApiRef = useRef<{ refresh: () => void } | null>(null);
+    const [status, setStatus] = useState<EditorStatusInfo | null>(null);
+    const statusFlagsRef = useRef<EditorStatusExtra>({
+      eol: "\n",
+      language: null,
+      readonly: false,
+      dirty: false,
+    });
 
     useEffect(() => {
       let cancelled = false;
@@ -419,6 +433,14 @@ export const EditorPane = memo(
         languageCompartment.of([]),
         lspCompartment.of([]),
         diagnosticsReporter(() => pathRef.current),
+        (() => {
+          const api = editorStatus(
+            () => statusFlagsRef.current,
+            (info) => setStatus(info),
+          );
+          statusApiRef.current = api;
+          return api.extension;
+        })(),
         // Before inlineCompletion so an open popup wins Tab over the ghost.
         Prec.highest(keymap.of([{ key: "Tab", run: acceptCompletion }])),
         inlineCompletion({
@@ -502,6 +524,19 @@ export const EditorPane = memo(
         ),
       });
     }, [doc]);
+
+    // Keep the editor status bar in sync with out-of-band changes: dirty flag,
+    // resolved language, and the document's EOL. These don't go through CM
+    // updates, so re-emit the status whenever one of them changes.
+    useEffect(() => {
+      statusFlagsRef.current = {
+        eol: doc.status === "ready" ? detectEol(doc.content) : "\n",
+        language: langId,
+        readonly: false,
+        dirty,
+      };
+      statusApiRef.current?.refresh();
+    }, [doc, langId, dirty]);
 
     // Git blame: show the active line's commit badge at the line end (GitLens
     // style). Resolve the repo root for the current file, fetch its blame map,
@@ -865,6 +900,33 @@ export const EditorPane = memo(
                 searchKeymap: true,
               }}
             />
+            {status ? (
+              <div className="flex h-6 shrink-0 items-center gap-3 border-t border-border/60 px-3 text-[11px] tabular-nums text-muted-foreground">
+                <span>
+                  {t("editor.status.lineCol", {
+                    line: status.line,
+                    col: status.col,
+                  })}
+                </span>
+                <span>{status.eol === "\r\n" ? "CRLF" : "LF"}</span>
+                <span>
+                  {status.indentUnit === "\t"
+                    ? "Tab"
+                    : t("editor.status.spaces", {
+                        count: status.indentUnit.length,
+                      })}
+                </span>
+                {status.language ? <span>{status.language}</span> : null}
+                {status.readonly ? (
+                  <span>{t("editor.status.readOnly")}</span>
+                ) : null}
+                {status.dirty ? (
+                  <span className="text-amber-500">
+                    {t("editor.status.dirty")}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent

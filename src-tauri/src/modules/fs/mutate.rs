@@ -36,7 +36,7 @@ fn is_conflict(error: &io::Error) -> bool {
     )
 }
 
-fn resolve_authorized_root(
+pub(crate) fn resolve_authorized_root(
     root: &str,
     workspace: &WorkspaceEnv,
     registry: &WorkspaceRegistry,
@@ -55,7 +55,7 @@ fn resolve_authorized_root(
     }
 }
 
-fn authorize_mutation_entry(path: &Path, root: &Path) -> Result<(), String> {
+pub(crate) fn authorize_mutation_entry(path: &Path, root: &Path) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| format!("path has no parent: {}", path.display()))?;

@@ -3,7 +3,12 @@ import { indentUnit } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
 import { search } from "@codemirror/search";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import {
+  crosshairCursor,
+  drawSelection,
+  EditorView,
+  rectangularSelection,
+} from "@codemirror/view";
 import { blameBadge } from "./blameBadge";
 import { chromeTheme } from "./chromeTheme";
 import { modifiedLines } from "./modifiedLines";
@@ -55,6 +60,13 @@ export function wordWrapExtension(column: number | null): Extension {
 // highlightSelectionMatches and the search keymap.
 // Singleton: per-pane instances would inject duplicate style modules.
 const SHARED_EXTENSIONS: readonly Extension[] = Object.freeze([
+  // Multiple cursors + rectangular (column) selection. `Mod-d` to select the
+  // next occurrence comes from @codemirror/search's searchKeymap (already on
+  // via basicSetup); allowing multiple selections makes it accumulate cursors.
+  EditorState.allowMultipleSelections.of(true),
+  drawSelection(),
+  rectangularSelection(),
+  crosshairCursor(),
   search({ top: true }),
   lintGutter(),
   blameBadge(),

@@ -51,6 +51,7 @@ export type CommandPaletteActionContext = {
   splitPaneDown: () => void;
   focusSearch: () => void;
   focusExplorerSearch: () => void;
+  openSearchPanel: () => void;
   toggleSidebar: () => void;
   toggleHiddenFiles: () => void;
   toggleAi: () => void;
@@ -118,7 +119,14 @@ export function createCommandItems(
       labelKey: "commandPalette.cmd.spaces.overview",
       title: "Spaces: Overview",
       group: "Spaces",
-      keywords: ["spaces", "sessions", "overview", "organize", "manage", "move"],
+      keywords: [
+        "spaces",
+        "sessions",
+        "overview",
+        "organize",
+        "manage",
+        "move",
+      ],
       icon: DashboardSquare01Icon,
       run: ctx.openSpacesOverview,
     },
@@ -137,8 +145,7 @@ export function createCommandItems(
       group: "Spaces" as const,
       keywords: ["space", "switch", "session", sp.name],
       icon: DashboardSquare01Icon,
-      disabledReason:
-        sp.id === ctx.activeSpaceId ? "Current space" : undefined,
+      disabledReason: sp.id === ctx.activeSpaceId ? "Current space" : undefined,
       run: () => ctx.switchSpace(sp.id),
     })),
     {
@@ -252,6 +259,23 @@ export function createCommandItems(
       icon: FileSearchIcon,
       trailing: "#",
       run: noop,
+    },
+    {
+      id: "search.open",
+      labelKey: "commandPalette.cmd.search.open",
+      title: "Find & replace in files",
+      group: "Search",
+      keywords: [
+        "grep",
+        "replace",
+        "find and replace",
+        "contents",
+        "workspace",
+      ],
+      icon: FileSearchIcon,
+      shortcutId: "search.inFiles",
+      disabledReason: ctx.explorerRoot ? undefined : "No workspace root",
+      run: ctx.openSearchPanel,
     },
     {
       id: "history.open",

@@ -42,6 +42,8 @@ import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { native } from "@/modules/ai/lib/native";
 import { useTranslation } from "react-i18next";
 import { CommandPalette, createCommandItems } from "@/modules/command-palette";
+import { SearchPanel } from "@/modules/search-panel/SearchPanel";
+import { useSearchPanel } from "@/modules/search-panel/useSearchPanel";
 import { useControlBridge } from "@/modules/control";
 import {
   type EditorPaneHandle,
@@ -380,6 +382,7 @@ export default function App() {
   const focusInput = useChatStore((s) => s.focusInput);
   const openPanel = useChatStore((s) => s.openPanel);
   const panelOpen = useChatStore((s) => s.panelOpen);
+  const searchPanelOpen = useSearchPanel((s) => s.open);
   const setLive = useChatStore((s) => s.setLive);
   const respondToApproval = useChatStore((s) => s.respondToApproval);
 
@@ -987,6 +990,7 @@ export default function App() {
         if (editor) editor.openSearch();
         else searchInlineRef.current?.focus();
       },
+      "search.inFiles": () => useSearchPanel.getState().openPanel(),
       "ai.toggle": togglePanelAndFocus,
       "ai.toggleMini": () => {
         if (!hasComposer) {
@@ -1419,6 +1423,7 @@ export default function App() {
             splitPaneDown: () => splitActivePaneInActiveTab("col"),
             focusSearch: () => searchInlineRef.current?.focus(),
             focusExplorerSearch: () => explorerRef.current?.focusSearch(),
+            openSearchPanel: () => useSearchPanel.getState().openPanel(),
             toggleSidebar,
             toggleHiddenFiles: () => {
               const preferences = usePreferencesStore.getState();
@@ -1706,6 +1711,13 @@ export default function App() {
               </ResizablePanel>
             </ResizablePanelGroup>
           </main>
+
+          {searchPanelOpen ? (
+            <SearchPanel
+              root={explorerRoot}
+              onOpenContentHit={openContentHit}
+            />
+          ) : null}
 
           {!zenMode && (
             <StatusBar

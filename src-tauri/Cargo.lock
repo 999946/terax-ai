@@ -5405,7 +5405,7 @@ dependencies = [
 
 [[package]]
 name = "terax"
-version = "0.9.7"
+version = "0.9.8"
 dependencies = [
  "block2",
  "bytes",
@@ -5427,6 +5427,7 @@ dependencies = [
  "objc2-foundation",
  "portable-pty",
  "proptest",
+ "regex",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -5455,7 +5456,7 @@ dependencies = [
 
 [[package]]
 name = "terax-cli"
-version = "0.9.7"
+version = "0.9.8"
 dependencies = [
  "dirs 7.0.0",
  "libc",
@@ -5467,7 +5468,7 @@ dependencies = [
 
 [[package]]
 name = "terax-control-protocol"
-version = "0.9.7"
+version = "0.9.8"
 dependencies = [
  "serde",
  "serde_json",

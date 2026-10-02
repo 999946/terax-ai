@@ -298,6 +298,7 @@ pub fn run() {
             fs::grep::fs_grep,
             fs::grep::fs_grep_interactive,
             fs::grep::fs_glob,
+            fs::replace::fs_replace_matches,
             git::commands::git_list_repos,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,

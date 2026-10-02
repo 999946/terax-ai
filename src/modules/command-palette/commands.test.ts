@@ -40,6 +40,7 @@ function baseContext(
     splitPaneDown: noop,
     focusSearch: noop,
     focusExplorerSearch: noop,
+    openSearchPanel: noop,
     toggleSidebar: noop,
     toggleHiddenFiles: noop,
     toggleAi: noop,

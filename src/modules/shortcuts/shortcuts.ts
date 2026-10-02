@@ -34,6 +34,7 @@ export type ShortcutId =
   | "blocks.next"
   | "search.focus"
   | "explorer.search"
+  | "search.inFiles"
   | "explorer.focus"
   | "explorer.toggleHidden"
   | "view.zoomIn"
@@ -293,6 +294,14 @@ export const SHORTCUTS: Shortcut[] = [
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
   },
   {
+    id: "search.inFiles",
+    labelKey: "settings.shortcuts.items.search.inFiles",
+    label: "Find & replace in files",
+    group: "Search",
+    // WebStorm's replace-in-path chord. Mod+Shift+F is taken by explorer.search.
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "r" }],
+  },
+  {
     id: "search.focus",
     labelKey: "settings.shortcuts.items.search.focus",
     label: "Find in tab",
@@ -479,7 +488,7 @@ function keyFromCode(code: string): string | null {
 export function matchBinding(
   e: KeyboardEvent,
   binding: KeyBinding,
-  id?: ShortcutId
+  id?: ShortcutId,
 ): boolean {
   const eventKey = e.key.toLowerCase();
   const bindingKey = binding.key.toLowerCase();
