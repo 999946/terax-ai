@@ -503,7 +503,7 @@ mod tests {
         assert!(!selected.contains("h2"), "hunk 2 excluded");
         // Selecting nothing yields just the header.
         let none = build_hunk_patch(diff, &[]);
-        assert!(!none.contains("@@") || none == "", "no hunk bodies kept");
+        assert!(!none.contains("@@") || none.is_empty(), "no hunk bodies kept");
         assert!(none.starts_with("diff --git"));
     }
 }
