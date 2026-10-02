@@ -199,6 +199,9 @@ export const zhCN: Record<string, string> = {
   "settings.editor.description": "描述",
   "settings.editor.fontSize": "字体大小",
   "settings.editor.fontSizeDescription": "编辑器文本的字体大小。",
+  "settings.editor.fontLigatures": "字体连字",
+  "settings.editor.fontLigaturesDescription":
+    "在编辑器字体中启用上下文连字（如 `=>`、`==`）。需字体本身支持连字，默认关闭。",
   "settings.editor.formatOnSave": "保存时格式化",
   "settings.editor.formatter": "格式化程序",
   "settings.editor.languageOverrides": "语言覆盖设置",

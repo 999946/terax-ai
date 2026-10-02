@@ -17,6 +17,7 @@ import { modifiedLines } from "./modifiedLines";
 export const languageCompartment = new Compartment();
 export const readOnlyCompartment = new Compartment();
 export const wrapCompartment = new Compartment();
+export const ligatureCompartment = new Compartment();
 export const vimCompartment = new Compartment();
 export const lspCompartment = new Compartment();
 export const indentCompartment = new Compartment();
@@ -52,6 +53,19 @@ export function wordWrapExtension(column: number | null): Extension {
       style: `${WORD_WRAP_COLUMN_VAR}: ${column}ch`,
     }),
   ];
+}
+
+/**
+ * Enables contextual font ligatures (e.g. `=>`, `==` render as a single
+ * glyph). Only takes effect when the editor font itself supports ligatures
+ * (many Nerd Fonts do not), so it is off by default and toggled by the
+ * `editorFontLigatures` preference via the {@link ligatureCompartment}.
+ */
+export function ligatureExtension(enabled: boolean): Extension {
+  if (!enabled) return [];
+  return EditorView.theme({
+    ".cm-scroller": { fontVariantLigatures: "contextual" },
+  });
 }
 
 // Only what basicSetup doesn't already cover, to avoid duplicate extensions.

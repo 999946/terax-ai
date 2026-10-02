@@ -25,6 +25,7 @@ import {
   setEditorAutoSave,
   setEditorAutoSaveDelay,
   setEditorCustomFormatCommand,
+  setEditorFontLigatures,
   setEditorFontSize,
   setEditorFormatOnSave,
   setEditorFormatter,
@@ -47,6 +48,7 @@ const AUTO_SAVE_STEP = 100;
 export function EditorSection() {
   const { t } = useTranslation();
   const editorFontSize = usePreferencesStore((s) => s.editorFontSize);
+  const editorFontLigatures = usePreferencesStore((s) => s.editorFontLigatures);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
   const gitDiffCollapseUnchanged = usePreferencesStore(
@@ -98,6 +100,15 @@ export function EditorSection() {
               ))}
             </SelectContent>
           </Select>
+        </SettingRow>
+        <SettingRow
+          title={t("settings.editor.fontLigatures")}
+          description={t("settings.editor.fontLigaturesDescription")}
+        >
+          <Switch
+            checked={editorFontLigatures}
+            onCheckedChange={(v) => void setEditorFontLigatures(v)}
+          />
         </SettingRow>
       </div>
 
@@ -208,7 +219,11 @@ function FormatterSelect({
       <SelectContent>
         {FORMATTER_OPTIONS.map((id) => (
           <SelectItem key={id} value={id}>
-            {id === "lsp" ? t("settings.editor.languageServer") : id === "custom" ? t("settings.editor.customCommand") : FORMATTER_LABELS[id]}
+            {id === "lsp"
+              ? t("settings.editor.languageServer")
+              : id === "custom"
+                ? t("settings.editor.customCommand")
+                : FORMATTER_LABELS[id]}
           </SelectItem>
         ))}
       </SelectContent>
@@ -427,7 +442,9 @@ function WordWrapColumnInput({
           }}
           className="h-8 w-20 rounded-md border border-border bg-background px-2.5 text-right text-[12px] md:text-[12px] tabular-nums outline-none focus:border-foreground/40 focus-visible:ring-0 focus-visible:border-foreground/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="text-[11px] text-muted-foreground">{t("settings.editor.columns")}</span>
+        <span className="text-[11px] text-muted-foreground">
+          {t("settings.editor.columns")}
+        </span>
       </div>
     </SettingRow>
   );

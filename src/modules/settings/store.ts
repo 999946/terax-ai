@@ -157,6 +157,7 @@ export type Preferences = {
   vimMode: boolean;
   editorWordWrap: boolean;
   editorWordWrapColumn: number;
+  editorFontLigatures: boolean;
   gitDiffCollapseUnchanged: boolean;
   showHidden: boolean;
   explorerGitDecorations: boolean;
@@ -258,6 +259,7 @@ const KEY_RECENT_MODELS = "recentModelIds";
 const KEY_VIM_MODE = "vimMode";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_WORD_WRAP_COLUMN = "editorWordWrapColumn";
+const KEY_EDITOR_FONT_LIGATURES = "editorFontLigatures";
 const KEY_GIT_DIFF_COLLAPSE_UNCHANGED = "gitDiffCollapseUnchanged";
 const KEY_SHOW_HIDDEN = "showHidden";
 const LEGACY_KEY_SHOW_HIDDEN_DIRS = "showHiddenDirectories";
@@ -357,6 +359,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vimMode: false,
   editorWordWrap: false,
   editorWordWrapColumn: EDITOR_WORD_WRAP_COLUMN_DEFAULT,
+  editorFontLigatures: false,
   gitDiffCollapseUnchanged: false,
   showHidden: false,
   explorerGitDecorations: true,
@@ -515,6 +518,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_EDITOR_WORD_WRAP_COLUMN) ??
         DEFAULT_PREFERENCES.editorWordWrapColumn,
     ),
+    editorFontLigatures:
+      get<boolean>(KEY_EDITOR_FONT_LIGATURES) ??
+      DEFAULT_PREFERENCES.editorFontLigatures,
     gitDiffCollapseUnchanged:
       get<boolean>(KEY_GIT_DIFF_COLLAPSE_UNCHANGED) ??
       DEFAULT_PREFERENCES.gitDiffCollapseUnchanged,
@@ -812,6 +818,10 @@ export async function setEditorWordWrap(value: boolean): Promise<void> {
   await writePref(KEY_EDITOR_WORD_WRAP, value);
 }
 
+export async function setEditorFontLigatures(value: boolean): Promise<void> {
+  await writePref(KEY_EDITOR_FONT_LIGATURES, value);
+}
+
 export async function setGitDiffCollapseUnchanged(
   value: boolean,
 ): Promise<void> {
@@ -1058,6 +1068,7 @@ export async function onPreferencesChange(
     [KEY_VIM_MODE]: "vimMode",
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_WORD_WRAP_COLUMN]: "editorWordWrapColumn",
+    [KEY_EDITOR_FONT_LIGATURES]: "editorFontLigatures",
     [KEY_GIT_DIFF_COLLAPSE_UNCHANGED]: "gitDiffCollapseUnchanged",
     [KEY_SHOW_HIDDEN]: "showHidden",
     [KEY_EXPLORER_GIT_DECORATIONS]: "explorerGitDecorations",

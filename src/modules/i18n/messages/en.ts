@@ -352,6 +352,9 @@ export const en: Record<string, string> = {
   "settings.editor.description": "Description",
   "settings.editor.fontSize": "Font size",
   "settings.editor.fontSizeDescription": "Font size description",
+  "settings.editor.fontLigatures": "Font ligatures",
+  "settings.editor.fontLigaturesDescription":
+    "Enable contextual ligatures in the editor font (e.g. `=>`, `==`). Requires a font that supports ligatures; off by default.",
   "settings.editor.formatOnSave": "Format on save",
   "settings.editor.formatter": "Formatter",
   "settings.editor.languageOverrides": "Language overrides",

@@ -26,9 +26,18 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import {
   forwardRef,
+  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -55,6 +64,8 @@ import {
   indentCompartment,
   indentExtension,
   languageCompartment,
+  ligatureCompartment,
+  ligatureExtension,
   lspCompartment,
   vimCompartment,
   wordWrapExtension,
@@ -72,6 +83,10 @@ import {
   type EditorStatusInfo,
   type EditorStatusExtra,
 } from "./lib/editorStatus";
+import {
+  symbolBreadcrumb,
+  type BreadcrumbSegment,
+} from "./lib/symbolBreadcrumb";
 import { detectEol } from "./lib/eol";
 import { type LanguageResult, resolveLanguage } from "./lib/languageResolver";
 import { FORCE_READ_LIMIT, useDocument } from "./lib/useDocument";
@@ -164,11 +179,17 @@ export const EditorPane = memo(
     const wordWrapColumn = usePreferencesStore((s) =>
       s.editorWordWrap ? s.editorWordWrapColumn : null,
     );
+    const fontLigatures = usePreferencesStore((s) => s.editorFontLigatures);
     const languageRef = useRef<string | null>(null);
+    const langIdRef = useRef<string | null>(null);
     const [langId, setLangId] = useState<string | null>(null);
     const apiKeyRef = useRef<string | null>(null);
     const statusApiRef = useRef<{ refresh: () => void } | null>(null);
     const [status, setStatus] = useState<EditorStatusInfo | null>(null);
+    const breadcrumbApiRef = useRef<{ refresh: () => void } | null>(null);
+    const [breadcrumb, setBreadcrumb] = useState<BreadcrumbSegment[] | null>(
+      null,
+    );
     const statusFlagsRef = useRef<EditorStatusExtra>({
       eol: "\n",
       language: null,
@@ -349,6 +370,18 @@ export const EditorPane = memo(
       if (pendingPath === path) focusWhenRendered(view, pendingPath);
     }, [focusWhenRendered, path]);
 
+    // Jump to a breadcrumb symbol: select the declaration name token and center
+    // it, mirroring the pending-goto dispatch.
+    const jumpToSymbol = useCallback((from: number) => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        selection: { anchor: from },
+        effects: EditorView.scrollIntoView(from, { y: "center" }),
+      });
+      view.focus();
+    }, []);
+
     const hasSelection = useCallback(() => {
       const view = cmRef.current?.view;
       if (!view) return false;
@@ -422,6 +455,9 @@ export const EditorPane = memo(
               : null,
           ),
         ),
+        ligatureCompartment.of(
+          ligatureExtension(usePreferencesStore.getState().editorFontLigatures),
+        ),
         vimHandlersExtension(() => ({
           save: () => {
             void performSaveRef.current();
@@ -439,6 +475,14 @@ export const EditorPane = memo(
             (info) => setStatus(info),
           );
           statusApiRef.current = api;
+          return api.extension;
+        })(),
+        (() => {
+          const api = symbolBreadcrumb(
+            () => ({ id: langIdRef.current }),
+            (segs) => setBreadcrumb(segs),
+          );
+          breadcrumbApiRef.current = api;
           return api.extension;
         })(),
         // Before inlineCompletion so an open popup wins Tab over the ghost.
@@ -515,6 +559,16 @@ export const EditorPane = memo(
     }, [wordWrapColumn]);
 
     useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: ligatureCompartment.reconfigure(
+          ligatureExtension(fontLigatures),
+        ),
+      });
+    }, [fontLigatures]);
+
+    useEffect(() => {
       if (doc.status !== "ready") return;
       const view = cmRef.current?.view;
       if (!view) return;
@@ -536,6 +590,10 @@ export const EditorPane = memo(
         dirty,
       };
       statusApiRef.current?.refresh();
+      // The breadcrumb extension reads language through a ref; mirror langId so
+      // a resolved/cleared language triggers a re-emit out-of-band.
+      langIdRef.current = langId;
+      breadcrumbApiRef.current?.refresh();
     }, [doc, langId, dirty]);
 
     // Git blame: show the active line's commit badge at the line end (GitLens
@@ -880,6 +938,37 @@ export const EditorPane = memo(
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div className="flex h-full min-h-0 flex-col zoom-exempt">
+            {breadcrumb && breadcrumb.length > 0 ? (
+              <Breadcrumb className="h-6 shrink-0 border-b border-border/60 px-3">
+                <BreadcrumbList className="text-[11px]">
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="text-muted-foreground">
+                      {langId}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                  {breadcrumb.map((seg, i) => (
+                    <Fragment key={`${seg.from}-${i}`}>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        {i === breadcrumb.length - 1 ? (
+                          <BreadcrumbPage className="font-medium">
+                            {seg.label}
+                          </BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink
+                            asChild
+                            className="cursor-pointer"
+                            onClick={() => jumpToSymbol(seg.from)}
+                          >
+                            <span>{seg.label}</span>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </Fragment>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+            ) : null}
             <CodeMirror
               ref={cmRef}
               value={doc.content}
