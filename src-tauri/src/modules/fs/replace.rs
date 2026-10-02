@@ -48,6 +48,19 @@ fn escape_literal(s: &str) -> String {
     out
 }
 
+/// Escape a literal replacement for the regex replacement syntax. `replace_all`
+/// parses `$N`/`$name` in the replacement as capture-group refs even when the
+/// *pattern* is literals, so an unescaped `$` in a literal replacement (e.g.
+/// `US$5`, `${var}`) would silently drop the group-like part. `$$` inserts a
+/// literal `$`. A backslash has no special meaning in the regex replacement
+/// string, so it passes through untouched.
+fn escape_replacement(s: &str) -> String {
+    if !s.contains('$') {
+        return s.to_string();
+    }
+    s.replace('$', "$$")
+}
+
 /// Detect the dominant EOL like the editor's `detectEol`: CRLF wins only when
 /// it outnumbers bare LF. Lone `\r` line endings are treated as LF by
 /// normalization (matches the editor, which keeps buffers in LF space).
@@ -90,6 +103,14 @@ fn replace_in(
     } else {
         pattern.to_string()
     };
+    // The replacement must also be literal in literal mode: `replace_all`
+    // parses `$N`/`$name` as group refs, so escape `$` (→ `$$`) so a literal
+    // `$` (e.g. `US$5`) is inserted as-is instead of silently dropped.
+    let replacement_for_re = if literal {
+        escape_replacement(replacement)
+    } else {
+        replacement.to_string()
+    };
     let re = Regex::new(&pattern_for_re)
         .map_err(|e| format!("bad pattern: {e}"))?;
     let re = if case_insensitive {
@@ -104,7 +125,7 @@ fn replace_in(
     if count == 0 {
         return Ok((content.to_string(), 0));
     }
-    let replaced = re.replace_all(content, replacement).into_owned();
+    let replaced = re.replace_all(content, replacement_for_re).into_owned();
     Ok((replaced, count))
 }
 
@@ -265,6 +286,43 @@ mod tests {
         let (out, count) = replace_in("hello", "zzz", "X", true, false).unwrap();
         assert_eq!(out, "hello");
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn literal_replacement_inserts_dollar_literally() {
+        // `$5` is not a capture group in literal mode: it must come out verbatim.
+        let (out, count) = replace_in("the price", "price", "US$5", true, false).unwrap();
+        assert_eq!(out, "the US$5");
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn literal_replacement_group_like_text_is_not_a_capture() {
+        // `${name}`, `$1` and `$$` in a literal replacement stay literal.
+        let (out, _) = replace_in("a b", "a", "${var}", true, false).unwrap();
+        assert_eq!(out, "${var} b");
+
+        let (out, _) = replace_in("a b", "a", "x$1y", true, false).unwrap();
+        assert_eq!(out, "x$1y b");
+
+        let (out, _) = replace_in("a b", "a", "a$$", true, false).unwrap();
+        assert_eq!(out, "a$$ b");
+    }
+
+    #[test]
+    fn literal_replacement_keeps_backslash() {
+        // regex replacement treats `\` as a plain char, so it must pass through.
+        let (out, _) = replace_in("a b", "a", "C:\\dir", true, false).unwrap();
+        assert_eq!(out, "C:\\dir b");
+    }
+
+    #[test]
+    fn regex_mode_still_resolves_capture_groups() {
+        // Literal escaping must not leak into regex mode: `$1` stays a capture.
+        let (out, count) =
+            replace_in("a1 b2 c3", r"([a-z])\d", r"<$1>", false, false).unwrap();
+        assert_eq!(out, "<a> <b> <c>");
+        assert_eq!(count, 3);
     }
 
     #[test]
