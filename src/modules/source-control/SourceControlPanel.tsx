@@ -648,7 +648,7 @@ export const SourceControlPanel = memo(function SourceControlPanel({
         ) : null}
 
         {panelState === "loading" ? (
-          <PanelCenter title={t("sourceControl.loadingRepo")} />
+          <PanelCenter title={t("sourceControl.loadingRepo")} loading />
         ) : null}
 
         {panelState === "no-repo" ? (
@@ -954,13 +954,16 @@ function PanelCenter({
   title,
   body,
   action,
+  loading = false,
 }: {
   title: string;
   body?: string;
   action?: ReactNode;
+  loading?: boolean;
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+      {loading ? <Spinner className="size-4 text-muted-foreground" /> : null}
       <div className="text-sm font-medium">{title}</div>
       {body ? (
         <div className="max-w-64 text-[11px] leading-relaxed text-muted-foreground">

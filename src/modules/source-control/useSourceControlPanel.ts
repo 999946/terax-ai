@@ -615,6 +615,17 @@ export function useSourceControlPanel(
       setSelectionTransition("none");
       return;
     }
+    if (
+      summary.contextPath === null &&
+      !summary.isLoading &&
+      !summary.localError
+    ) {
+      // useSourceControl has not settled on any path yet (first load still
+      // queued behind the idle callback). Show loading instead of a premature
+      // "no repository" state.
+      setPanelState("loading");
+      return;
+    }
     if (summary.isLoading && !summary.hasRepo && !summary.status) {
       setPanelState("loading");
       return;
@@ -676,6 +687,7 @@ export function useSourceControlPanel(
     }
   }, [
     isOpen,
+    summary.contextPath,
     summary.hasRepo,
     summary.isLoading,
     summary.localError,
