@@ -23,8 +23,8 @@ const MERGE_TOOLTIP_CLASS =
 
 /**
  * Per-repo merge status against the configured target branches. Renders one
- * icon per target: a gray ✅ when merged, a clickable merge icon when not
- * (keeps the one-click merge-into flow), an alert on error, and a spinner
+ * icon per target: a green checkmark when merged, a clickable merge icon when
+ * not (keeps the one-click merge-into flow), an alert on error, and a spinner
  * while a merge is running. Hover shows the target branch name. Hidden when no
  * targets are configured or the repo can't be resolved.
  *

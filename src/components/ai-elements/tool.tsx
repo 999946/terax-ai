@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowRight01Icon,
   CheckListIcon,
+  CheckmarkCircle01Icon,
   Edit02Icon,
   EyeIcon,
   File01Icon,
@@ -383,7 +384,12 @@ function renderToolOutput(
     const lines = content ? content.split("\n").length : null;
     return (
       <div className="flex items-center gap-1.5 font-mono text-[11px]">
-        <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+        <HugeiconsIcon
+          icon={CheckmarkCircle01Icon}
+          size={12}
+          strokeWidth={2}
+          className="text-emerald-600 dark:text-emerald-400"
+        />
         <span className="text-foreground">{t("ai.tool.output.read")}</span>
         {path ? <span className="text-muted-foreground">· {path}</span> : null}
         {lines != null ? (
@@ -549,7 +555,12 @@ function renderToolOutput(
       const path = typeof o.path === "string" ? o.path : "";
       return (
         <div className="flex items-center gap-1.5 font-mono text-[11px]">
-          <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+          <HugeiconsIcon
+          icon={CheckmarkCircle01Icon}
+          size={12}
+          strokeWidth={2}
+          className="text-emerald-600 dark:text-emerald-400"
+        />
           {reps != null ? (
             <span className="text-foreground">
               {t("ai.tool.output.replacementCount", { count: reps })}
@@ -568,7 +579,12 @@ function renderToolOutput(
     const bytes = typeof o.bytesWritten === "number" ? o.bytesWritten : null;
     return (
       <div className="flex items-center gap-1.5 font-mono text-[11px]">
-        <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+        <HugeiconsIcon
+          icon={CheckmarkCircle01Icon}
+          size={12}
+          strokeWidth={2}
+          className="text-emerald-600 dark:text-emerald-400"
+        />
         <span className="text-foreground">
           {toolName === "create_directory"
             ? t("ai.tool.output.created")
