@@ -719,6 +719,16 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                 </Tooltip>
               </div>
 
+              <label className="flex cursor-pointer select-none items-center gap-1.5 text-[10.5px] text-muted-foreground hover:text-foreground">
+                <Checkbox
+                  aria-label={t("sourceControl.skipHooksAria")}
+                  checked={scm.skipHooks}
+                  onCheckedChange={(v) => scm.setSkipHooks(v === true)}
+                  className="size-3.5"
+                />
+                <span>{t("sourceControl.skipHooks")}</span>
+              </label>
+
               <div
                 className={cn(
                   "relative rounded-lg border bg-background/95 shadow-sm transition-colors",
@@ -775,16 +785,6 @@ export const SourceControlPanel = memo(function SourceControlPanel({
                   {pushStatusLabel}
                 </span>
               </div>
-
-              <label className="flex cursor-pointer select-none items-center gap-1.5 text-[10.5px] text-muted-foreground hover:text-foreground">
-                <Checkbox
-                  aria-label={t("sourceControl.skipHooksAria")}
-                  checked={scm.skipHooks}
-                  onCheckedChange={(v) => scm.setSkipHooks(v === true)}
-                  className="size-3.5"
-                />
-                <span>{t("sourceControl.skipHooks")}</span>
-              </label>
 
               <div className="grid w-full grid-cols-2 gap-1.5">
                 <Tooltip>

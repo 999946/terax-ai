@@ -7,13 +7,14 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import {
-  native,
-  type GitMergeStatusResult,
-} from "@/modules/ai/lib/native";
+import { native, type GitMergeStatusResult } from "@/modules/ai/lib/native";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getMergeStatus } from "./mergeStatusCache";
 
@@ -146,21 +147,21 @@ export function MergeStatusIcons({
                   <span className="inline-flex cursor-default items-center">
                     <HugeiconsIcon
                       icon={Alert02Icon}
-                      size={9}
+                      size={12}
                       strokeWidth={2}
-                      className="text-muted-foreground/40"
+                      className="text-amber-500/90"
                     />
                   </span>
                 ) : entry.merged || targetBusy ? (
                   <span className="inline-flex cursor-default items-center">
                     {targetBusy ? (
-                      <Spinner className="size-2.5" />
+                      <Spinner className="size-3" />
                     ) : (
                       <HugeiconsIcon
                         icon={CheckmarkCircle01Icon}
-                        size={10}
-                        strokeWidth={1.8}
-                        className="text-muted-foreground/60"
+                        size={12}
+                        strokeWidth={2}
+                        className="text-emerald-500/90"
                       />
                     )}
                   </span>
@@ -175,13 +176,13 @@ export function MergeStatusIcons({
                       e.stopPropagation();
                       void mergeInto(entry.name);
                     }}
-                    className="inline-flex cursor-pointer items-center rounded-sm transition-colors hover:text-foreground"
+                    className="inline-flex cursor-pointer items-center rounded-sm transition-colors hover:bg-foreground/10"
                   >
                     <HugeiconsIcon
                       icon={GitMergeIcon}
-                      size={10}
-                      strokeWidth={1.8}
-                      className="text-muted-foreground/85"
+                      size={12}
+                      strokeWidth={2}
+                      className="text-primary/85 hover:text-primary"
                     />
                   </button>
                 )}

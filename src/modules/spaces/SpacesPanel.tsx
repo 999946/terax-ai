@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { Pin02Icon, PinOffIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { Tab } from "@/modules/tabs";
 import { useSpaces } from "./lib/useSpaces";
 import {
@@ -116,48 +118,35 @@ export function SpacesPanel({
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {pinned ? (
-                      <>
-                        <rect x="3" y="11" width="18" height="11" rx="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                      </>
-                    ) : (
-                      <>
-                        <rect x="3" y="11" width="18" height="11" rx="2" />
-                        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                      </>
-                    )}
-                  </svg>
+                  <HugeiconsIcon
+                    icon={pinned ? Pin02Icon : PinOffIcon}
+                    size={12}
+                    strokeWidth={1.8}
+                  />
                 </button>
-                <button
-                  type="button"
-                  aria-label={t("spaces.collapsePanel", "Collapse spaces")}
-                  aria-expanded={true}
-                  onClick={collapse}
-                  className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
+                {/* The collapse affordance is only needed when the panel is
+                    pinned; unpinned it auto-collapses on pointer leave. */}
+                {pinned ? (
+                  <button
+                    type="button"
+                    aria-label={t("spaces.collapsePanel", "Collapse spaces")}
+                    aria-expanded={true}
+                    onClick={collapse}
+                    className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
-                    <path d="M7 3L4 6L7 9" />
-                  </svg>
-                </button>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    >
+                      <path d="M7 3L4 6L7 9" />
+                    </svg>
+                  </button>
+                ) : null}
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
