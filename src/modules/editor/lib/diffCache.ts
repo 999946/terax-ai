@@ -41,6 +41,9 @@ export function invalidateRepoDiffs(repoRoot: string): void {
   for (const k of [...cache.keys()]) {
     if (k.startsWith(prefix)) cache.delete(k);
   }
+  for (const k of [...hunkCache.keys()]) {
+    if (k.startsWith(prefix)) hunkCache.delete(k);
+  }
 }
 
 export function workingDiffKey(
@@ -80,6 +83,44 @@ export function invalidateWorkingDiff(repoRoot: string, path: string): void {
   invalidateDiff(conflictDiffKey(repoRoot, path));
   hunkCache.delete(workingHunksKey(repoRoot, path, true));
   hunkCache.delete(workingHunksKey(repoRoot, path, false));
+}
+
+/** Repo-relative path the diff caches key on, or `null` when the absolute path
+ * doesn't live under the repo root (e.g. a `/var` vs `/private/var` alias
+ * mismatch on macOS). The caller is responsible for the fallback in that case. */
+export function toRepoRelativePath(
+  repoRoot: string,
+  filePath: string,
+): string | null {
+  const root = repoRoot.replace(/\\/g, "/").replace(/\/+$/, "");
+  const abs = filePath.replace(/\\/g, "/");
+  if (abs === root) return "";
+  if (abs.startsWith(`${root}/`)) return abs.slice(root.length + 1);
+  return null;
+}
+
+/** Invalidate the working diff for a saved file on disk, resolving the
+ * repo-relative cache key from the absolute editor path. When the path can't
+ * be relativized, clear the repo's working (not commit) caches so no stale
+ * entry survives; commit diffs are immutable history and must be kept. */
+export function invalidateWorkingDiffForPath(
+  repoRoot: string,
+  filePath: string,
+): void {
+  const rel = toRepoRelativePath(repoRoot, filePath);
+  if (rel === null) {
+    const prefix = `${currentWorkspaceScopeKey()}|${repoRoot}|`;
+    for (const k of [...cache.keys()]) {
+      if (k.startsWith(`${prefix}w|`) || k.startsWith(`${prefix}x|`)) {
+        cache.delete(k);
+      }
+    }
+    for (const k of [...hunkCache.keys()]) {
+      if (k.startsWith(`${prefix}h|`)) hunkCache.delete(k);
+    }
+    return;
+  }
+  invalidateWorkingDiff(repoRoot, rel);
 }
 
 /** Parse the hunks of a per-path worktree/staged diff. Mirrors the content

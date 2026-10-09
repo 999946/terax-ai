@@ -58,6 +58,7 @@ import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
 import { setBaselineEffect } from "./lib/modifiedLines";
 import { setConflictEffect } from "./lib/conflictLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
+import { invalidateWorkingDiffForPath } from "./lib/diffCache";
 import { fetchGitBaseline } from "./lib/gitBaselineCache";
 import {
   buildSharedExtensions,
@@ -305,7 +306,22 @@ export const EditorPane = memo(
         }
       }
       onSavedRef.current?.();
-      if (path) invalidateBlameForPath(path);
+      // The working diff (and hunk) caches key on the repo-relative path. A
+      // save changes the file on disk, so the GitDiff tab must re-read on next
+      // focus; otherwise it keeps showing the pre-save content. Resolve the
+      // repo and relativize the absolute editor path, falling back to clearing
+      // the repo's diff cache when the mapping fails (e.g. /var vs /private/var).
+      if (pathRef.current) {
+        try {
+          const repo = await native.gitResolveRepo(pathRef.current);
+          if (repo?.repoRoot) {
+            invalidateWorkingDiffForPath(repo.repoRoot, pathRef.current);
+          }
+        } catch {
+          // Ignore: a save is not worth failing if the repo can't resolve.
+        }
+        invalidateBlameForPath(pathRef.current);
+      }
     }, []);
     const performSaveRef = useRef(performSave);
     performSaveRef.current = performSave;

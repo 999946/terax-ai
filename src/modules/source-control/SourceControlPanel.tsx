@@ -75,6 +75,7 @@ import {
   Link03Icon,
   MoreHorizontalIcon,
   PlusSignIcon,
+  Undo02Icon,
   UndoIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -197,8 +198,19 @@ function dirname(path: string): string {
   return normalized.slice(0, index);
 }
 
-function entryPathLabel(entry: SourceControlFileEntry): string {
-  if (entry.originalPath) return `${entry.originalPath} → ${entry.path}`;
+/** Parent dir for a plain change, or `old → new` for a rename. The old side of
+ * a rename is a deleted path (the file moved), so it gets line-through to
+ * signal the removal next to the live new path. */
+function entryPathNode(entry: SourceControlFileEntry): ReactNode {
+  if (entry.originalPath) {
+    return (
+      <>
+        <span className="line-through">{entry.originalPath}</span>
+        <span className="mx-0.5 text-muted-foreground/60">→</span>
+        {entry.path}
+      </>
+    );
+  }
   return dirname(entry.path);
 }
 
@@ -1172,7 +1184,7 @@ function DirRow({
             {isDiscardBusy ? (
               <Spinner className="size-3" />
             ) : (
-              <HugeiconsIcon icon={UndoIcon} size={11} strokeWidth={1.9} />
+              <HugeiconsIcon icon={Undo02Icon} size={11} strokeWidth={1.9} />
             )}
           </IconActionButton>
         </div>
@@ -1201,7 +1213,8 @@ const EntryRow = memo(function EntryRow({
   const isSelected = selectedPath === entry.path;
   const fileName = basename(entry.path);
   const iconUrl = fileIconUrl(fileName);
-  const pathLabel = entryPathLabel(entry);
+  const pathLabel = entryPathNode(entry);
+  const hasPathLabel = Boolean(entry.originalPath || dirname(entry.path));
   const showDiscard = entry.unstaged;
   const isConflict = entry.statusLabel === "Unmerged";
   const isStageBusy =
@@ -1276,12 +1289,13 @@ const EntryRow = memo(function EntryRow({
                     ? "font-semibold text-rose-600 dark:text-rose-400"
                     : statusColor(entry.statusCode),
                   isSelected || focused ? "font-semibold" : "font-medium",
-                  pathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
+                  isDeleted && "line-through",
+                  hasPathLabel ? "max-w-[58%] shrink-0" : "min-w-0 flex-1",
                 )}
               >
                 {fileName}
               </span>
-              {pathLabel ? (
+              {hasPathLabel ? (
                 <span className="min-w-0 flex-1 truncate text-[10.5px] leading-tight text-muted-foreground/75">
                   {pathLabel}
                 </span>
@@ -1324,7 +1338,11 @@ const EntryRow = memo(function EntryRow({
                 {isDiscardBusy ? (
                   <Spinner className="size-3" />
                 ) : (
-                  <HugeiconsIcon icon={UndoIcon} size={11} strokeWidth={1.9} />
+                  <HugeiconsIcon
+                    icon={Undo02Icon}
+                    size={11}
+                    strokeWidth={1.9}
+                  />
                 )}
               </IconActionButton>
             ) : null}

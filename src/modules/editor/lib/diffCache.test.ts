@@ -276,4 +276,72 @@ describe("git diff content cache", () => {
       mod.getCachedDiff(mod.workingDiffKey("/repo", "a.ts", "+")),
     ).toBeUndefined();
   });
+
+  it("relativizes absolute editor paths to repo-relative cache keys", async () => {
+    const mod = await loadModule();
+    expect(mod.toRepoRelativePath("/repo", "/repo/src/a.ts")).toBe("src/a.ts");
+    expect(mod.toRepoRelativePath("/repo/", "/repo/a.ts")).toBe("a.ts");
+    expect(mod.toRepoRelativePath("/repo", "/repo")).toBe("");
+    expect(mod.toRepoRelativePath("/repo", "/elsewhere/a.ts")).toBeNull();
+  });
+
+  it("invalidates working diffs from an absolute saved path", async () => {
+    const mod = await loadModule();
+    nativeMock.gitDiffContent.mockResolvedValue(result("work"));
+    nativeMock.gitDiff.mockResolvedValue({
+      diffText: "…",
+      truncated: false,
+      hunks: [],
+    });
+
+    await mod.fetchWorkingDiff("/repo", "src/a.ts", "-", null);
+    await mod.fetchWorkingDiff("/repo", "src/a.ts", "+", null);
+    await mod.fetchWorkingHunks("/repo", "src/a.ts", false);
+
+    mod.invalidateWorkingDiffForPath("/repo", "/repo/src/a.ts");
+
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "src/a.ts", "-")),
+    ).toBeUndefined();
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "src/a.ts", "+")),
+    ).toBeUndefined();
+  });
+
+  it("clears a repo's working caches when the path cannot be relativized", async () => {
+    const mod = await loadModule();
+    nativeMock.gitDiffContent.mockResolvedValue(result("work"));
+    nativeMock.gitCommitFileDiff.mockResolvedValue(result("commit"));
+
+    await mod.fetchWorkingDiff("/repo", "src/a.ts", "-", null);
+    await mod.fetchCommitDiff("/repo", "sha1", "src/a.ts", null);
+
+    mod.invalidateWorkingDiffForPath("/repo", "/elsewhere/a.ts");
+
+    // Working diff gone; commit diff unaffected (different namespace).
+    expect(
+      mod.getCachedDiff(mod.workingDiffKey("/repo", "src/a.ts", "-")),
+    ).toBeUndefined();
+    expect(
+      mod.getCachedDiff(mod.commitDiffKey("/repo", "sha1", "src/a.ts")),
+    ).toBeDefined();
+  });
+
+  it("invalidateRepoDiffs also clears the hunk cache", async () => {
+    const mod = await loadModule();
+    nativeMock.gitDiff.mockResolvedValue({
+      diffText: "…",
+      truncated: false,
+      hunks: [],
+    });
+
+    await mod.fetchWorkingHunks("/repo", "b.ts", true);
+    await mod.fetchWorkingHunks("/repo", "b.ts", false);
+
+    mod.invalidateRepoDiffs("/repo");
+
+    // Next fetch must hit the backend again, not the removed hunk cache.
+    await mod.fetchWorkingHunks("/repo", "b.ts", true);
+    expect(nativeMock.gitDiff).toHaveBeenCalledTimes(3);
+  });
 });
