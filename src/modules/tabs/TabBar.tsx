@@ -132,10 +132,14 @@ export function TabBar({
   const [showAllLanguages, setShowAllLanguages] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      // A plain click must not start a drag: 4px is within finger/pointer
-      // jitter on the wider tab hit area. Raise it so accidental drags are
-      // rare, while a deliberate drag still activates past 8px.
-      activationConstraint: { distance: 8 },
+      // A plain click must never start a drag. A pure `distance` constraint
+      // fires as soon as the pointer moves past the threshold, and a click
+      // routinely carries a few px of hand jitter — so clicks kept turning
+      // into drags no matter how high the threshold went. Require the press to
+      // be held (`delay`) and only then allow a drag; moving past `tolerance`
+      // while still inside the delay cancels activation, so a fast swipe is a
+      // click, not a drag.
+      activationConstraint: { delay: 120, tolerance: 10 },
     }),
   );
   const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
