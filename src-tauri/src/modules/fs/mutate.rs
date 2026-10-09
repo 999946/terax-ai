@@ -56,12 +56,17 @@ pub(crate) fn resolve_authorized_root(
 }
 
 pub(crate) fn authorize_mutation_entry(path: &Path, root: &Path) -> Result<(), String> {
+    // Compare both sides canonicalized: the caller may pass a mid-flight root
+    // (e.g. a tempdir with symlinked or 8.3-shortened components) that
+    // canonicalize would rewrite in a way that breaks a raw prefix compare.
+    let root = std::fs::canonicalize(root)
+        .map_err(|error| format!("workspace root is not accessible: {error}"))?;
     let parent = path
         .parent()
         .ok_or_else(|| format!("path has no parent: {}", path.display()))?;
     let canonical = std::fs::canonicalize(parent)
         .map_err(|error| format!("path parent is not accessible: {error}"))?;
-    if canonical.starts_with(root) {
+    if canonical.starts_with(&root) {
         Ok(())
     } else {
         Err(format!(
@@ -725,5 +730,26 @@ mod tests {
         assert!(!link.exists(), "symlink itself should be gone");
         assert!(real.is_dir(), "target dir must survive");
         assert_eq!(std::fs::read(real.join("keep.txt")).unwrap(), b"keep");
+    }
+
+    // The raw (non-canonicalized) tempdir root must still gate entries. On CI
+    // the temp dir sits under /var (a /private/var symlink) or a Windows 8.3
+    // short path, so a raw prefix compare against the canonicalized entry
+    // parent would reject a file that is inside the workspace.
+    #[test]
+    fn authorize_mutation_entry_normalizes_root_and_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let inside = dir.path().join("a.txt");
+        std::fs::write(&inside, b"x").unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let outside_file = outside.path().join("b.txt");
+        std::fs::write(&outside_file, b"y").unwrap();
+
+        // root passed as-is (no canonicalize), like the test helpers do.
+        authorize_mutation_entry(&inside, dir.path()).expect("inside root ok");
+        assert!(
+            authorize_mutation_entry(&outside_file, dir.path()).is_err(),
+            "file outside the root must be refused"
+        );
     }
 }
