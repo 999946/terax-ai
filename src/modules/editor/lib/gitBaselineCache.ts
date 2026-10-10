@@ -19,11 +19,6 @@ function touch(key: string, value: string) {
   }
 }
 
-export function clearGitBaselineCache(): void {
-  cache.clear();
-  inflight.clear();
-}
-
 /**
  * Drop any cached/in-flight HEAD baseline for the given editor paths (the cache
  * is keyed by path per repo). Called after a commit so the next refetch reflects

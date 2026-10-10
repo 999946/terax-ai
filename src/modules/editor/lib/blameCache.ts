@@ -27,11 +27,6 @@ function touch(key: string, value: Map<number, GitBlameEntry>) {
   }
 }
 
-export function clearBlameCache(): void {
-  cache.clear();
-  inflight.clear();
-}
-
 /**
  * Drop any cached/in-flight blame for `path` (across every repo root). Called
  * when a file is saved so the next blame refetch reflects the committed state —
