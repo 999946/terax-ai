@@ -366,7 +366,7 @@ fn prepare_each(
     registry: &WorkspaceRegistry,
     path: &Path,
 ) -> Option<PathBuf> {
-    let canonical = std::fs::canonicalize(&path).ok()?;
+    let canonical = std::fs::canonicalize(path).ok()?;
     if !registry.is_authorized(&canonical) {
         return None;
     }
@@ -559,7 +559,7 @@ mod tests {
             changes
                 .get(p)
                 .copied()
-                .expect(concat!("expected path recorded"))
+                .expect("expected path recorded")
         };
         assert!(matches!(get("/a/new"), FsChangeKind::Added));
         assert!(matches!(get("/a/gone"), FsChangeKind::Deleted));
