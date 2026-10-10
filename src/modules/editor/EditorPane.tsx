@@ -128,6 +128,12 @@ export type EditorPaneHandle = {
 type Props = {
   path: string;
   overrideLanguage?: string | null;
+  /** The file was deleted/renamed/moved on disk (ORPHAN): show a strikethrough
+   * over the content and keep the buffer readable/copyable. */
+  deleted?: boolean;
+  /** Disk content conflicts with the unsaved buffer (CONFLICT): saving back is
+   * blocked; the status bar surfaces it. */
+  conflict?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onClose?: () => void;
@@ -158,6 +164,8 @@ export const EditorPane = memo(
     const {
       path,
       overrideLanguage,
+      deleted,
+      conflict,
       onDirtyChange,
       onSaved,
       onClose,
@@ -170,6 +178,8 @@ export const EditorPane = memo(
       useDocument({
         path,
         onDirtyChange,
+        deleted,
+        conflict,
       });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
@@ -998,7 +1008,11 @@ export const EditorPane = memo(
               theme={themeExt}
               extensions={extensions}
               height="100%"
-              className="terax-code-editor flex-1 min-h-0 overflow-hidden"
+              className={
+                deleted
+                  ? "terax-code-editor terax-editor-deleted flex-1 min-h-0 overflow-hidden"
+                  : "terax-code-editor flex-1 min-h-0 overflow-hidden"
+              }
               basicSetup={{
                 lineNumbers: true,
                 highlightActiveLineGutter: true,
@@ -1030,6 +1044,16 @@ export const EditorPane = memo(
                 {status.language ? <span>{status.language}</span> : null}
                 {status.readonly ? (
                   <span>{t("editor.status.readOnly")}</span>
+                ) : null}
+                {deleted ? (
+                  <span className="text-rose-400">
+                    {t("editor.externalDeleted")}
+                  </span>
+                ) : null}
+                {conflict && !deleted ? (
+                  <span className="text-amber-500">
+                    {t("editor.externalConflict")}
+                  </span>
                 ) : null}
                 {status.dirty ? (
                   <span className="text-amber-500">

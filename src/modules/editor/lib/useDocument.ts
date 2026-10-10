@@ -27,9 +27,19 @@ export type DocumentState =
 type Options = {
   path: string;
   onDirtyChange?: (dirty: boolean) => void;
+  /** File deleted on disk (external delete/rename/move): saves are blocked —
+   * never silently recreate the file. */
+  deleted?: boolean;
+  /** Disk content conflicts with the unsaved buffer: autosave is withheld. */
+  conflict?: boolean;
 };
 
-export function useDocument({ path, onDirtyChange }: Options) {
+export function useDocument({
+  path,
+  onDirtyChange,
+  deleted = false,
+  conflict = false,
+}: Options) {
   const { t } = useTranslation();
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
@@ -48,6 +58,12 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
   const autoSaveRef = useRef({ autoSave, autoSaveDelay });
   autoSaveRef.current = { autoSave, autoSaveDelay };
+
+  // External-deleted / conflict flags arrive as props from the editor tab
+  // (driven by useEditorFileSync). Read through refs so onChange's callback
+  // identity doesn't churn when they flip.
+  const externalRef = useRef({ deleted, conflict });
+  externalRef.current = { deleted, conflict };
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -84,7 +100,17 @@ export function useDocument({ path, onDirtyChange }: Options) {
         path,
         workspace: currentWorkspaceEnv(),
       }).catch(() => null);
-      if (stat && stat.mtime !== known) {
+      if (!stat) {
+        // The file was deleted on disk. Never silently recreate it: keep the
+        // buffer so the user can copy or Save As elsewhere.
+        const name = path.split(/[\\/]/).pop() ?? path;
+        toast.warning(t("editor.fileDeletedConflict"), {
+          id: `save-deleted:${path}`,
+          description: t("editor.fileDeletedConflictDescription", { name }),
+        });
+        return false;
+      }
+      if (stat.mtime !== known) {
         const name = path.split(/[\\/]/).pop() ?? path;
         toast.warning(t("editor.fileChangedOnDisk"), {
           id: `save-conflict:${path}`,
@@ -222,8 +248,11 @@ export function useDocument({ path, onDirtyChange }: Options) {
 
       clearAutoSaveTimer();
 
+      // Autosave must not fire on a deleted/conflicted file: the disk write is
+      // blocked anyway (see saveNow) and would just re-toast every autosave.
+      const { deleted: isDeleted, conflict: isConflict } = externalRef.current;
       const { autoSave: active, autoSaveDelay: delay } = autoSaveRef.current;
-      if (active && isDirty) {
+      if (active && isDirty && !isDeleted && !isConflict) {
         timeoutRef.current = setTimeout(() => {
           saveNow().catch((e) => console.error("[autosave]", e));
         }, delay);

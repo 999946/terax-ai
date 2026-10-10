@@ -72,6 +72,18 @@ export type EditorTab = TabBase & {
   overrideLanguage?: string | null;
   /** For markdown files. Absent (or "raw") = the plain source editor. */
   viewMode?: MarkdownViewMode;
+  /**
+   * The file was deleted, renamed or moved away on disk (VSCode's ORPHAN
+   * state). The tab stays open with a strikethrough; the buffer is preserved
+   * for viewing/copying/continuing to edit. Cleared when the file reappears.
+   */
+  deleted?: boolean;
+  /**
+   * The disk content conflicts with the unsaved buffer (VSCode's CONFLICT
+   * state): either the file was deleted while dirty, or it changed on disk
+   * underneath unsaved edits. Saving back to the original path is blocked.
+   */
+  conflict?: boolean;
 };
 
 export type PreviewTab = TabBase & {
@@ -151,6 +163,10 @@ export type TabPatch = Partial<{
   /** Empty string resets a terminal tab to its cwd-derived name. */
   customTitle: string;
   overrideLanguage: string | null;
+  /** Set by useEditorFileSync on external delete/rename/move detection. */
+  deleted: boolean;
+  /** Set by useEditorFileSync on disk/buffer conflict or deleted+dirty. */
+  conflict: boolean;
 }>;
 
 export type GitDiffOpenInput = {
@@ -1268,6 +1284,8 @@ export function useTabs(initial?: Partial<TerminalTab>) {
           ...(patch.overrideLanguage !== undefined && {
             overrideLanguage: patch.overrideLanguage,
           }),
+          ...(patch.deleted !== undefined && { deleted: patch.deleted }),
+          ...(patch.conflict !== undefined && { conflict: patch.conflict }),
         };
       }),
     );

@@ -465,10 +465,26 @@ export function TabBar({
                           <TabIcon tab={tab} />
                         )}
                         {/* Preview tabs use italic to signal the transient state,
-                        matching the visual convention from VSCode. */}
-                        <span className={cn("truncate", isPreview && "italic")}>
+                        matching the visual convention from VSCode. A deleted
+                        editor tab gets a strikethrough on the title. */}
+                        <span
+                          className={cn(
+                            "truncate",
+                            isPreview && "italic",
+                            tab.kind === "editor" &&
+                              tab.deleted &&
+                              "line-through text-muted-foreground/70",
+                          )}
+                        >
                           {labelFor(tab)}
                         </span>
+                        {tab.kind === "editor" && tab.conflict ? (
+                          <span
+                            aria-label={t("tabs.externalConflict")}
+                            title={t("tabs.externalConflict")}
+                            className="size-1.5 shrink-0 rounded-full bg-amber-500"
+                          />
+                        ) : null}
                         {tab.kind === "editor" && tab.dirty ? (
                           <span
                             aria-label={t("tabs.unsavedChanges")}

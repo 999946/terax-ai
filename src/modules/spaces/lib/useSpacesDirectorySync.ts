@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { listenFsChanged, watchAdd, watchRemove } from "@/modules/explorer/lib/watch";
+import {
+  listenFsChanged,
+  watchAdd,
+  watchRemove,
+} from "@/modules/explorer/lib/watch";
 import { listSpaceFolders } from "./filesystem";
 import { useSpaces } from "./useSpaces";
 
@@ -13,15 +17,25 @@ export function useSpacesDirectorySync(): void {
     const scan = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        void listSpaceFolders(root).then((roots) => {
-          if (alive) useSpaces.getState().reconcile(roots);
-        }).catch(() => {});
+        void listSpaceFolders(root)
+          .then((roots) => {
+            if (alive) useSpaces.getState().reconcile(roots);
+          })
+          .catch(() => {});
       }, 100);
     };
     scan();
     watchAdd([root]);
-    const unlisten = listenFsChanged((paths) => {
-      if (paths.some((path) => path === root || path.startsWith(`${root}/`) || path.startsWith(`${root}\\`))) scan();
+    const unlisten = listenFsChanged((changes) => {
+      if (
+        changes.some(
+          (c) =>
+            c.path === root ||
+            c.path.startsWith(`${root}/`) ||
+            c.path.startsWith(`${root}\\`),
+        )
+      )
+        scan();
     });
     const onFocus = () => scan();
     window.addEventListener("focus", onFocus);

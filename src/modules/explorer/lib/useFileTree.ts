@@ -279,10 +279,11 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   useEffect(() => {
     let alive = true;
     let unlisten: (() => void) | undefined;
-    void listenFsChanged((paths) => {
+    void listenFsChanged((changes) => {
       const current = nodesRef.current;
       const dirs = new Set<string>();
-      for (const p of paths) {
+      for (const c of changes) {
+        const p = c.path;
         const parent = dirname(p);
         if (current[parent]?.status === "loaded") dirs.add(parent);
         if (current[p]?.status === "loaded") dirs.add(p);

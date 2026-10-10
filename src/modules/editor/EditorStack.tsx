@@ -1,13 +1,6 @@
 import { cn, isMarkdownPath } from "@/lib/utils";
-import {
-  MarkdownPreviewPane,
-  MarkdownViewToggle,
-} from "@/modules/markdown";
-import type {
-  EditorTab,
-  MarkdownViewMode,
-  Tab,
-} from "@/modules/tabs";
+import { MarkdownPreviewPane, MarkdownViewToggle } from "@/modules/markdown";
+import type { EditorTab, MarkdownViewMode, Tab } from "@/modules/tabs";
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef } from "react";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
@@ -113,7 +106,7 @@ export function EditorStack({
         // Markdown files carry a per-tab view mode (raw / rendered / split);
         // plain files always show the source editor.
         const isMd = isMarkdownPath(tab.path);
-        const mode: MarkdownViewMode = isMd ? tab.viewMode ?? "raw" : "raw";
+        const mode: MarkdownViewMode = isMd ? (tab.viewMode ?? "raw") : "raw";
         const showEditor = mode !== "rendered";
         const showPreview = isMd && mode !== "raw";
         return (
@@ -147,6 +140,8 @@ export function EditorStack({
                     ref={getRefCallback(tab.id)}
                     path={tab.path}
                     overrideLanguage={tab.overrideLanguage}
+                    deleted={tab.deleted}
+                    conflict={tab.conflict}
                     onDirtyChange={getDirtyCallback(tab.id)}
                     onClose={getCloseCallback(tab.id)}
                     onOpenFileHistory={onOpenFileHistory}
@@ -155,11 +150,13 @@ export function EditorStack({
                 </div>
               )}
               {showPreview && (
-                <div className={cn("h-full min-w-0", mode === "split" ? "w-1/2" : "flex-1")}>
-                  <MarkdownPreviewPane
-                    path={tab.path}
-                    visible={visible}
-                  />
+                <div
+                  className={cn(
+                    "h-full min-w-0",
+                    mode === "split" ? "w-1/2" : "flex-1",
+                  )}
+                >
+                  <MarkdownPreviewPane path={tab.path} visible={visible} />
                 </div>
               )}
             </div>

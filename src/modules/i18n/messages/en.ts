@@ -109,6 +109,11 @@ export const en: Record<string, string> = {
   "editor.fileChangedOnDiskDescription":
     "{name} was modified by another program while you had unsaved changes. Overwrite to keep your version.",
   "editor.overwrite": "Overwrite",
+  "editor.externalDeleted": "File deleted",
+  "editor.fileDeletedConflict": "File deleted",
+  "editor.fileDeletedConflictDescription":
+    "{name} was deleted on disk. Your unsaved changes are preserved in the editor but cannot be saved to this path.",
+  "editor.externalConflict": "Conflict with external changes",
   "editor.aiDiffPendingReview": "Pending review",
   "editor.aiDiffApplied": "Applied",
   "editor.aiDiffRejected": "Rejected",
@@ -444,6 +449,7 @@ export const en: Record<string, string> = {
   "tabs.fewerLanguages": "↑ Fewer languages",
   "tabs.allLanguages": "↓ All languages",
   "tabs.unsavedChanges": "Unsaved changes",
+  "tabs.externalConflict": "Conflict with external changes",
   "tabs.closeTab": "Close tab",
   "tabs.rename": "Rename",
   "tabs.close": "Close",

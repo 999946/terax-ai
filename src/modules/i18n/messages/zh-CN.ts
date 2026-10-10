@@ -282,6 +282,11 @@ export const zhCN: Record<string, string> = {
   "editor.fileChangedOnDiskDescription":
     "你有未保存更改时，{name} 被其他程序修改了。覆盖文件以保留你的版本。",
   "editor.overwrite": "覆盖",
+  "editor.externalDeleted": "文件已删除",
+  "editor.fileDeletedConflict": "文件已删除",
+  "editor.fileDeletedConflictDescription":
+    "{name} 已从磁盘删除。你的未保存更改仍保留在编辑器中，但无法保存回此路径。",
+  "editor.externalConflict": "与外部更改冲突",
   "editor.aiDiffPendingReview": "待审核",
   "editor.aiDiffApplied": "已应用",
   "editor.aiDiffRejected": "已拒绝",
@@ -434,6 +439,7 @@ export const zhCN: Record<string, string> = {
   "tabs.fewerLanguages": "↑ 更少语言",
   "tabs.allLanguages": "↓ 所有语言",
   "tabs.unsavedChanges": "未保存的更改",
+  "tabs.externalConflict": "与外部更改冲突",
   "tabs.closeTab": "关闭标签页",
   "tabs.rename": "重命名",
   "tabs.close": "关闭",

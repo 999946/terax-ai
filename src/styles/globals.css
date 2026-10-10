@@ -399,6 +399,22 @@ html *::-webkit-scrollbar {
   );
 }
 
+/* A file deleted/renamed/moved away on disk: strike the editor text so the
+   path-from-everything-else state is unmistakable, while the buffer stays
+   readable and copyable. */
+.terax-editor-deleted .cm-line {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--muted-foreground) 45%,
+    transparent
+  );
+}
+.terax-editor-deleted .cm-gutterElement {
+  opacity: 0.65;
+}
+
 /* Motion tokens. Reduced-motion zeroes the durations as a global snap. */
 :root {
   --dur-fast: 160ms;

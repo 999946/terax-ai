@@ -53,6 +53,9 @@ import {
 } from "@/modules/editor";
 import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
 import { invalidateGitBaselinesForPaths } from "@/modules/editor/lib/gitBaselineCache";
+import { invalidateBlameForPath } from "@/modules/editor/lib/blameCache";
+import { invalidateMergeStatus } from "@/modules/source-control/mergeStatusCache";
+import { useGitAutoRefresh } from "@/modules/source-control/useGitAutoRefresh";
 import type { GitHistorySearchHandle } from "@/modules/git-history";
 import {
   Header,
@@ -398,7 +401,22 @@ export default function App() {
   const isEditorTab = activeTab?.kind === "editor";
   const isGitHistoryTab = activeTab?.kind === "git-history";
 
-  useEditorFileSync({ tabs, tabsRef, editorRefs });
+  // External delete/rename/move and disk/buffer conflict decisions from
+  // useEditorFileSync are applied onto the editor tab. When the file is
+  // deleted (ORPHAN), any unsaved buffer is a conflict — saving back is blocked
+  // in useDocument, so the conflict flag just drives the status bar text.
+  const handleEditorExternalPatch = useCallback(
+    (id: number, patch: { deleted?: boolean; conflict?: boolean }) =>
+      updateTab(id, patch),
+    [updateTab],
+  );
+
+  useEditorFileSync({
+    tabs,
+    tabsRef,
+    editorRefs,
+    onPatchTab: handleEditorExternalPatch,
+  });
   useThemeFileEditing({ tabsRef, openFileTab });
 
   // 文件树根目录来自当前 Space 的 root，不依赖终端 cwd
@@ -1178,6 +1196,47 @@ export default function App() {
     },
     [refreshSourceControl, refreshEditorGitBaselines],
   );
+
+  // External git operations (a terminal commit/checkout/pull) rewrite .git
+  // metadata. .git/HEAD moving invalidates every git-side cache keyed on the
+  // committed content for files under this repo: change-marker baselines and
+  // blame (re-pulled below), and merge status (next render refetches).
+  const handleGitMetaChange = useCallback((repoRoot: string) => {
+    invalidateMergeStatus(repoRoot);
+    const root = repoRoot.replace(/\\/g, "/").replace(/\/+$/, "");
+    const paths = tabsRef.current
+      .filter((t) => t.kind === "editor")
+      .filter((t) => {
+        const p = t.path.replace(/\\/g, "/");
+        return p === root || p.startsWith(`${root}/`);
+      })
+      .map((t) => t.path);
+    if (paths.length === 0) return;
+    invalidateGitBaselinesForPaths(paths);
+    for (const p of paths) invalidateBlameForPath(p);
+    for (const t of tabsRef.current) {
+      if (t.kind === "editor" && paths.includes(t.path)) {
+        editorRefs.current.get(t.id)?.refreshGitBaseline();
+      }
+    }
+  }, []);
+
+  const refreshRepoForRoot = useCallback(
+    (root: string): Promise<void> => {
+      const repo = repositories.find((r) => r.repoRoot === root);
+      return repo ? repo.refresh() : Promise.resolve();
+    },
+    [repositories],
+  );
+
+  // Surface external git operations into the panel, rail badge and explorer
+  // decorations without a focus/manual refresh. Handled after
+  // refreshEditorGitBaselines so onGitMetaChange can re-pull baselines.
+  useGitAutoRefresh({
+    repositories,
+    refreshRepo: refreshRepoForRoot,
+    onGitMetaChange: handleGitMetaChange,
+  });
 
   const handlePreviewUrl = useCallback(
     (id: number, url: string) => updateTab(id, { url }),
