@@ -1,14 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { MergeView, unifiedMergeView } from "@codemirror/merge";
+import { getChunks, MergeView, unifiedMergeView } from "@codemirror/merge";
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { type GitHunk, native } from "@/modules/ai/lib/native";
 import {
   commitDiffKey,
@@ -30,6 +30,14 @@ import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { DiffViewToggle } from "./DiffViewToggle";
 import { DEFAULT_DIFF_MODE, type DiffMode } from "./diffMode";
+import { DiffOverview } from "./DiffOverview";
+import {
+  hunkCheckGutter,
+  type RulerMark,
+  rulerMarks,
+  setHunksEffect,
+} from "./lib/diffHunkMarkers";
+import { changedLines } from "./lib/modifiedLines";
 
 type WorkingSource = {
   kind: "working";
@@ -172,30 +180,37 @@ export function GitDiffPane({
     active ? loadStateFromCache(source) : { kind: "idle" },
   );
   const [hunks, setHunks] = useState<GitHunk[]>([]);
-  const [busyHunk, setBusyHunk] = useState<number | "all" | null>(null);
+  const [busyHunk, setBusyHunk] = useState<number | null>(null);
+  // Latest hunks for imperative dispatch into a freshly created view, where a
+  // state effect may not have run yet.
+  const hunksRef = useRef<GitHunk[]>([]);
 
   const key = cacheKey(source);
 
   // Hunk-level staging applies only to a working (non-conflict) diff. Fetch the
-  // parsed hunks once the content is known, so the strip can offer one button
-  // per hunk. A commit/conflict diff has no stage-able hunks.
+  // parsed hunks once the content is known, so the checkbox column can offer
+  // one box per hunk. A commit/conflict diff has no stage-able hunks.
   const isWorkingDiff = source.kind === "working" && !source.conflict;
   const staged = source.kind === "working" ? source.mode === "+" : false;
   useEffect(() => {
     if (!active || !isWorkingDiff) return;
     let cancelled = false;
     setHunks([]);
+    hunksRef.current = [];
     void fetchWorkingHunks(source.repoRoot, source.path, staged).then((h) => {
-      if (!cancelled) setHunks(h);
+      if (cancelled) return;
+      setHunks(h);
+      hunksRef.current = h;
     });
     return () => {
       cancelled = true;
     };
   }, [active, isWorkingDiff, source.repoRoot, source.path, staged, key]);
 
-  /** Stage or unstage a single hunk, then invalidate caches and notify the
-   * panel/editor to refresh. `discard` un-stages a staged hunk; otherwise it
-   * stages an unstaged hunk. */
+  /** Stage or unstage a single hunk, then invalidate caches, re-fetch the
+   * remaining hunks so the checkbox column tracks the new index state, and
+   * notify the panel/editor to refresh. `discard` un-stages a staged hunk;
+   * otherwise it stages an unstaged hunk. */
   const handleHunk = useCallback(
     async (index: number, discard: boolean) => {
       setBusyHunk(index);
@@ -207,34 +222,32 @@ export function GitDiffPane({
         }
         invalidateWorkingDiff(source.repoRoot, source.path);
         onHunkStaged?.(source.repoRoot, source.path);
+        const next = await fetchWorkingHunks(
+          source.repoRoot,
+          source.path,
+          staged,
+        );
+        setHunks(next);
+        hunksRef.current = next;
       } catch (e) {
         toast.error(String(e));
       } finally {
         setBusyHunk(null);
       }
     },
-    [source.repoRoot, source.path, onHunkStaged],
+    [source.repoRoot, source.path, staged, onHunkStaged],
   );
 
-  /** Stage or unstage all hunks (whole file). */
-  const handleAllHunks = useCallback(
-    async (discard: boolean) => {
-      setBusyHunk("all");
-      try {
-        if (discard) {
-          await native.gitResetHunks(source.repoRoot, source.path, []);
-        } else {
-          await native.gitStageHunks(source.repoRoot, source.path, []);
-        }
-        invalidateWorkingDiff(source.repoRoot, source.path);
-        onHunkStaged?.(source.repoRoot, source.path);
-      } catch (e) {
-        toast.error(String(e));
-      } finally {
-        setBusyHunk(null);
-      }
+  /** Clicking a hunk checkbox from anywhere in the pane. */
+  const handlePaneClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      if (busyHunk !== null) return;
+      const el = (e.target as HTMLElement).closest("[data-hunk-idx]");
+      if (!el) return;
+      const idx = Number(el.getAttribute("data-hunk-idx"));
+      if (Number.isInteger(idx) && idx >= 0) void handleHunk(idx, staged);
     },
-    [source.repoRoot, source.path, onHunkStaged],
+    [busyHunk, handleHunk, staged],
   );
 
   useEffect(() => {
@@ -325,9 +338,27 @@ export function GitDiffPane({
         syntaxHighlightDeletions: true,
         collapseUnchanged,
       }),
+      ...(isWorkingDiff
+        ? [
+            hunkCheckGutter(
+              {
+                stage: t("editor.diffStageHunk"),
+                unstage: t("editor.diffUnstageHunk"),
+              },
+              staged,
+            ),
+          ]
+        : []),
       DIFF_THEME,
     ],
-    [originalContent, langExt, gitDiffCollapseUnchanged],
+    [
+      originalContent,
+      langExt,
+      gitDiffCollapseUnchanged,
+      isWorkingDiff,
+      staged,
+      t,
+    ],
   );
 
   // Cache-hit path only: the diff came from the cache before the language
@@ -358,9 +389,23 @@ export function GitDiffPane({
       DIFF_THEME,
       themeExt,
     ];
+    const splitExtsB: Extension[] = [
+      ...splitExts,
+      ...(isWorkingDiff
+        ? [
+            hunkCheckGutter(
+              {
+                stage: t("editor.diffStageHunk"),
+                unstage: t("editor.diffUnstageHunk"),
+              },
+              staged,
+            ),
+          ]
+        : []),
+    ];
     const view = new MergeView({
       a: { doc: originalContent, extensions: splitExts },
-      b: { doc: modifiedContent, extensions: splitExts },
+      b: { doc: modifiedContent, extensions: splitExtsB },
       parent: root,
       gutter: true,
       highlightChanges: true,
@@ -370,6 +415,9 @@ export function GitDiffPane({
     dom.style.height = "100%";
     dom.style.overflow = "auto";
     mergeViewRef.current = view;
+    if (hunksRef.current.length > 0) {
+      view.b.dispatch({ effects: setHunksEffect.of(hunksRef.current) });
+    }
     return () => {
       view.destroy();
       root.innerHTML = "";
@@ -382,7 +430,73 @@ export function GitDiffPane({
     langExt,
     themeExt,
     gitDiffCollapseUnchanged,
+    isWorkingDiff,
+    staged,
+    t,
   ]);
+
+  // Push freshly fetched hunks into the checkbox gutter of whichever view is
+  // current. The split view dispatches during construction (above); this covers
+  // the unified view and hunks that arrive after the split editor exists, and
+  // the empty case that clears the boxes once the last hunk is staged (the diff
+  // content itself is unchanged by staging, so the editor may not rebuild).
+  useEffect(() => {
+    const view =
+      diffMode === "split" ? mergeViewRef.current?.b : cmRef.current?.view;
+    if (!view) return;
+    view.dispatch({ effects: setHunksEffect.of(hunks) });
+  }, [hunks, diffMode, splitReady, state.kind]);
+
+  // Right-edge overview ruler: derive the B-side changed bands from the merge
+  // chunks of the active view. The diff is read-only and loaded once, so this
+  // recomputes only when the view or content is replaced.
+  const [overview, setOverview] = useState<{
+    marks: RulerMark[];
+    totalLines: number;
+  } | null>(null);
+  useEffect(() => {
+    if (useFallback) {
+      setOverview(null);
+      return;
+    }
+    const view =
+      diffMode === "split" ? mergeViewRef.current?.b : cmRef.current?.view;
+    if (!view) return;
+    const chunks =
+      diffMode === "split"
+        ? (mergeViewRef.current?.chunks ?? [])
+        : (getChunks(view.state)?.chunks ?? []);
+    const doc = view.state.doc;
+    setOverview({
+      marks: rulerMarks(changedLines(chunks, doc), doc.lines),
+      totalLines: doc.lines,
+    });
+  }, [
+    diffMode,
+    splitReady,
+    originalContent,
+    modifiedContent,
+    langExt,
+    themeExt,
+    gitDiffCollapseUnchanged,
+    useFallback,
+  ]);
+
+  const jumpToLine = useCallback(
+    (line: number) => {
+      const view =
+        diffMode === "split" ? mergeViewRef.current?.b : cmRef.current?.view;
+      if (!view) return;
+      const maxLine = view.state.doc.lines;
+      const target = Math.max(1, Math.min(line, maxLine));
+      const pos = view.state.doc.line(target).from;
+      view.dispatch({
+        selection: { anchor: pos },
+        effects: EditorView.scrollIntoView(pos, { y: "start" }),
+      });
+    },
+    [diffMode],
+  );
 
   const stats = useMemo(
     () =>
@@ -391,7 +505,10 @@ export function GitDiffPane({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div
+      className="flex h-full min-h-0 flex-col bg-background"
+      onClick={handlePaneClick}
+    >
       <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-border/60 px-3">
         <div className="flex min-w-0 items-center gap-2">
           <Badge
@@ -443,59 +560,16 @@ export function GitDiffPane({
         </div>
       ) : null}
 
-      {isWorkingDiff && !useFallback && hunks.length > 0 ? (
-        <div className="flex shrink-0 items-center gap-1.5 border-b border-border/60 bg-foreground/[0.02] px-3 py-1.5">
-          <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-            {t("editor.hunkCount", { count: hunks.length })}
-          </span>
-          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5">
-            {hunks.map((hunk, i) => {
-              const busy = busyHunk === i;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={busyHunk !== null}
-                  onClick={() => void handleHunk(i, staged)}
-                  className={cn(
-                    "flex shrink-0 cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                    staged
-                      ? "border-rose-500/30 text-rose-600 hover:bg-rose-500/10 dark:text-rose-400"
-                      : "border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400",
-                  )}
-                >
-                  {busy ? (
-                    <Spinner className="size-2.5" />
-                  ) : (
-                    <span>{staged ? "−" : "+"}</span>
-                  )}
-                  <span className="font-mono tabular-nums">
-                    L{hunk.newStart}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            disabled={busyHunk !== null}
-            onClick={() => void handleAllHunks(staged)}
-            className="flex shrink-0 cursor-pointer items-center gap-1 rounded border border-border/70 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:bg-foreground/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busyHunk === "all" ? (
-              <Spinner className="size-2.5" />
-            ) : staged ? (
-              t("editor.unstageAll")
-            ) : (
-              t("editor.stageAll")
-            )}
-          </button>
-        </div>
-      ) : null}
-
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {loaded && !useFallback ? (
           <DiffViewToggle mode={diffMode} onChange={setDiffMode} />
+        ) : null}
+        {loaded && !useFallback && overview ? (
+          <DiffOverview
+            totalLines={overview.totalLines}
+            marks={overview.marks}
+            onJump={jumpToLine}
+          />
         ) : null}
         {state.kind === "loading" || state.kind === "idle" ? (
           <div className="flex h-full items-center justify-center gap-2 text-[11px] text-muted-foreground">

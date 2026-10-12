@@ -984,9 +984,9 @@ export const en: Record<string, string> = {
   "editor.conflictUnresolved": "Unresolved conflict",
   "editor.conflictHint":
     "Resolve the conflict below, then stage and commit. Left (ours) / right (theirs).",
-  "editor.hunkCount": "Hunks",
-  "editor.stageAll": "Stage all",
-  "editor.unstageAll": "Unstage all",
+  "editor.diffStageHunk": "Stage this hunk",
+  "editor.diffUnstageHunk": "Unstage this hunk",
+  "editor.diffOverview": "Diff overview",
   "commandPalette.description":
     "Run a command, switch theme, or search your workspace.",
   "commandPalette.themes": "Themes",

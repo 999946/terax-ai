@@ -956,9 +956,9 @@ export const zhCN: Record<string, string> = {
   "editor.conflictUnresolved": "未解决的冲突",
   "editor.conflictHint":
     "请在下面对照解决冲突后暂存并提交。左：ours / 右：theirs。",
-  "editor.hunkCount": "分块",
-  "editor.stageAll": "全部暂存",
-  "editor.unstageAll": "全部撤销暂存",
+  "editor.diffStageHunk": "暂存该差异块",
+  "editor.diffUnstageHunk": "撤销暂存该差异块",
+  "editor.diffOverview": "修改概览",
   "commandPalette.description": "运行命令、切换主题或搜索工作区。",
   "commandPalette.themes": "主题",
   "commandPalette.noThemes": "无主题",
