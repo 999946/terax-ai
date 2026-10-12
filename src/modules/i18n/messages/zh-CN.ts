@@ -1011,6 +1011,7 @@ export const zhCN: Record<string, string> = {
   "sourceControl.merged": "已合并",
   "sourceControl.notMerged": "未合并",
   "sourceControl.mergedIntoTarget": "已将 {branch} 合并到 {target}",
+  "sourceControl.mergeStatusError": "无法获取合并状态",
   "sourceControl.switchBranch": "切换分支",
   "sourceControl.creating": "正在创建…",
   "sourceControl.pushAfterCreate": "创建后推送并设置上游",

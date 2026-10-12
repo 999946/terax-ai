@@ -1,7 +1,7 @@
 import {
   Alert02Icon,
+  CancelCircleIcon,
   CheckmarkCircle01Icon,
-  GitMergeIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useState } from "react";
@@ -131,7 +131,11 @@ export function MergeStatusIcons({
               className={cn(MERGE_TOOLTIP_CLASS, "text-[10.5px]")}
             >
               <span className="font-mono">{entry.name}</span>
-              {!entry.error && (
+              {entry.error ? (
+                <span className="text-rose-400/90">
+                  {entry.error.trim() || t("sourceControl.mergeStatusError")}
+                </span>
+              ) : (
                 <span className="text-muted-foreground">
                   {entry.merged
                     ? t("sourceControl.merged")
@@ -179,10 +183,10 @@ export function MergeStatusIcons({
                     className="inline-flex cursor-pointer items-center rounded-sm transition-colors hover:bg-foreground/10"
                   >
                     <HugeiconsIcon
-                      icon={GitMergeIcon}
+                      icon={CancelCircleIcon}
                       size={12}
                       strokeWidth={2}
-                      className="text-primary/85 hover:text-primary"
+                      className="text-rose-500/90 hover:text-rose-400"
                     />
                   </button>
                 )}

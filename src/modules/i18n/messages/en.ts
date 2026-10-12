@@ -1042,6 +1042,7 @@ export const en: Record<string, string> = {
   "sourceControl.merged": "Merged",
   "sourceControl.notMerged": "Not merged",
   "sourceControl.mergedIntoTarget": "Merged {branch} into {target}",
+  "sourceControl.mergeStatusError": "Unable to get merge status",
   "sourceControl.switchBranch": "Switch Branch",
   "sourceControl.creating": "Creating…",
   "sourceControl.pushAfterCreate": "Push and set upstream after creating",
