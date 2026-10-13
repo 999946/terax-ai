@@ -1923,18 +1923,67 @@ pub fn merge_into_branch(
         ));
     }
 
+    // Resolve a bare branch name, including one that only exists on a remote,
+    // and (for remote targets) first create a local tracking branch so the
+    // merge lands on a real branch.
+    let remotes = list_remotes(&repo_root);
+    let Some((target_ref, remote)) = resolve_merge_target(&repo_root, target, &remotes) else {
+        return Err(GitError::command(
+            "git merge-into",
+            format!("branch {target} not found locally or on any remote"),
+        ));
+    };
+    let is_local_branch = matches!(
+        git_stdout_line_opt(
+            &repo_root.workspace,
+            &repo_root.git_path,
+            ["rev-parse", "--verify", "--quiet", &format!("refs/heads/{target}")],
+        ),
+        Ok(Some(_))
+    );
+    let checkout_name: String;
+    if is_local_branch {
+        // Local branch: check it out directly.
+        checkout_name = target_ref;
+    } else if let Some(remote) = remote {
+        // Remote-only target: create a local tracking branch first.
+        let branch = target_ref
+            .strip_prefix(&format!("{remote}/"))
+            .unwrap_or(target)
+            .to_string();
+        let track_out = run_git(
+            &repo_root.workspace,
+            Some(&repo_root.git_path),
+            ["checkout", "-b", &branch, "--track", &target_ref],
+            DEFAULT_TIMEOUT_SECS,
+        )?;
+        if track_out.exit_code != Some(0) {
+            return Err(GitError::command(
+                "git checkout",
+                format!(
+                    "git checkout -b {branch} --track {target_ref} failed: {}",
+                    output_stderr(&track_out)
+                ),
+            ));
+        }
+        checkout_name = branch;
+    } else {
+        // Tag or other parsed ref: check out detached (original behavior).
+        checkout_name = target_ref;
+    }
+
     // 1. Move onto the target branch.
     let checkout_out = run_git(
         &repo_root.workspace,
         Some(&repo_root.git_path),
-        ["checkout", target],
+        ["checkout", &checkout_name],
         DEFAULT_TIMEOUT_SECS,
     )?;
     if checkout_out.exit_code != Some(0) {
         return Err(GitError::command(
             "git checkout",
             format!(
-                "git checkout {target} failed: {}",
+                "git checkout {checkout_name} failed: {}",
                 output_stderr(&checkout_out)
             ),
         ));
@@ -2207,6 +2256,50 @@ pub fn delete_branch(
     ensure_success(&output, "git branch delete failed")
 }
 
+/// Configured remotes of a repo (`git remote`), sanitized the same way
+/// `list_branches` validates remote names.
+fn list_remotes(repo_root: &ResolvedGitDirectory) -> Vec<String> {
+    git_stdout_lines(&repo_root.workspace, &repo_root.git_path, ["remote"])
+        .unwrap_or_default()
+        .into_iter()
+        .map(|line| line.trim().to_string())
+        .filter(|r| !r.is_empty() && r.chars().all(is_remote_name_char))
+        .collect()
+}
+
+/// Resolve a merge-target name to a ref git can parse: the name itself first
+/// (local branch, tag, or full `remote/branch`), then `remote/name` for each
+/// configured remote, so a bare branch name that only exists on a remote
+/// (e.g. `feature/x` -> `origin/feature/x`) still resolves. Returns the
+/// resolvable ref and, when it only resolved via a remote, that remote's name.
+fn resolve_merge_target(
+    repo_root: &ResolvedGitDirectory,
+    name: &str,
+    remotes: &[String],
+) -> Option<(String, Option<String>)> {
+    let resolves = |candidate: &str| {
+        let spec = format!("{candidate}^{{commit}}");
+        matches!(
+            git_stdout_line_opt(
+                &repo_root.workspace,
+                &repo_root.git_path,
+                ["rev-parse", "--verify", "--quiet", "--end-of-options", &spec],
+            ),
+            Ok(Some(_))
+        )
+    };
+    if resolves(name) {
+        return Some((name.to_string(), None));
+    }
+    for remote in remotes {
+        let candidate = format!("{remote}/{name}");
+        if resolves(&candidate) {
+            return Some((candidate, Some(remote.clone())));
+        }
+    }
+    None
+}
+
 /// For each target branch, report whether the current branch is already merged
 /// into it (i.e. the current HEAD is an ancestor of the target).
 ///
@@ -2222,6 +2315,8 @@ pub fn merge_status(
 ) -> Result<GitMergeStatusResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
+
+    let remotes = list_remotes(&repo_root);
 
     let current = git_stdout_line_opt(
         &repo_root.workspace,
@@ -2247,10 +2342,18 @@ pub fn merge_status(
             });
             continue;
         }
+        let Some((target, _)) = resolve_merge_target(&repo_root, name, &remotes) else {
+            entries.push(GitMergeStatusEntry {
+                name: name.into(),
+                merged: false,
+                error: Some(format!("branch {name} not found locally or on any remote")),
+            });
+            continue;
+        };
         let output = run_git(
             &repo_root.workspace,
             Some(&repo_root.git_path),
-            ["merge-base", "--is-ancestor", &current, name],
+            ["merge-base", "--is-ancestor", &current, &target],
             DEFAULT_TIMEOUT_SECS,
         );
         match output {

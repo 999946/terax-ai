@@ -950,3 +950,158 @@ fn remote_add_list_set_url_and_remove() {
         operations::remote_add(&fx.registry, &fx.repo_str(), "bad name", "x", &fx.workspace).is_err()
     );
 }
+
+/// Create a bare remote `origin`, push a `developer/sit` branch onto it, and
+/// fetch so a remote-tracking ref exists — without any local `developer/sit`
+/// branch, so the target is remote-only. The returned `TempDir` keeps the bare
+/// remote alive; after the fetch the tracking ref lives in the fixture repo.
+fn remote_only_developer_sit(fx: &GitRepoFixture) -> TempDir {
+    let remote = TempDir::new().unwrap();
+    let ok = std::process::Command::new("git")
+        .args(["init", "-q", "--bare", remote.path().to_str().unwrap()])
+        .status()
+        .expect("git on PATH");
+    assert!(ok.success());
+    fx.run_git(&["remote", "add", "origin", remote.path().to_str().unwrap()]);
+    fx.run_git(&["push", "-q", "origin", "main:developer/sit"]);
+    fx.run_git(&["fetch", "-q", "origin"]);
+    remote
+}
+
+#[test]
+fn merge_status_resolves_remote_only_target() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "seed\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+    let _remote = remote_only_developer_sit(&fx);
+
+    let res = operations::merge_status(
+        &fx.registry,
+        &fx.repo_str(),
+        &["developer/sit".to_string()],
+        &fx.workspace,
+    )
+    .expect("merge_status");
+    assert_eq!(res.entries.len(), 1);
+    let entry = &res.entries[0];
+    assert_eq!(entry.name, "developer/sit");
+    assert!(
+        entry.error.is_none(),
+        "remote-only target must resolve, got: {:?}",
+        entry.error
+    );
+    assert!(entry.merged, "HEAD is an ancestor of its own pushed branch");
+}
+
+#[test]
+fn merge_status_keeps_local_branch_resolution() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "seed\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+    let _remote = remote_only_developer_sit(&fx);
+
+    let res = operations::merge_status(
+        &fx.registry,
+        &fx.repo_str(),
+        &["main".to_string()],
+        &fx.workspace,
+    )
+    .expect("merge_status");
+    assert_eq!(res.entries.len(), 1);
+    let entry = &res.entries[0];
+    assert!(
+        entry.error.is_none(),
+        "local branch resolves without remote fallback: {:?}",
+        entry.error
+    );
+    assert!(entry.merged);
+}
+
+#[test]
+fn merge_status_reports_missing_target() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "seed\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+    let _remote = remote_only_developer_sit(&fx);
+
+    let res = operations::merge_status(
+        &fx.registry,
+        &fx.repo_str(),
+        &["nonexistent/x".to_string()],
+        &fx.workspace,
+    )
+    .expect("merge_status");
+    assert_eq!(res.entries.len(), 1);
+    let entry = &res.entries[0];
+    assert!(!entry.merged);
+    let err = entry.error.as_deref().expect("error for missing target");
+    assert!(
+        err.contains("not found locally or on any remote"),
+        "friendly error instead of git stderr: {err}"
+    );
+    assert!(!err.contains("fatal"));
+}
+
+#[test]
+fn merge_into_creates_tracking_branch_for_remote_target() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    fx.write_file("a.txt", "seed\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "seed"]);
+    let _remote = remote_only_developer_sit(&fx);
+
+    // main moves ahead of the pushed remote branch.
+    fx.write_file("a.txt", "next\n");
+    fx.run_git(&["commit", "-q", "-am", "next"]);
+
+    operations::merge_into_branch(
+        &fx.registry,
+        &fx.repo_str(),
+        "developer/sit",
+        &fx.workspace,
+    )
+    .expect("merge into remote-only branch");
+
+    // Switched back to the original branch.
+    assert_eq!(
+        fx.git_output(&["rev-parse", "--abbrev-ref", "HEAD"]),
+        "main",
+        "switched back to the original branch"
+    );
+    // A local tracking branch was created for the remote target.
+    assert!(
+        !fx.git_output(&["rev-parse", "--verify", "--quiet", "refs/heads/developer/sit"])
+            .is_empty(),
+        "local tracking branch created"
+    );
+    assert_eq!(
+        fx.git_output(&[
+            "for-each-ref",
+            "--format=%(upstream:short)",
+            "refs/heads/developer/sit"
+        ]),
+        "origin/developer/sit",
+        "tracking branch points at the remote"
+    );
+    // The merge fast-forwarded the remote branch to main.
+    assert_eq!(
+        fx.git_output(&["rev-parse", "developer/sit"]),
+        fx.git_output(&["rev-parse", "main"]),
+        "merge fast-forwarded the remote branch"
+    );
+}
