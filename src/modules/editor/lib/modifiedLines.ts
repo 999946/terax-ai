@@ -96,7 +96,7 @@ export function changedLines(
   return out;
 }
 
-const modifiedField = StateField.define<ModifiedState>({
+export const modifiedField = StateField.define<ModifiedState>({
   create: () => ({ base: null, chunks: [] }),
   update: (value, tr) => {
     // A fresh baseline wins over any diff from this transaction.
