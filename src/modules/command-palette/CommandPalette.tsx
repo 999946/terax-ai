@@ -21,6 +21,7 @@ import {
   AlertCircleIcon,
   ArrowTurnBackwardIcon,
   CommandIcon,
+  Folder01Icon,
   Tick02Icon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -33,6 +34,7 @@ import {
   CONTENT_SEARCH_MIN_QUERY,
   useContentSearch,
 } from "./hooks/useContentSearch";
+import { useFileSearch } from "./hooks/useFileSearch";
 import { fuzzyBest } from "./lib/fuzzy";
 import { MODE_HINTS, parseQuery } from "./lib/mode";
 import { mruRank, mruSnapshot, recordUse } from "./lib/mru";
@@ -41,10 +43,11 @@ import type { PaletteItem } from "./types";
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialMode?: "commands" | "content";
+  initialMode?: "commands" | "content" | "files";
   commandItems: PaletteItem[];
   workspaceRoot: string | null;
   onOpenContentHit: (path: string, line: number) => void;
+  onOpenFile: (path: string) => void;
   insertCommand: ((cmd: string) => void) | null;
 };
 
@@ -58,6 +61,7 @@ export function CommandPalette({
   commandItems,
   workspaceRoot,
   onOpenContentHit,
+  onOpenFile,
   insertCommand,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -65,6 +69,7 @@ export function CommandPalette({
   const [page, setPage] = useState<"root" | "themes">("root");
   const { t } = useTranslation();
   const userShortcuts = usePreferencesStore((s) => s.shortcuts);
+  const showHidden = usePreferencesStore((s) => s.showHidden);
   const { themeId, customThemes, setThemeId, previewThemeId } = useTheme();
 
   const parsed = parseQuery(query);
@@ -75,6 +80,12 @@ export function CommandPalette({
     workspaceRoot,
     parsed.term,
     open && !inThemes && parsed.mode === "content",
+  );
+  const files = useFileSearch(
+    workspaceRoot,
+    parsed.term,
+    open && !inThemes && parsed.mode === "files",
+    showHidden,
   );
   const history = useCommandHistory(
     parsed.term,
@@ -117,7 +128,14 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!open) return;
-    setQuery(initialMode === "content" ? "#" : "");
+    setQuery(
+      initialMode === "content"
+        ? "#"
+        : initialMode === "commands"
+          ? ">"
+          : // files (VSCode Quick Open default): no prefix
+            "",
+    );
     setPage("root");
     const handle = window.setTimeout(() => {
       document.getElementById("terax-command-palette-input")?.focus();
@@ -162,7 +180,7 @@ export function CommandPalette({
       if (item.disabledReason) return;
       if (item.id === "theme.pick") return enterThemes();
       if (item.id === "search.content") return setQuery("#");
-      if (item.id === "history.open") return setQuery(">");
+      if (item.id === "history.open") return setQuery("!");
       recordUse(item.id);
       runAfterClose(item.run);
     },
@@ -174,6 +192,13 @@ export function CommandPalette({
       runAfterClose(() => onOpenContentHit(path, line));
     },
     [onOpenContentHit, runAfterClose],
+  );
+
+  const openFile = useCallback(
+    (path: string) => {
+      runAfterClose(() => onOpenFile(path));
+    },
+    [onOpenFile, runAfterClose],
   );
 
   const runHistory = useCallback(
@@ -210,7 +235,9 @@ export function CommandPalette({
       ? t("commandPalette.searchFiles")
       : parsed.mode === "history"
         ? t("commandPalette.searchHistory")
-        : t("commandPalette.placeholder");
+        : parsed.mode === "commands"
+          ? t("commandPalette.searchCommands")
+          : t("commandPalette.searchFileName");
 
   return (
     <CommandDialog
@@ -272,12 +299,58 @@ export function CommandPalette({
                   <StatusItem label={t("commandPalette.noThemes")} />
                 ) : null}
               </CommandGroup>
+            ) : parsed.mode === "files" ? (
+              <CommandGroup heading={t("commandPalette.files")}>
+                {!workspaceRoot ? (
+                  <StatusItem label={t("editor.noWorkspaceRoot")} />
+                ) : (
+                  <AsyncBody
+                    loading={files.loading}
+                    error={files.error}
+                    empty={files.results.length === 0}
+                    emptyLabel={t("commandPalette.noFiles")}
+                    onRetry={files.retry}
+                  >
+                    {files.results.map((hit) => (
+                      <CommandItem
+                        key={hit.path}
+                        value={`file:${hit.path}`}
+                        onSelect={() => openFile(hit.path)}
+                        className="text-[12.5px]"
+                      >
+                        {hit.isDir ? (
+                          <HugeiconsIcon
+                            icon={Folder01Icon}
+                            size={14}
+                            strokeWidth={1.75}
+                            className="shrink-0 text-muted-foreground"
+                          />
+                        ) : (
+                          <img
+                            src={fileIconUrl(basename(hit.name))}
+                            alt=""
+                            className="size-4 shrink-0"
+                          />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">
+                          {hit.name}
+                        </span>
+                        <span className="ml-auto max-w-64 shrink-0 truncate text-[11px] font-normal text-muted-foreground">
+                          {hit.rel}
+                        </span>
+                      </CommandItem>
+                    ))}
+                  </AsyncBody>
+                )}
+              </CommandGroup>
             ) : parsed.mode === "commands" ? (
               rankedCommands.length === 0 ? (
                 <EmptyHint />
               ) : (
                 COMMAND_GROUPS.map((group) => {
-                  const rows = rankedCommands.filter((a) => a.group === group.id);
+                  const rows = rankedCommands.filter(
+                    (a) => a.group === group.id,
+                  );
                   if (rows.length === 0) return null;
                   return (
                     <CommandGroup key={group.id} heading={t(group.labelKey)}>
@@ -336,7 +409,9 @@ export function CommandPalette({
             ) : parsed.mode === "history" ? (
               <CommandGroup heading={t("commandPalette.commandHistory")}>
                 {!insertCommand ? (
-                  <StatusItem label={t("commandPalette.openTerminalForHistory")} />
+                  <StatusItem
+                    label={t("commandPalette.openTerminalForHistory")}
+                  />
                 ) : (
                   <AsyncBody
                     loading={history.loading}
@@ -378,7 +453,7 @@ export function CommandPalette({
                     <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
                       {hint.sigil}
                     </kbd>
-                    <span>{hint.label}</span>
+                    <span>{t(hint.labelKey)}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -400,7 +475,11 @@ function rankCommands(
   }
   const scored: { item: PaletteItem; s: number }[] = [];
   for (const item of items) {
-    const s = fuzzyBest(term, [item.title, item.group, ...(item.keywords ?? [])]);
+    const s = fuzzyBest(term, [
+      item.title,
+      item.group,
+      ...(item.keywords ?? []),
+    ]);
     if (s !== null) scored.push({ item, s });
   }
   scored.sort(
@@ -475,7 +554,8 @@ function AsyncBody({
       </>
     );
   }
-  if (empty && loading) return <StatusItem label={t("commandPalette.searching")} />;
+  if (empty && loading)
+    return <StatusItem label={t("commandPalette.searching")} />;
   if (empty) return <StatusItem label={emptyLabel} />;
   return <>{children}</>;
 }
@@ -502,7 +582,9 @@ function StatusItem({
         />
       ) : null}
       <span
-        className={tone === "error" ? "text-destructive" : "text-muted-foreground"}
+        className={
+          tone === "error" ? "text-destructive" : "text-muted-foreground"
+        }
       >
         {label}
       </span>

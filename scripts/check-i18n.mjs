@@ -52,6 +52,9 @@ const DYNAMIC_KEYS = [
   "settings.tabs.general", "settings.tabs.editor", "settings.tabs.themes",
   "settings.tabs.shortcuts", "settings.tabs.models", "settings.tabs.agents",
   "settings.tabs.plugin", "settings.tabs.about",
+  // src/modules/command-palette/CommandPalette.tsx MODE_HINTS[].labelKey
+  "commandPalette.hint.commands", "commandPalette.hint.content",
+  "commandPalette.hint.history",
 ];
 
 // 已知变量键调用点签名（相对 src 的路径 + 首参表达式）。若扫描到未登记的新变量键调用，
@@ -74,6 +77,7 @@ const EXPECTED_VARIABLE_CALLS = new Set([
   "modules/ai/components/SnippetPicker.tsx:c.labelKey",
   "modules/command-palette/CommandPalette.tsx:group.labelKey",
   "modules/command-palette/CommandPalette.tsx:item.labelKey",
+  "modules/command-palette/CommandPalette.tsx:hint.labelKey",
   "settings/sections/ShortcutsSection.tsx:s.labelKey",
   "settings/sections/ShortcutsSection.tsx:group.labelKey",
 ]);

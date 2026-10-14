@@ -6,6 +6,7 @@ import { IS_MAC, MOD_PROP } from "@/lib/platform";
 
 export type ShortcutId =
   | "commandPalette.open"
+  | "commandPalette.commands"
   | "commandPalette.content"
   | "tab.new"
   | "tab.newBlock"
@@ -85,16 +86,23 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "commandPalette.open",
     labelKey: "settings.shortcuts.items.commandPalette.open",
-    label: "Open command palette",
+    label: "Quick open file",
     group: "General",
     defaultBindings: [{ [MOD_PROP]: true, key: "p" }],
+  },
+  {
+    id: "commandPalette.commands",
+    labelKey: "settings.shortcuts.items.commandPalette.commands",
+    label: "Command palette",
+    group: "General",
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
   },
   {
     id: "commandPalette.content",
     labelKey: "settings.shortcuts.items.commandPalette.content",
     label: "Find in files",
     group: "General",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "p" }],
+    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
   },
   {
     id: "settings.open",
@@ -291,14 +299,18 @@ export const SHORTCUTS: Shortcut[] = [
     labelKey: "settings.shortcuts.items.explorer.search",
     label: "Search files",
     group: "Search",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "f" }],
+    // No default binding: Cmd+Shift+F is the palette's file-content search,
+    // and quick file open lives in the palette (Cmd+P). The explorer search
+    // box stays reachable from the toolbar and the palette command.
+    defaultBindings: [],
   },
   {
     id: "search.inFiles",
     labelKey: "settings.shortcuts.items.search.inFiles",
     label: "Find & replace in files",
     group: "Search",
-    // WebStorm's replace-in-path chord. Mod+Shift+F is taken by explorer.search.
+    // WebStorm's replace-in-path chord. Mod+Shift+F is taken by the palette's
+    // file-content search.
     defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "r" }],
   },
   {

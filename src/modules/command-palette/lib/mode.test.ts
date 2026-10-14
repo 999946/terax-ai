@@ -2,16 +2,20 @@ import { describe, expect, it } from "vitest";
 import { parseQuery } from "./mode";
 
 describe("parseQuery", () => {
-  it("defaults to commands mode with a trimmed term", () => {
+  it("defaults (no prefix) to files mode with a trimmed term", () => {
     expect(parseQuery("  foo ")).toEqual({
-      mode: "commands",
+      mode: "files",
       term: "foo",
       raw: "  foo ",
     });
   });
 
-  it("routes > to command history", () => {
-    expect(parseQuery(">git")).toMatchObject({ mode: "history", term: "git" });
+  it("routes > to commands", () => {
+    expect(parseQuery(">th")).toMatchObject({ mode: "commands", term: "th" });
+  });
+
+  it("routes ! to command history", () => {
+    expect(parseQuery("!git")).toMatchObject({ mode: "history", term: "git" });
   });
 
   it("routes # to content search", () => {

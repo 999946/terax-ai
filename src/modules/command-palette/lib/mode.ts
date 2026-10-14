@@ -6,8 +6,12 @@ export type ParsedQuery = {
   raw: string;
 };
 
+// No-prefix input is the VSCode-style Quick Open: file name search. `>`
+// switches to command search (what Cmd+Shift+P prefills); `!` to shell
+// command history; `#` to file-content search; `?` lists these modes.
 const PREFIXES: ReadonlyArray<{ sigil: string; mode: PaletteMode }> = [
-  { sigil: ">", mode: "history" },
+  { sigil: ">", mode: "commands" },
+  { sigil: "!", mode: "history" },
   { sigil: "#", mode: "content" },
   { sigil: "?", mode: "help" },
 ];
@@ -18,10 +22,11 @@ export function parseQuery(raw: string): ParsedQuery {
       return { mode, term: raw.slice(sigil.length).trim(), raw };
     }
   }
-  return { mode: "commands", term: raw.trim(), raw };
+  return { mode: "files", term: raw.trim(), raw };
 }
 
-export const MODE_HINTS: ReadonlyArray<{ sigil: string; label: string }> = [
-  { sigil: ">", label: "Search command history" },
-  { sigil: "#", label: "Find text in files" },
+export const MODE_HINTS: ReadonlyArray<{ sigil: string; labelKey: string }> = [
+  { sigil: ">", labelKey: "commandPalette.hint.commands" },
+  { sigil: "#", labelKey: "commandPalette.hint.content" },
+  { sigil: "!", labelKey: "commandPalette.hint.history" },
 ];

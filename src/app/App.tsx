@@ -369,10 +369,10 @@ export default function App() {
   const [newSpaceName, setNewSpaceName] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [paletteInitialMode, setPaletteInitialMode] = useState<
-    "commands" | "content"
-  >("commands");
+    "commands" | "content" | "files"
+  >("files");
   const openCommandPalette = useCallback(
-    (mode: "commands" | "content" = "commands") => {
+    (mode: "commands" | "content" | "files" = "files") => {
       setPaletteInitialMode(mode);
       setCommandPaletteOpen(true);
     },
@@ -968,7 +968,8 @@ export default function App() {
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
-      "commandPalette.open": () => openCommandPalette("commands"),
+      "commandPalette.open": () => openCommandPalette("files"),
+      "commandPalette.commands": () => openCommandPalette("commands"),
       "commandPalette.content": () => openCommandPalette("content"),
       "tab.new": openNewTab,
       "tab.newBlock": openNewBlockTab,
@@ -1847,6 +1848,7 @@ export default function App() {
             commandItems={commandPaletteItems}
             workspaceRoot={explorerRoot}
             onOpenContentHit={openContentHit}
+            onOpenFile={handleOpenFile}
             insertCommand={insertHistoryCommand}
           />
 
