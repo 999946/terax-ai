@@ -413,8 +413,17 @@ export const FileExplorer = memo(
     // row becomes visible, then let the sync effect below select/scroll to it.
     // `tree.expand` fetches children itself (it doesn't need the parent row
     // rendered), so the whole chain can be expanded in one pass.
+    //
+    // Fires once per focused file (not on every expansion change): once a path
+    // has been revealed, a later manual collapse of its ancestor directories is
+    // respected instead of being undone by a re-run of this effect. Re-keying
+    // on rootPath means a freshly-rebuilt tree re-reveals the active file.
+    const lastRevealKeyRef = useRef<string | null>(null);
     useEffect(() => {
       if (!activeFilePath || !rootPath) return;
+      const revealKey = `${rootPath}\u0000${activeFilePath}`;
+      if (revealKey === lastRevealKeyRef.current) return;
+      lastRevealKeyRef.current = revealKey;
       if (!activeFilePath.startsWith(`${rootPath}/`)) return;
       if (entryIndexByPath.has(activeFilePath)) return;
 
@@ -429,7 +438,13 @@ export const FileExplorer = memo(
       for (const dir of chain) {
         if (!tree.expanded.has(dir)) tree.expand(dir);
       }
-    }, [activeFilePath, rootPath, entryIndexByPath, tree.expanded, tree.expand]);
+    }, [
+      activeFilePath,
+      rootPath,
+      entryIndexByPath,
+      tree.expanded,
+      tree.expand,
+    ]);
 
     const lastSyncedActivePathRef = useRef<string | null>(null);
     useEffect(() => {
