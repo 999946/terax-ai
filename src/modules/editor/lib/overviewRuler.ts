@@ -9,7 +9,7 @@ import {
 } from "./modifiedLines";
 
 /**
- * Right-edge change overview for the file editor, matching the git diff pane's
+ * Left-edge change overview for the file editor, matching the git diff pane's
  * DiffOverview: additions and modifications fold into contiguous green bands,
  * deletions into red, positioned by logical line ratio, so a glance shows how
  * much of the file diverges and where. Clicking a band scrolls the editor to
@@ -135,7 +135,7 @@ const overviewTheme = EditorView.theme({
   ".cm-editor-overview": {
     position: "absolute",
     top: "0",
-    right: "1px",
+    left: "1px",
     bottom: "0",
     width: "6px",
     zIndex: 20,
@@ -154,7 +154,7 @@ const overviewTheme = EditorView.theme({
   },
 });
 
-/** Show a diff-pane-style change overview at the editor's right edge. */
+/** Show a diff-pane-style change overview at the editor's left edge. */
 export function overviewRuler(): Extension {
   return [overviewPlugin, overviewTheme];
 }

@@ -43,6 +43,7 @@ export const en: Record<string, string> = {
   "settings.about.tagline": "Open-source AI-native terminal emulator",
   "settings.about.viewOnGitHub": "View on GitHub",
   "settings.about.reportIssue": "Report an issue",
+  "settings.about.openLogFolder": "Open log folder",
   "spaces.new": "New space",
   "spaces.title": "Spaces",
   "spaces.rename": "Rename space",

@@ -45,6 +45,7 @@ export const zhCN: Record<string, string> = {
   "settings.about.tagline": "开源 AI 原生终端模拟器",
   "settings.about.viewOnGitHub": "在 GitHub 上查看",
   "settings.about.reportIssue": "报告问题",
+  "settings.about.openLogFolder": "打开日志文件夹",
   "spaces.new": "新建工作空间",
   "spaces.title": "工作空间",
   "spaces.rename": "重命名工作空间",

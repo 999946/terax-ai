@@ -1,12 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { useUpdater } from "@/modules/updater";
-import { GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
+import {
+  Folder01Icon,
+  GithubIcon,
+  Globe02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getName, getVersion } from "@tauri-apps/api/app";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { appLogDir } from "@tauri-apps/api/path";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { SectionHeader } from "../components/SectionHeader";
 
 const REPO_URL = "https://github.com/999946/terax-ai";
@@ -53,6 +59,14 @@ export function AboutSection() {
   const onUpdateClick = () => {
     if (available) void install();
     else void check({ manual: true });
+  };
+
+  const onOpenLogs = async () => {
+    try {
+      await openPath(await appLogDir());
+    } catch (e) {
+      toast.error(String(e));
+    }
   };
 
   useEffect(() => {
@@ -151,6 +165,15 @@ export function AboutSection() {
             onClick={() => void openUrl(`${REPO_URL}/issues/new`)}
           >
             {t("settings.about.reportIssue")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void onOpenLogs()}
+            className="gap-1.5"
+          >
+            <HugeiconsIcon icon={Folder01Icon} size={12} strokeWidth={1.75} />
+            {t("settings.about.openLogFolder")}
           </Button>
         </div>
         {status.kind === "error" && (
