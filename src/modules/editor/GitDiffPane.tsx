@@ -12,9 +12,7 @@ import { toast } from "sonner";
 import { type GitHunk, native } from "@/modules/ai/lib/native";
 import {
   commitDiffKey,
-  conflictDiffKey,
   fetchCommitDiff,
-  fetchConflictDiff,
   fetchWorkingDiff,
   getCachedDiff,
   workingDiffKey,
@@ -45,8 +43,6 @@ type WorkingSource = {
   path: string;
   mode: "-" | "+";
   originalPath: string | null;
-  /** True for an unmerged (conflicted) file: render ours vs theirs. */
-  conflict?: boolean;
 };
 
 type CommitSource = {
@@ -142,7 +138,6 @@ type LoadState =
 
 function cacheKey(source: WorkingSource | CommitSource): string {
   if (source.kind === "working") {
-    if (source.conflict) return conflictDiffKey(source.repoRoot, source.path);
     return workingDiffKey(source.repoRoot, source.path, source.mode);
   }
   return commitDiffKey(source.repoRoot, source.sha, source.path);
@@ -187,10 +182,11 @@ export function GitDiffPane({
 
   const key = cacheKey(source);
 
-  // Hunk-level staging applies only to a working (non-conflict) diff. Fetch the
-  // parsed hunks once the content is known, so the checkbox column can offer
-  // one box per hunk. A commit/conflict diff has no stage-able hunks.
-  const isWorkingDiff = source.kind === "working" && !source.conflict;
+  // Hunk-level staging applies only to a working diff (a conflict opens the
+  // three-pane merge editor instead). Fetch the parsed hunks once the content
+  // is known, so the checkbox column can offer one box per hunk. A commit diff
+  // has no stage-able hunks.
+  const isWorkingDiff = source.kind === "working";
   const staged = source.kind === "working" ? source.mode === "+" : false;
   useEffect(() => {
     if (!active || !isWorkingDiff) return;
@@ -260,21 +256,19 @@ export function GitDiffPane({
     let cancelled = false;
     setState({ kind: "loading" });
     const promise =
-      source.kind === "working" && source.conflict
-        ? fetchConflictDiff(source.repoRoot, source.path)
-        : source.kind === "working"
-          ? fetchWorkingDiff(
-              source.repoRoot,
-              source.path,
-              source.mode,
-              source.originalPath,
-            )
-          : fetchCommitDiff(
-              source.repoRoot,
-              source.sha,
-              source.path,
-              source.originalPath,
-            );
+      source.kind === "working"
+        ? fetchWorkingDiff(
+            source.repoRoot,
+            source.path,
+            source.mode,
+            source.originalPath,
+          )
+        : fetchCommitDiff(
+            source.repoRoot,
+            source.sha,
+            source.path,
+            source.originalPath,
+          );
     Promise.all([promise, resolveLanguage(source.path).catch(() => null)])
       .then(([res, lang]) => {
         if (cancelled) return;
@@ -304,7 +298,6 @@ export function GitDiffPane({
 
   const path = source.path;
   const repoRoot = source.repoRoot;
-  const isConflict = source.kind === "working" && source.conflict;
   const mode = source.kind === "working" ? source.mode : "+";
   const loaded = state.kind === "loaded" ? state : null;
   const originalContent = loaded?.originalContent ?? "";
@@ -547,18 +540,6 @@ export function GitDiffPane({
           ) : null}
         </div>
       </div>
-
-      {isConflict ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/5 px-3 py-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
-          <Badge
-            variant="outline"
-            className="shrink-0 border-amber-500/30 text-[9.5px] uppercase tracking-wide text-amber-700 dark:text-amber-300"
-          >
-            {t("editor.conflictUnresolved")}
-          </Badge>
-          <span className="min-w-0">{t("editor.conflictHint")}</span>
-        </div>
-      ) : null}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {loaded && !useFallback ? (

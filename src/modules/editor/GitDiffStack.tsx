@@ -1,11 +1,13 @@
 import type { GitCommitFileDiffTab, GitDiffTab, Tab } from "@/modules/tabs";
+import { ConflictMergePane } from "./ConflictMergePane";
 import { GitDiffPane } from "./GitDiffPane";
 
 type Props = {
   tabs: Tab[];
   activeId: number;
-  /** Called after a hunk-level stage/discard, so the source-control panel and
-   * open editor baselines can refresh. */
+  /** Called after a hunk-level stage/discard or a conflict resolution writes
+   * the index/worktree, so the source-control panel and open editor baselines
+   * can refresh. */
   onHunkStaged?: (repoRoot: string, path: string) => void;
 };
 
@@ -17,6 +19,21 @@ export function GitDiffStack({ tabs, activeId, onHunkStaged }: Props) {
   );
   if (!active) return null;
   if (active.kind === "git-diff") {
+    // A conflicted (unmerged) file opens the three-pane merge editor instead of
+    // the working diff.
+    if (active.conflict) {
+      return (
+        <div className="h-full w-full">
+          <ConflictMergePane
+            key={active.id}
+            active
+            repoRoot={active.repoRoot}
+            path={active.path}
+            onResolved={onHunkStaged}
+          />
+        </div>
+      );
+    }
     return (
       <div className="h-full w-full">
         <GitDiffPane
@@ -28,7 +45,6 @@ export function GitDiffStack({ tabs, activeId, onHunkStaged }: Props) {
             path: active.path,
             mode: active.mode,
             originalPath: active.originalPath,
-            conflict: active.conflict ?? false,
           }}
           onHunkStaged={onHunkStaged}
         />

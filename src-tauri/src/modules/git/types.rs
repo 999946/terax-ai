@@ -119,6 +119,42 @@ pub struct GitConflictResult {
     pub files: Vec<GitConflictFile>,
 }
 
+/// Who stands on each side of the conflicts of the operation in progress
+/// (merge-editor titles, as IDEA labels them).
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GitMergeSides {
+    /// `merge`, `rebase`, `cherry-pick`, `revert`, `unstash`…; `None` outside
+    /// an operation.
+    pub operation: Option<String>,
+    /// Git's "ours" is not the user's work during a rebase (stage 2 holds the
+    /// commits rebased onto, stage 3 the user's commit being replayed).
+    /// [`GitMergeVersions`] is already swapped; conflict markers in the file are not.
+    pub reversed: bool,
+    /// The current branch (for a rebase: the branch being rebased).
+    pub branch: Option<String>,
+    /// Short id of the commit being applied (REBASE_HEAD, CHERRY_PICK_HEAD,
+    /// REVERT_HEAD) or merged (MERGE_HEAD).
+    pub commit: Option<String>,
+    /// The other branch: the one being merged, or the one rebased onto.
+    pub other_branch: Option<String>,
+}
+
+/// The versions of a conflicted file as the merge editor shows them.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitMergeVersions {
+    pub base: Option<String>,
+    /// The user's side ("Accept Yours"): git's stage 2, or stage 3 when `sides.reversed`.
+    pub ours: Option<String>,
+    pub theirs: Option<String>,
+    pub sides: GitMergeSides,
+    /// Three-way merge of the versions above: non-conflicting changes merged,
+    /// each conflict left as a diff3 block. `None` when a side is missing
+    /// (deleted on one side).
+    pub merged: Option<String>,
+}
+
 /// A named remote and its fetch URL, from `git remote -v`.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

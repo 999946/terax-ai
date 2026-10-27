@@ -115,6 +115,39 @@ export type GitConflictResult = {
   files: GitConflictFile[];
 };
 
+/**
+ * Who stands on each side of the conflicts of the operation in progress
+ * (merge-editor titles, as IDEA labels them).
+ */
+export type GitMergeSides = {
+  /** `merge`, `rebase`, `cherry-pick`, `revert`, `unstash`…; `null` outside an operation. */
+  operation: string | null;
+  /** Git's "ours" is not the user's work during a rebase. `GitMergeVersions`
+   * is already swapped; conflict markers in the file are not. */
+  reversed: boolean;
+  /** The current branch (for a rebase: the branch being rebased). */
+  branch: string | null;
+  /** Short id of the commit being applied (REBASE_HEAD, CHERRY_PICK_HEAD,
+   * REVERT_HEAD) or merged (MERGE_HEAD). */
+  commit: string | null;
+  /** The other branch: the one being merged, or the one rebased onto. */
+  otherBranch: string | null;
+};
+
+/**
+ * The versions of a conflicted file as the merge editor shows them.
+ */
+export type GitMergeVersions = {
+  base: string | null;
+  /** The user's side ("Accept Yours"): git's stage 2, or stage 3 when `sides.reversed`. */
+  ours: string | null;
+  theirs: string | null;
+  sides: GitMergeSides;
+  /** Three-way merge: non-conflicting changes merged, each conflict left as a
+   * diff3 block. `null` when a side is missing (deleted on one side). */
+  merged: string | null;
+};
+
 export type GitRemote = {
   name: string;
   url: string;
@@ -586,6 +619,29 @@ export const native = {
     }),
   gitConflictFiles: (repoRoot: string) =>
     invoke<GitConflictFile[]>("git_conflict_files", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitConflictVersions: (repoRoot: string, path: string) =>
+    invoke<GitMergeVersions>("git_conflict_versions", {
+      repoRoot,
+      path,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitMergeSides: (repoRoot: string) =>
+    invoke<GitMergeSides>("git_merge_sides", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitConflictResolve: (repoRoot: string, path: string, content: string) =>
+    invoke<void>("git_conflict_resolve", {
+      repoRoot,
+      path,
+      content,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitConflictContinue: (repoRoot: string) =>
+    invoke<void>("git_conflict_continue", {
       repoRoot,
       workspace: currentWorkspaceEnv(),
     }),

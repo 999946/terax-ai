@@ -1,12 +1,13 @@
 use tauri::{AppHandle, Manager};
 
+use crate::modules::git::merge_conflict;
 use crate::modules::git::operations;
 use crate::modules::git::line_diff::LineHunk;
 use crate::modules::git::types::{
     DiscardEntry, GitBlameResult, GitBranchListResult, GitCommitFileChange, GitCommitInput,
     GitCommitResult, GitConflictFile, GitConflictResult, GitDiffContentResult, GitDiffResult,
-    GitLogEntry, GitMergeStatusResult, GitPanelSnapshot, GitPushResult, GitRemote, GitRepoInfo,
-    GitStashListResult, GitStatusSnapshot,
+    GitLogEntry, GitMergeSides, GitMergeStatusResult, GitMergeVersions, GitPanelSnapshot,
+    GitPushResult, GitRemote, GitRepoInfo, GitStashListResult, GitStatusSnapshot,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -573,6 +574,62 @@ pub async fn git_conflict_files(
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
         operations::conflict_files(r, &repo_root, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_conflict_versions(
+    repo_root: String,
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<GitMergeVersions, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        merge_conflict::conflict_versions(r, &repo_root, &path, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_merge_sides(
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<GitMergeSides, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        merge_conflict::merge_sides(r, &repo_root, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_conflict_resolve(
+    repo_root: String,
+    path: String,
+    content: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        merge_conflict::write_resolution(r, &repo_root, &path, &content, &workspace)
+            .map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_conflict_continue(
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |r| {
+        merge_conflict::continue_operation(r, &repo_root, &workspace).map_err(Into::into)
     })
     .await
 }

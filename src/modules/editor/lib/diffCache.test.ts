@@ -1,9 +1,8 @@
-﻿import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const nativeMock = vi.hoisted(() => ({
   gitDiffContent: vi.fn(),
   gitCommitFileDiff: vi.fn(),
-  gitConflictFiles: vi.fn(),
   gitDiff: vi.fn(),
 }));
 
@@ -36,7 +35,6 @@ describe("git diff content cache", () => {
     vi.resetModules();
     nativeMock.gitDiffContent.mockReset();
     nativeMock.gitCommitFileDiff.mockReset();
-    nativeMock.gitConflictFiles.mockReset();
     nativeMock.gitDiff.mockReset();
     workspaceMock.currentWorkspaceScopeKey.mockClear();
     workspaceMock.currentWorkspaceScopeKey.mockReturnValue("scope");
@@ -173,49 +171,6 @@ describe("git diff content cache", () => {
       "a.ts",
       null,
     );
-  });
-
-  it("builds ours/theirs from the matched conflict file", async () => {
-    const mod = await loadModule();
-    nativeMock.gitConflictFiles.mockResolvedValue([
-      {
-        path: "a.ts",
-        ours: "ours\n",
-        theirs: "theirs\n",
-        base: "base\n",
-        isBinary: false,
-      },
-    ]);
-
-    const res = await mod.fetchConflictDiff("/repo", "a.ts");
-
-    expect(nativeMock.gitConflictFiles).toHaveBeenCalledWith("/repo");
-    expect(res.originalContent).toBe("ours\n");
-    expect(res.modifiedContent).toBe("theirs\n");
-    expect(res.isBinary).toBe(false);
-  });
-
-  it("caches conflict diffs by path", async () => {
-    const mod = await loadModule();
-    nativeMock.gitConflictFiles.mockResolvedValue([
-      { path: "a.ts", ours: "o", theirs: "t", base: null, isBinary: false },
-    ]);
-
-    await mod.fetchConflictDiff("/repo", "a.ts");
-    await mod.fetchConflictDiff("/repo", "a.ts");
-
-    expect(nativeMock.gitConflictFiles).toHaveBeenCalledTimes(1);
-  });
-
-  it("marks a missing or binary conflict file as binary fallback", async () => {
-    const mod = await loadModule();
-    nativeMock.gitConflictFiles.mockResolvedValue([
-      { path: "a.ts", ours: null, theirs: null, base: null, isBinary: true },
-    ]);
-
-    const res = await mod.fetchConflictDiff("/repo", "a.ts");
-
-    expect(res.isBinary).toBe(true);
   });
 
   it("parses hunks from git diff and caches by path + staged flag", async () => {

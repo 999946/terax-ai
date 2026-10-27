@@ -62,10 +62,6 @@ export function commitDiffKey(
   return `${currentWorkspaceScopeKey()}|${repoRoot}|c|${sha}|${path}`;
 }
 
-export function conflictDiffKey(repoRoot: string, path: string): string {
-  return `${currentWorkspaceScopeKey()}|${repoRoot}|x|${path}`;
-}
-
 export function workingHunksKey(
   repoRoot: string,
   path: string,
@@ -80,7 +76,6 @@ export function workingHunksKey(
 export function invalidateWorkingDiff(repoRoot: string, path: string): void {
   invalidateDiff(workingDiffKey(repoRoot, path, "+"));
   invalidateDiff(workingDiffKey(repoRoot, path, "-"));
-  invalidateDiff(conflictDiffKey(repoRoot, path));
   hunkCache.delete(workingHunksKey(repoRoot, path, true));
   hunkCache.delete(workingHunksKey(repoRoot, path, false));
 }
@@ -111,7 +106,7 @@ export function invalidateWorkingDiffForPath(
   if (rel === null) {
     const prefix = `${currentWorkspaceScopeKey()}|${repoRoot}|`;
     for (const k of [...cache.keys()]) {
-      if (k.startsWith(`${prefix}w|`) || k.startsWith(`${prefix}x|`)) {
+      if (k.startsWith(`${prefix}w|`)) {
         cache.delete(k);
       }
     }
@@ -146,52 +141,6 @@ export async function fetchWorkingHunks(
       hunkInflight.delete(key);
     });
   hunkInflight.set(key, p);
-  return p;
-}
-
-/**
- * Fetch the ours/theirs contents of an unmerged (conflicted) file via the
- * conflict-files command and pick the matching path. Reuses the diff cache so
- * repeated opens (and refresh toggles) don't re-read git blobs.
- */
-export async function fetchConflictDiff(
-  repoRoot: string,
-  path: string,
-): Promise<GitDiffContentResult> {
-  const key = conflictDiffKey(repoRoot, path);
-  const cached = getCachedDiff(key);
-  if (cached) return cached;
-  const pending = inflight.get(key);
-  if (pending) return pending;
-  const p = native
-    .gitConflictFiles(repoRoot)
-    .then((files) => {
-      const hit = files.find((f) => f.path === path);
-      if (!hit || hit.isBinary) {
-        return {
-          originalContent: hit?.ours ?? "",
-          modifiedContent: hit?.theirs ?? "",
-          isBinary: hit?.isBinary ?? false,
-          fallbackPatch: "",
-          truncated: false,
-        };
-      }
-      return {
-        originalContent: hit.ours ?? "",
-        modifiedContent: hit.theirs ?? "",
-        isBinary: false,
-        fallbackPatch: "",
-        truncated: false,
-      };
-    })
-    .then((res) => {
-      touch(key, res);
-      return res;
-    })
-    .finally(() => {
-      inflight.delete(key);
-    });
-  inflight.set(key, p);
   return p;
 }
 
