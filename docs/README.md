@@ -38,6 +38,7 @@ repository and are not included in the application bundle.
 
 - [OpenIDEA feature review for Terax](architecture/openidea-review.md) - borrowing assessment of an IDEA-style Rust IDE, with a Chinese translation in `architecture/openidea-review_zh.md`.
 - [Unified gutter Lane refactor design](architecture/gutter-lane-design.md) - follow-up design for the first borrowing; reorganizes editor left-edge change marks and the overview into one lane API. Chinese translation in `architecture/gutter-lane-design_zh.md`.
+- [ADE competitor comparison: OpenIDEA vs Lithe vs Terax](architecture/ade-competitor-comparison.md) - three-way, source-level comparison of Terax against two lightweight IDE alternatives, with a Chinese translation in `architecture/ade-competitor-comparison_zh.md`.
 
 ## Contributing guides
 
