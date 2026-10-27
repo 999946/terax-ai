@@ -34,6 +34,11 @@ they do not replace the current architecture or establish full release readiness
 These contributor documents and test-only reference WASM cores stay in the
 repository and are not included in the application bundle.
 
+## Product and research
+
+- [OpenIDEA feature review for Terax](architecture/openidea-review.md) - borrowing assessment of an IDEA-style Rust IDE, with a Chinese translation in `architecture/openidea-review_zh.md`.
+- [Unified gutter Lane refactor design](architecture/gutter-lane-design.md) - follow-up design for the first borrowing; reorganizes editor left-edge change marks and the overview into one lane API. Chinese translation in `architecture/gutter-lane-design_zh.md`.
+
 ## Contributing guides
 
 - [Testing](contributing/testing.md) - the testing contract, how to run checks, and what makes a good core-subsystem test.
