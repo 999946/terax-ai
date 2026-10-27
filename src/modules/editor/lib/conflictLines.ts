@@ -4,7 +4,6 @@ import {
   StateField,
   type Transaction,
 } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
 
 /**
  * Merge-conflict markers in the editor gutter. A red bar covers every line
@@ -86,27 +85,13 @@ const conflictField = StateField.define<Map<number, ConflictMark>>({
   },
 });
 
-/** Per-line conflict indicator colour. */
-const conflictTheme = EditorView.theme({
-  // Base bar geometry (shared with the change-indicator bar) so this theme is
-  // self-contained even if the modified-lines gutter were absent.
-  ".cm-ml-bar": {
-    position: "absolute",
-    top: "0",
-    bottom: "0",
-    left: "0",
-    width: "3px",
-  },
-  ".cm-ml--conflict": { backgroundColor: "var(--ml-conflict)" },
-});
-
 /**
- * Wire the conflict field and its styling into an editor. The gutter itself is
- * provided by `modifiedLines()`; the conflict marks are rendered there so a
+ * Wire the conflict field into the editor. The shared lanes read it alongside
+ * the modified-lines field; conflict bars render in the same 3px lane so a
  * conflicted file keeps a single indicator column (no extra gutter width).
  */
 export function conflictLines(): Extension {
-  return [conflictField, conflictTheme];
+  return [conflictField];
 }
 
 export { conflictField };

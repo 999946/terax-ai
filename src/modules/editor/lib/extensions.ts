@@ -12,8 +12,8 @@ import {
 import { blameBadge } from "./blameBadge";
 import { chromeTheme } from "./chromeTheme";
 import { conflictLines } from "./conflictLines";
+import { changeLane, overviewLane } from "./lanes";
 import { modifiedLines } from "./modifiedLines";
-import { overviewRuler } from "./overviewRuler";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
 export const languageCompartment = new Compartment();
@@ -86,9 +86,10 @@ const SHARED_EXTENSIONS: readonly Extension[] = Object.freeze([
   search({ top: true }),
   lintGutter(),
   blameBadge(),
+  changeLane(),
+  overviewLane(),
   modifiedLines(),
   conflictLines(),
-  overviewRuler(),
   chromeTheme(),
   EditorView.theme({
     "&, &.cm-editor, &.cm-editor.cm-focused": {

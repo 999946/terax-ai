@@ -1,7 +1,13 @@
 import { ChangeSet, Text } from "@codemirror/state";
 import { Chunk } from "@codemirror/merge";
 import { describe, expect, it } from "vitest";
-import { classifyChange, changedLines, textFromString } from "./modifiedLines";
+import {
+  changeLaneFromState,
+  classifyChange,
+  changedLines,
+  overviewFromState,
+  textFromString,
+} from "./modifiedLines";
 
 /** Baseline doc: "a\nb\nc\n" (Text.of(['a','b','c',''])). */
 function baseDoc(): Text {
@@ -124,5 +130,49 @@ describe("incremental update", () => {
     // A fully added doc; once the baseline is set to the same text, nothing shows.
     const doc = textFromString("lone\n");
     expect(kinds(changedLines(Chunk.build(doc, doc), doc))).toEqual([]);
+  });
+});
+
+describe("changeLaneFromState / overviewFromState", () => {
+  it("maps a modified line into one change-lane mark", () => {
+    const one = apply({ from: 0, to: 1, insert: "aa" });
+    const chunks = Chunk.build(baseDoc(), one.doc);
+    const state = { base: baseDoc(), chunks };
+    const marks = changeLaneFromState(state, new Map(), one.doc);
+    expect(marks).toEqual([{ line: 1, color: "modified" }]);
+  });
+
+  it("overrides an added line with conflict when both present", () => {
+    const one = apply({ from: 0, insert: "X\n" });
+    const chunks = Chunk.build(baseDoc(), one.doc);
+    const state = { base: baseDoc(), chunks };
+    const conflict = new Map<number, string>([[1, "conflict"]]);
+    const marks = changeLaneFromState(state, conflict, one.doc);
+    expect(marks.find((m) => m.line === 1)?.color).toBe("conflict");
+  });
+
+  it("returns an empty array when there is no baseline", () => {
+    const doc = Text.of(["a", ""]);
+    expect(changeLaneFromState(null, null, doc)).toEqual([]);
+    expect(overviewFromState(null, null, doc)).toEqual([]);
+  });
+
+  it("maps contiguous changes into overview bands with doc offsets", () => {
+    const one = apply({ from: 0, insert: "X\nY\n" });
+    const chunks = Chunk.build(baseDoc(), one.doc);
+    const state = { base: baseDoc(), chunks };
+    const bands = overviewFromState(state, new Map(), one.doc);
+    // Two new header lines push the changed region onto lines 1-2.
+    expect(bands.length).toBeGreaterThan(0);
+    expect(bands[0]).toMatchObject({ from: 0, color: "added" });
+  });
+
+  it("surfaces conflict lines as deleted overview bands", () => {
+    const one = apply({ from: 0, insert: "start\n" });
+    const chunks = Chunk.build(baseDoc(), one.doc);
+    const state = { base: baseDoc(), chunks };
+    const conflict = new Map<number, string>([[1, "conflict"]]);
+    const bands = overviewFromState(state, conflict, one.doc);
+    expect(bands.some((b) => b.color === "deleted")).toBe(true);
   });
 });

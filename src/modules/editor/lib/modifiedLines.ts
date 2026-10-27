@@ -1,22 +1,24 @@
 import { type Change, Chunk } from "@codemirror/merge";
 import {
   type Extension,
-  Prec,
-  type Range,
-  RangeSet,
   StateEffect,
   StateField,
   Text,
 } from "@codemirror/state";
-import { GutterMarker, EditorView, gutter } from "@codemirror/view";
 import { conflictField } from "./conflictLines";
+import {
+  changeLaneMarkers,
+  overviewMarks,
+  type ChangeLaneMark,
+  type OverviewMark,
+} from "./lanes";
 
 /**
- * Unsaved-change markers in the editor gutter: a thin colored bar to the left
- * of the line numbers for every line that differs from the last saved
- * baseline — green for added lines, orange for modified, and a red top edge on
- * the line above a deletion (VS Code's gutter indicators). Nothing is shown
- * until a baseline is set via {@link setBaselineEffect}.
+ * Unsaved-change markers: the field below holds the baseline-vs-live diff
+ * plus conflict marks; providers feed it into {@link changeLaneMarkers} and
+ * {@link overviewMarks} so the shared lanes render the 3px bars and the
+ * overview bands (VS Code's gutter indicators). Nothing is shown until a
+ * baseline is set via {@link setBaselineEffect}.
  *
  * The diff between the saved baseline (document A) and the live editor
  * (document B) is maintained incrementally with `@codemirror/merge`'s
@@ -117,95 +119,99 @@ export const modifiedField = StateField.define<ModifiedState>({
   },
 });
 
-/** A single gutter indicator. `"spacer"` renders an invisible bar to pin width. */
-class ChangeMarker extends GutterMarker {
-  constructor(readonly kind: LineKind | "spacer" | "conflict") {
-    super();
+/** Turn diff chunks + conflict marks into change-lane bars (1-based lines). */
+export function changeLaneFromState(
+  state:
+    | {
+        base: Text | null;
+        chunks: readonly Chunk[];
+      }
+    | null
+    | undefined,
+  conflict: ReadonlyMap<number, string> | null | undefined,
+  doc: Text,
+): ChangeLaneMark[] {
+  const marks: ChangeLaneMark[] = [];
+  const conflicts = conflict ?? new Map<number, string>();
+  if (conflicts.size > 0) {
+    for (const line of conflicts.keys())
+      marks.push({ line, color: "conflict" });
   }
-
-  eq(other: ChangeMarker): boolean {
-    return other.kind === this.kind;
-  }
-
-  toDOM(): HTMLElement {
-    const div = document.createElement("div");
-    div.className =
-      this.kind === "spacer" ? "cm-ml-bar" : `cm-ml-bar cm-ml--${this.kind}`;
-    return div;
-  }
-}
-
-function buildMarkers(view: EditorView): RangeSet<GutterMarker> {
-  const state = view.state.field(modifiedField, false);
-  const conflict = view.state.field(conflictField, false);
-  const hasConflict = !!conflict && conflict.size > 0;
-  if (
-    hasConflict &&
-    (!state || state.base == null || state.chunks.length === 0)
-  ) {
-    const markers: Range<GutterMarker>[] = [];
-    for (const line of conflict.keys()) {
-      markers.push(
-        new ChangeMarker("conflict").range(view.state.doc.line(line).from),
-      );
-    }
-    return RangeSet.of(markers);
-  }
-  if (!state || state.base == null || state.chunks.length === 0) {
-    return RangeSet.empty;
-  }
-  const lines = changedLines(state.chunks, view.state.doc);
-  const markers: Range<GutterMarker>[] = [];
+  if (!state || state.base == null || state.chunks.length === 0) return marks;
+  const lines = changedLines(state.chunks, doc);
   for (const [line, kind] of lines) {
-    // A conflict overrides the change indicator on the same line — the file is
-    // mid-merge, so the red conflict bar is the more important signal.
-    if (hasConflict && conflict.has(line)) {
-      markers.push(
-        new ChangeMarker("conflict").range(view.state.doc.line(line).from),
-      );
-    } else {
-      markers.push(
-        new ChangeMarker(kind).range(view.state.doc.line(line).from),
-      );
-    }
+    if (conflicts.has(line)) continue; // conflict wins
+    marks.push({ line, color: kind });
   }
-  return RangeSet.of(markers);
+  return marks;
 }
 
-const modifiedGutter = gutter({
-  class: "cm-ml-gutter",
-  markers: (view) => buildMarkers(view),
-  initialSpacer: () => new ChangeMarker("spacer"),
-});
+/** Turn diff chunks + conflict marks into overview bands (document offsets). */
+export function overviewFromState(
+  state:
+    | {
+        base: Text | null;
+        chunks: readonly Chunk[];
+      }
+    | null
+    | undefined,
+  conflict: ReadonlyMap<number, string> | null | undefined,
+  doc: Text,
+): OverviewMark[] {
+  if (!state || state.base == null || state.chunks.length === 0) return [];
+  const changed = changedLines(state.chunks, doc);
+  if (conflict) {
+    for (const [line] of conflict) changed.set(line, "deleted");
+  }
+  const total = doc.lines;
+  if (total < 1 || changed.size === 0) return [];
+  const lines = [...changed.keys()].sort((a, b) => a - b);
+  const bands: OverviewMark[] = [];
+  let open: { from: number; to: number; kind: "add" | "del" } | null = null;
+  const color = (k: "add" | "del") => (k === "add" ? "added" : "deleted");
+  for (const line of lines) {
+    const kind = changed.get(line) === "deleted" ? "del" : "add";
+    if (open && open.kind === kind && line === open.to + 1) {
+      open.to = line;
+      continue;
+    }
+    if (open)
+      bands.push({
+        from: doc.line(open.from).from,
+        to: doc.line(open.to).to,
+        color: color(open.kind),
+      });
+    open = { from: line, to: line, kind };
+  }
+  if (open)
+    bands.push({
+      from: doc.line(open.from).from,
+      to: doc.line(open.to).to,
+      color: color(open.kind),
+    });
+  return bands;
+}
 
-const modifiedTheme = EditorView.theme({
-  // A fixed-width slot left of the line numbers. The marker bar is absolutely
-  // positioned, so without an explicit gutter width the slot would collapse to
-  // 0 and hide the indicators. Keep both the gutter and its elements at the
-  // bar's width so the coloured marks have room to render.
-  ".cm-ml-gutter": {
-    width: "3px",
-  },
-  ".cm-ml-gutter .cm-gutterElement": {
-    position: "relative",
-    width: "3px",
-    padding: "0",
-  },
-  ".cm-ml-bar": {
-    position: "absolute",
-    top: "0",
-    bottom: "0",
-    left: "0",
-    width: "3px",
-  },
-  ".cm-ml--added": { backgroundColor: "var(--ml-added)" },
-  ".cm-ml--modified": { backgroundColor: "var(--ml-modified)" },
-  // Deletions take no space in B; a red top edge on the line above the gap.
-  ".cm-ml--deleted": { boxShadow: "inset 0 2px 0 0 var(--ml-deleted)" },
-  ".cm-ml--conflict": { backgroundColor: "var(--ml-conflict)" },
-});
-
-/** Wire the baseline field, the change gutter, and its styling into an editor. */
+/**
+ * Wire the baseline field into the shared lanes. The field itself is the
+ * incremental Chunk engine; providers feed the lanes from it.
+ */
 export function modifiedLines(): Extension {
-  return [modifiedField, Prec.highest(modifiedGutter), modifiedTheme];
+  return [
+    modifiedField,
+    changeLaneMarkers.compute([modifiedField, conflictField], (s) =>
+      changeLaneFromState(
+        s.field(modifiedField, false),
+        s.field(conflictField, false),
+        s.doc,
+      ),
+    ),
+    overviewMarks.compute([modifiedField, conflictField], (s) =>
+      overviewFromState(
+        s.field(modifiedField, false),
+        s.field(conflictField, false),
+        s.doc,
+      ),
+    ),
+  ];
 }
