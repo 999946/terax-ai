@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Manager};
 
 use crate::modules::git::operations;
+use crate::modules::git::line_diff::LineHunk;
 use crate::modules::git::types::{
     DiscardEntry, GitBlameResult, GitBranchListResult, GitCommitFileChange, GitCommitInput,
     GitCommitResult, GitConflictFile, GitConflictResult, GitDiffContentResult, GitDiffResult,
@@ -113,16 +114,18 @@ pub async fn git_diff_content(
     .await
 }
 
+
 #[tauri::command]
-pub async fn git_head_content(
+pub async fn git_line_hunks(
     repo_root: String,
     path: String,
+    current_text: String,
     workspace: Option<WorkspaceEnv>,
     app: AppHandle,
-) -> Result<String, String> {
+) -> Result<Vec<LineHunk>, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
-        operations::head_content(r, &repo_root, &path, &workspace).map_err(Into::into)
+        operations::line_hunks(r, &repo_root, &path, &current_text, &workspace).map_err(Into::into)
     })
     .await
 }

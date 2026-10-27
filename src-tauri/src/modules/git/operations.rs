@@ -2,6 +2,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
 use crate::modules::git::errors::{GitError, Result};
+use crate::modules::git::line_diff::{self, LineHunk};
 use crate::modules::git::parser::{build_hunk_patch, parse_porcelain_v2, parse_unified_hunks};
 use crate::modules::git::process::{
     ensure_git_available, ensure_success, git_show_text, git_stdout_line_opt, git_stdout_lines,
@@ -311,27 +312,6 @@ pub fn diff_content(
         fallback_patch: patch.diff_text,
         truncated: patch.truncated,
     })
-}
-
-/// The file's committed (HEAD) text, for the editor's git change markers.
-/// Untracked/new files resolve to an empty string, matching an "all lines are
-/// additions" baseline; binary files decode to empty text as well.
-pub fn head_content(
-    registry: &WorkspaceRegistry,
-    repo_root: &str,
-    path: &str,
-    workspace: &WorkspaceEnv,
-) -> Result<String> {
-    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
-    ensure_git_available(&repo_root.workspace)?;
-    let worktree_path = resolve_within_repo(&repo_root.local_path, path)?;
-    let rel_path = pathspec(&repo_root.local_path, &worktree_path);
-    let source = git_show_text(
-        &repo_root.workspace,
-        &repo_root.git_path,
-        &format!("HEAD:{rel_path}"),
-    )?;
-    Ok(source.into_text())
 }
 
 pub fn stage(
@@ -2507,6 +2487,40 @@ pub fn stash_drop(
         DEFAULT_TIMEOUT_SECS,
     )?;
     ensure_success(&output, "git stash drop failed")
+}
+
+
+/// Structured line hunks of the unsaved buffer against the committed (HEAD)
+/// text, for the editor's git change lane. This is the Rust-side computation
+/// borrowed from OpenIDEA: the backend diffs the baseline and the current
+/// buffer (passed from the frontend) and the frontend only maps hunk
+/// positions onto the editor, instead of re-diffing in JS with an incremental
+/// chunk engine. EOL differences (CRLF-committed files) are normalized here,
+/// so a file whose HEAD version is CRLF no longer flags every line.
+///
+/// Untracked/new files resolve to a single all-added hunk; binary files and
+/// paths outside a repository yield no hunks.
+pub fn line_hunks(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    path: &str,
+    current_text: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<LineHunk>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let worktree_path = resolve_within_repo(&repo_root.local_path, path)?;
+    let rel_path = pathspec(&repo_root.local_path, &worktree_path);
+    let source = git_show_text(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        &format!("HEAD:{rel_path}"),
+    )?;
+    match source {
+        TextSource::Binary => Ok(Vec::new()),
+        TextSource::Missing => Ok(line_diff::all_added(current_text)),
+        TextSource::Text(base) => Ok(line_diff::line_hunks(&base, current_text)),
+    }
 }
 
 #[cfg(test)]

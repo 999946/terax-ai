@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod line_diff;
 pub mod errors;
 pub mod operations;
 pub mod parser;

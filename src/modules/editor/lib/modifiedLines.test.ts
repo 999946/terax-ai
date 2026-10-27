@@ -1,12 +1,18 @@
-import { ChangeSet, Text } from "@codemirror/state";
+import { ChangeSet, EditorState, Text } from "@codemirror/state";
 import { Chunk } from "@codemirror/merge";
 import { describe, expect, it } from "vitest";
 import {
   changeLaneFromState,
   classifyChange,
   changedLines,
+  marksFromHunks,
+  modifiedField,
+  overviewFromHunks,
   overviewFromState,
+  setHunksEffect,
   textFromString,
+  toEditorHunks,
+  type GitLineHunk,
 } from "./modifiedLines";
 
 /** Baseline doc: "a\nb\nc\n" (Text.of(['a','b','c',''])). */
@@ -67,7 +73,6 @@ describe("classifyChange", () => {
 
 describe("changedLines", () => {
   it("marks a full inserted line as added", () => {
-    // Insert "X\n" at the very start → B line 1 is new.
     const { cs, doc } = apply({ from: 0, insert: "X\n" });
     const chunks = Chunk.build(baseDoc(), doc);
     expect(kinds(changedLines(chunks, doc))).toEqual([[1, "added"]]);
@@ -75,7 +80,6 @@ describe("changedLines", () => {
   });
 
   it("marks a changed line as modified", () => {
-    // Rewrite "a" → "aa" inside line 1.
     const { cs, doc } = apply({ from: 0, to: 1, insert: "aa" });
     const chunks = Chunk.build(baseDoc(), doc);
     expect(kinds(changedLines(chunks, doc))).toEqual([[1, "modified"]]);
@@ -83,8 +87,6 @@ describe("changedLines", () => {
   });
 
   it("marks the line at the deletion gap as deleted", () => {
-    // Delete disk line 2 ("b\n", positions [2,4)) → B doc "a\nc\n". The gap
-    // sits at position 2, the top of what is now line 2.
     const { cs, doc } = apply({ from: 2, to: 4 });
     const chunks = Chunk.build(baseDoc(), doc);
     expect(kinds(changedLines(chunks, doc))).toEqual([[2, "deleted"]]);
@@ -97,82 +99,225 @@ describe("changedLines", () => {
   });
 
   it("handles an EOF insertion without overflowing", () => {
-    // Append after "a\nb\nc" at position doc.length.
     const { cs, doc } = apply({ from: 6, insert: "D" });
     const chunks = Chunk.build(baseDoc(), doc);
     expect(() => changedLines(chunks, doc)).not.toThrow();
-    // The appended line is flagged.
     expect([...changedLines(chunks, doc).values()]).toContain("added");
     void cs;
   });
 });
 
-describe("incremental update", () => {
-  it("keeps offsets stable when a second edit lands above the first", () => {
-    // Start from a baseline, insert a line at the top → B.
-    const one = apply({ from: 0, insert: "X\n" });
-    let chunks = Chunk.build(baseDoc(), one.doc);
-
-    // Now a second edit ABOVE the first change (insert another line at top).
-    const cs2 = ChangeSet.of({ from: 0, insert: "Y\n" }, one.doc.length);
-    const doc2 = cs2.apply(one.doc);
-    chunks = Chunk.updateB(chunks, baseDoc(), doc2, cs2);
-
-    // Both added lines survive and land on B line 1 and 2.
-    const map = changedLines(chunks, doc2);
-    expect(kinds(map)).toEqual([
-      [1, "added"],
-      [2, "added"],
-    ]);
+describe("toEditorHunks", () => {
+  it("maps 0-based backend lines onto document offsets", () => {
+    const doc = Text.of(["a", "b", "c", ""]);
+    const hunks: GitLineHunk[] = [
+      {
+        kind: "added",
+        start: 1,
+        lines: 2,
+        oldStart: 0,
+        oldLines: 0,
+        oldText: "",
+      },
+    ];
+    const editor = toEditorHunks(hunks, doc);
+    // start=1 (0-based) is the live line 2 ("b", offset 2); the hunk spans
+    // lines 2-3, so `to` is the start of the following line (offset 6, the
+    // empty 4th line).
+    expect(editor[0].from).toBe(2);
+    expect(editor[0].to).toBe(6);
   });
 
-  it("clears markers once the baseline equals the live doc", () => {
-    // A fully added doc; once the baseline is set to the same text, nothing shows.
-    const doc = textFromString("lone\n");
-    expect(kinds(changedLines(Chunk.build(doc, doc), doc))).toEqual([]);
+  it("places a pure deletion at its gap line", () => {
+    const doc = Text.of(["a", "b", "c", ""]);
+    const hunks: GitLineHunk[] = [
+      {
+        kind: "deleted",
+        start: 1,
+        lines: 0,
+        oldStart: 1,
+        oldLines: 2,
+        oldText: "b\nc\n",
+      },
+    ];
+    const editor = toEditorHunks(hunks, doc);
+    expect(editor[0].from).toBe(editor[0].to);
+    expect(editor[0].from).toBe(2);
+  });
+});
+
+describe("modifiedField", () => {
+  function drive(doc: Text, hunks: GitLineHunk[]) {
+    let state = EditorState.create({ doc, extensions: [modifiedField] });
+    state = state.update({ effects: [setHunksEffect.of(hunks)] }).state;
+    return state;
+  }
+
+  it("adopts a fresh hunk set", () => {
+    const doc = Text.of(["a", "b", "c", ""]);
+    const state = drive(doc, [
+      {
+        kind: "modified",
+        start: 1,
+        lines: 1,
+        oldStart: 1,
+        oldLines: 1,
+        oldText: "b\n",
+      },
+    ]);
+    const hunks = state.field(modifiedField, false)!.hunks;
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]!.from).toBe(2);
+  });
+
+  it("remaps offsets through an edit above the hunk", () => {
+    const doc = Text.of(["a", "b", "c", ""]);
+    let state = drive(doc, [
+      {
+        kind: "modified",
+        start: 1,
+        lines: 1,
+        oldStart: 1,
+        oldLines: 1,
+        oldText: "b\n",
+      },
+    ]);
+    // The hunk lives on line 2 (offset 2, 0-based start 1).
+    // Insert a line at the very top: the hunk's line shifts down by one.
+    state = state.update({ changes: { from: 0, insert: "X\n" } }).state;
+    const doc2 = state.doc;
+    const h0 = state.field(modifiedField, false)!.hunks[0]!;
+    // 0-based start stays 1 (a line), but its offset moves to line 3's start.
+    expect(h0.from).toBe(doc2.line(3).from);
+    expect(h0.to).toBe(doc2.line(4).from);
+  });
+
+  it("clamps hunks when the document below them is deleted", () => {
+    const doc = Text.of(["a", "b", ""]);
+    let state = drive(doc, [
+      {
+        kind: "added",
+        start: 1,
+        lines: 1,
+        oldStart: 0,
+        oldLines: 0,
+        oldText: "",
+      },
+    ]);
+    // Delete everything: the hunk's offsets clamp to the (empty) document.
+    state = state.update({ changes: { from: 0, to: 4 } }).state;
+    const hunks = state.field(modifiedField, false)!.hunks;
+    expect(hunks.length).toBe(1);
+    expect(hunks[0]!.from).toBeLessThanOrEqual(state.doc.length);
   });
 });
 
 describe("changeLaneFromState / overviewFromState", () => {
-  it("maps a modified line into one change-lane mark", () => {
-    const one = apply({ from: 0, to: 1, insert: "aa" });
-    const chunks = Chunk.build(baseDoc(), one.doc);
-    const state = { base: baseDoc(), chunks };
-    const marks = changeLaneFromState(state, new Map(), one.doc);
-    expect(marks).toEqual([{ line: 1, color: "modified" }]);
+  it("maps a modified hunk into one change-lane mark", () => {
+    const doc = Text.of(["a", "b", "c", ""]);
+    const state = {
+      hunks: [
+        {
+          kind: "modified" as const,
+          start: 1,
+          lines: 1,
+          from: 2,
+          to: 4,
+          oldStart: 1,
+          oldLines: 1,
+          oldText: "b\n",
+        },
+      ],
+    };
+    const marks = changeLaneFromState(state, new Map(), doc);
+    expect(marks).toEqual([{ line: 2, color: "modified" }]);
   });
 
   it("overrides an added line with conflict when both present", () => {
-    const one = apply({ from: 0, insert: "X\n" });
-    const chunks = Chunk.build(baseDoc(), one.doc);
-    const state = { base: baseDoc(), chunks };
-    const conflict = new Map<number, string>([[1, "conflict"]]);
-    const marks = changeLaneFromState(state, conflict, one.doc);
-    expect(marks.find((m) => m.line === 1)?.color).toBe("conflict");
+    const doc = Text.of(["a", "b", "c", ""]);
+    const state = {
+      hunks: [
+        {
+          kind: "added" as const,
+          start: 1,
+          lines: 1,
+          from: 2,
+          to: 4,
+          oldStart: 0,
+          oldLines: 0,
+          oldText: "",
+        },
+      ],
+    };
+    const conflict = new Map<number, string>([[2, "conflict"]]);
+    const marks = changeLaneFromState(state, conflict, doc);
+    expect(marks.find((m) => m.line === 2)?.color).toBe("conflict");
   });
 
-  it("returns an empty array when there is no baseline", () => {
+  it("returns an empty array when there are no hunks", () => {
     const doc = Text.of(["a", ""]);
     expect(changeLaneFromState(null, null, doc)).toEqual([]);
     expect(overviewFromState(null, null, doc)).toEqual([]);
   });
 
   it("maps contiguous changes into overview bands with doc offsets", () => {
-    const one = apply({ from: 0, insert: "X\nY\n" });
-    const chunks = Chunk.build(baseDoc(), one.doc);
-    const state = { base: baseDoc(), chunks };
-    const bands = overviewFromState(state, new Map(), one.doc);
-    // Two new header lines push the changed region onto lines 1-2.
-    expect(bands.length).toBeGreaterThan(0);
-    expect(bands[0]).toMatchObject({ from: 0, color: "added" });
+    const doc = Text.of(["a", "b", "c", ""]);
+    const bands = overviewFromHunks(
+      [
+        {
+          kind: "added",
+          start: 0,
+          lines: 2,
+          from: 0,
+          to: 4,
+          oldStart: 0,
+          oldLines: 0,
+          oldText: "",
+        },
+      ],
+      doc,
+    );
+    expect(bands[0]).toMatchObject({ from: 0, to: 3, color: "added" });
   });
 
   it("surfaces conflict lines as deleted overview bands", () => {
-    const one = apply({ from: 0, insert: "start\n" });
-    const chunks = Chunk.build(baseDoc(), one.doc);
-    const state = { base: baseDoc(), chunks };
+    const doc = Text.of(["a", "b", "c", ""]);
+    const state = {
+      hunks: [
+        {
+          kind: "added" as const,
+          start: 0,
+          lines: 1,
+          from: 0,
+          to: 2,
+          oldStart: 0,
+          oldLines: 0,
+          oldText: "",
+        },
+      ],
+    };
     const conflict = new Map<number, string>([[1, "conflict"]]);
-    const bands = overviewFromState(state, conflict, one.doc);
+    const bands = overviewFromState(state, conflict, doc);
     expect(bands.some((b) => b.color === "deleted")).toBe(true);
+  });
+
+  it("marks a deleted hunk as one deleted bar", () => {
+    const doc = Text.of(["a", "b", "c", ""]);
+    const marks = marksFromHunks(
+      [
+        {
+          kind: "deleted",
+          start: 2,
+          lines: 0,
+          from: 4,
+          to: 4,
+          oldStart: 2,
+          oldLines: 1,
+          oldText: "c\n",
+        },
+      ],
+      doc,
+    );
+    expect(marks).toEqual([{ line: 3, color: "deleted" }]);
   });
 });

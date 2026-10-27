@@ -55,11 +55,11 @@ import {
 import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
 import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
-import { setBaselineEffect } from "./lib/modifiedLines";
+import { setHunksEffect } from "./lib/modifiedLines";
 import { setConflictEffect } from "./lib/conflictLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
 import { invalidateWorkingDiffForPath } from "./lib/diffCache";
-import { fetchGitBaseline } from "./lib/gitBaselineCache";
+import { fetchGitHunks } from "./lib/gitBaselineCache";
 import {
   buildSharedExtensions,
   DEFAULT_INDENT,
@@ -150,6 +150,7 @@ type Props = {
 // Above this, syntax highlighting and LSP are disabled: a multi-MB lezer
 // parse tree and a didOpen of that size cost far more than they give.
 const SYNTAX_MAX_BYTES = 4 * 1024 * 1024;
+const HUNK_REFETCH_DEBOUNCE_MS = 300;
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -554,6 +555,17 @@ export const EditorPane = memo(
           getPath: () => pathRef.current,
           getLanguage: () => languageRef.current,
         }),
+        // Debounced backend refetch of change hunks: typing remaps hunk
+        // offsets locally (stateless, via modifiedField), then a quiet pause
+        // re-diffs against the latest buffer for drift correction (mirrors
+        // OpenIDEA's HunkFetcher). Uses a stable ref so the memoized extension
+        // array never reconfigures the editor state.
+        EditorView.updateListener.of((update) => {
+          if (!update.docChanged) return;
+          const refetch = refreshGitBaselineRef.current;
+          if (hunkTimerRef.current) clearTimeout(hunkTimerRef.current);
+          hunkTimerRef.current = setTimeout(refetch, HUNK_REFETCH_DEBOUNCE_MS);
+        }),
         keymap.of([
           {
             key: "Mod-s",
@@ -686,28 +698,35 @@ export const EditorPane = memo(
     // keeping the baseline cost away from big buffers.
     const docStatus = doc.status;
     const docSize = doc.status === "ready" ? doc.size : 0;
-    const fetchAndApplyBaseline = useCallback(
+    // Backend-computed change hunks (see git::line_hunks): the Rust side
+    // diffs the committed HEAD text against the live buffer and returns
+    // structured hunks, so EOL skew (CRLF baselines) can't mis-flag the
+    // whole file. The editor only maps hunk offsets; edits remap them
+    // locally until a refetch re-aligns.
+    const fetchAndApplyHunks = useCallback(
       (isCancelled: () => boolean): void => {
         const filePath = pathRef.current;
         const view = cmRef.current?.view;
         if (docStatus !== "ready" || !view) return;
+        const currentText = view.state.doc.toString();
         if (docSize > SYNTAX_MAX_BYTES) {
-          view.dispatch({ effects: setBaselineEffect.of({ text: "" }) });
+          view.dispatch({ effects: setHunksEffect.of([]) });
           return;
         }
         void (async () => {
           const repo = await native.gitResolveRepo(filePath);
           if (isCancelled()) return;
-          const text = await fetchGitBaseline(
+          const hunks = await fetchGitHunks(
             repo?.repoRoot ?? filePath,
             filePath,
+            currentText,
           );
           if (isCancelled()) return;
           // The buffer may have switched to another file while the fetch was in
-          // flight - never feed one file's baseline into another's view.
+          // flight - never feed one file's hunks into another's view.
           if (cmRef.current?.view !== view) return;
           if (pathRef.current !== filePath) return;
-          view.dispatch({ effects: setBaselineEffect.of({ text }) });
+          view.dispatch({ effects: setHunksEffect.of(hunks) });
         })();
       },
       [docStatus, docSize],
@@ -715,18 +734,23 @@ export const EditorPane = memo(
 
     useEffect(() => {
       let cancelled = false;
-      fetchAndApplyBaseline(() => cancelled);
+      fetchAndApplyHunks(() => cancelled);
       return () => {
         cancelled = true;
       };
-    }, [fetchAndApplyBaseline, path]);
+    }, [fetchAndApplyHunks, path]);
 
     // Imperative repull after a commit advances HEAD: the cached baseline is
     // invalidated first (see App.refreshEditorGitBaselines), so this refetches
     // the new HEAD text and clears the markers without touching the buffer.
     const refreshGitBaseline = useCallback(() => {
-      fetchAndApplyBaseline(() => false);
-    }, [fetchAndApplyBaseline]);
+      fetchAndApplyHunks(() => false);
+    }, [fetchAndApplyHunks]);
+    // Keep a stable ref so the per-pane extensions array (memoized with a
+    // stable identity) can debounce-refetch without forcing a reconfigure.
+    const refreshGitBaselineRef = useRef(refreshGitBaseline);
+    refreshGitBaselineRef.current = refreshGitBaseline;
+    const hunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const lspExt = useLspExtension(path, langId, doc.status === "ready");
     useEffect(() => {

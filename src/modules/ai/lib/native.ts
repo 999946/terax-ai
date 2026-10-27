@@ -79,6 +79,20 @@ export type GitHunkLine = {
   content: string;
 };
 
+export type GitLineHunk = {
+  kind: "added" | "modified" | "deleted";
+  /** 0-based first line in the current (B) document; the gap line for deletions. */
+  start: number;
+  /** Lines occupied in B (0 for pure deletions). */
+  lines: number;
+  /** 0-based first line in the baseline (HEAD). */
+  oldStart: number;
+  /** Baseline lines removed (0 for pure additions). */
+  oldLines: number;
+  /** The removed source text (popup / rollback). */
+  oldText: string;
+};
+
 export type GitHunk = {
   oldStart: number;
   oldCount: number;
@@ -365,10 +379,11 @@ export const native = {
       originalPath: originalPath ?? null,
       workspace: currentWorkspaceEnv(),
     }),
-  gitHeadContent: (repoRoot: string, path: string) =>
-    invoke<string>("git_head_content", {
+  gitLineHunks: (repoRoot: string, path: string, currentText: string) =>
+    invoke<GitLineHunk[]>("git_line_hunks", {
       repoRoot,
       path,
+      currentText,
       workspace: currentWorkspaceEnv(),
     }),
   gitStage: (repoRoot: string, paths: string[]) =>

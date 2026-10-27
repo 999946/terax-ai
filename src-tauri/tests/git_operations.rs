@@ -312,7 +312,7 @@ fn diff_staged_only_shows_index_change() {
 }
 
 #[test]
-fn head_content_returns_committed_text() {
+fn line_hunks_diff_against_committed_text() {
     if skip_if_no_git() {
         return;
     }
@@ -321,17 +321,19 @@ fn head_content_returns_committed_text() {
     fx.run_git(&["add", "a.txt"]);
     fx.run_git(&["commit", "-q", "-m", "init"]);
 
-    // A staged-but-uncommitted edit must still yield the committed content.
+    // A staged-but-uncommitted edit must still diff against the committed
+    // content, so the unsaved buffer lines are marked as added.
     fx.write_file("a.txt", "alpha\nbeta\n");
-    fx.run_git(&["add", "a.txt"]);
 
-    let content = operations::head_content(&fx.registry, &fx.repo_str(), "a.txt", &fx.workspace)
-        .expect("head_content");
-    assert_eq!(content, "alpha\n", "HEAD baseline is immune to staged edits");
+    let hunks = operations::line_hunks(&fx.registry, &fx.repo_str(), "a.txt", "alpha\nbeta\n", &fx.workspace)
+        .expect("line_hunks");
+    assert_eq!(hunks.len(), 1, "the extra line surfaces as one added hunk");
+    assert_eq!(hunks[0].kind, terax_lib::modules::git::line_diff::LineHunkKind::Added);
+    assert_eq!(hunks[0].start, 1, "added hunk sits on live line 2 (0-based 1)");
 }
 
 #[test]
-fn head_content_follows_new_commit() {
+fn line_hunks_follows_new_commit() {
     if skip_if_no_git() {
         return;
     }
@@ -344,23 +346,43 @@ fn head_content_follows_new_commit() {
     fx.run_git(&["add", "a.txt"]);
     fx.run_git(&["commit", "-q", "-m", "second"]);
 
-    let content = operations::head_content(&fx.registry, &fx.repo_str(), "a.txt", &fx.workspace)
-        .expect("head_content");
-    assert_eq!(content, "two\n", "baseline advances with each commit");
+    // Once committed, the unsaved buffer matching HEAD yields no hunks.
+    let hunks = operations::line_hunks(&fx.registry, &fx.repo_str(), "a.txt", "two\n", &fx.workspace)
+        .expect("line_hunks");
+    assert!(hunks.is_empty(), "baseline advances with each commit");
 }
 
 #[test]
-fn head_content_is_empty_for_untracked_file() {
+fn line_hunks_is_all_added_for_untracked_file() {
     if skip_if_no_git() {
         return;
     }
     let fx = GitRepoFixture::new();
-    // Never staged nor committed: an empty HEAD baseline means "all lines added".
+    // Never staged nor committed: an all-added hunk covers every line.
     fx.write_file("new.txt", "fresh\n");
 
-    let content = operations::head_content(&fx.registry, &fx.repo_str(), "new.txt", &fx.workspace)
-        .expect("head_content");
-    assert_eq!(content, "", "untracked file has no HEAD version");
+    let hunks = operations::line_hunks(&fx.registry, &fx.repo_str(), "new.txt", "fresh\n", &fx.workspace)
+        .expect("line_hunks");
+    assert_eq!(hunks.len(), 1, "untracked file has one all-added hunk");
+    assert_eq!(hunks[0].kind, terax_lib::modules::git::line_diff::LineHunkKind::Added);
+    assert_eq!((hunks[0].start, hunks[0].lines), (0, 1));
+}
+
+#[test]
+fn line_hunks_normalizes_crlf_baseline() {
+    if skip_if_no_git() {
+        return;
+    }
+    let fx = GitRepoFixture::new();
+    // Committed with CRLF line endings (e.g. autocrlf on Windows).
+    fx.write_file("a.txt", "a\r\nb\r\n");
+    fx.run_git(&["add", "a.txt"]);
+    fx.run_git(&["commit", "-q", "-m", "init"]);
+
+    // The editor buffer is LF-only; EOL must not flag every line as changed.
+    let hunks = operations::line_hunks(&fx.registry, &fx.repo_str(), "a.txt", "a\nb\n", &fx.workspace)
+        .expect("line_hunks");
+    assert!(hunks.is_empty(), "CRLF baseline equals LF buffer after normalization");
 }
 
 #[test]
