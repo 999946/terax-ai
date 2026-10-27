@@ -4,6 +4,17 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.22] - 2026-10-27
+
+### 变更
+- **编辑器 gutter Lane 统一重构**：将行号左侧的修改指示条（3px 变更条）与修改概览色条合并为统一的 lane 架构——两者共享同一份「基线 diff + 冲突检测」数据源，由统一 lane API 渲染。视觉呈现完全不变（同样 3px 色条、同样 6px 概览条与点击跳转），但为后续覆盖率、书签、断点等编辑器指示能力铺平了单 lane 承载的基础，避免多个 gutter 横向堆叠
+
+### 工程
+- 新增 [OpenIDEA 功能评估](docs/architecture/openidea-review_zh.md) 与 [统一 gutter Lane 重构设计](docs/architecture/gutter-lane-design_zh.md) 文档
+- 版本递增至 v0.9.22（同步所有版本清单）
+
+---
+
 ## [v0.9.21] - 2026-10-19
 
 ### 变更
