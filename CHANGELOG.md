@@ -4,7 +4,20 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
-## [v0.9.23] - 2026-10-27
+## [v0.9.24] - 2026-10-27
+
+### 新增
+- **三栏合并冲突编辑器**：处理 Git 合并冲突不再只有「左 我方 / 右 对方」的双栏对比，而是引入 IDEA 风格的 **Yours | Result | Theirs** 三栏编辑器——左右栏只读展示我方与对方版本（差异对 base 高亮），中间 Result 栏自动三方合并：非冲突改动直接合入，每个冲突块以 base 内容为占位并内嵌「接受我方 / 接受对方 / 两者都要 / 使用 base」按钮，逐块点选即可完成大多数冲突；工具栏提供上下冲突跳转、一键全部接受、剩余冲突计数，Apply 后写回文件并自动暂存，随后可继续（continue）中断的合并/rebase/cherry-pick。合并、rebase、cherry-pick、revert、暂存恢复五种场景的左右标题均按操作自动命名，rebase 时自动翻转左右（git 在此场景把用户提交放在 `>>>>>>>` 一侧）
+
+### 工程
+- Rust 后端新增 `merge_conflict` 模块：冲突标记解析、三方合并（`git merge-file --diff3`）、读取 `.git` 状态判定进行中的操作、写回并暂存、以 `core.editor=true` 续跑中断操作；新增 4 个 Tauri 命令（`git_conflict_versions` / `git_merge_sides` / `git_conflict_resolve` / `git_conflict_continue`）
+- 前端新增 `ConflictMergePane` 三栏编辑器与 `conflictMerge` 纯函数层（解析/解决/初始结果/标题），旧的双栏冲突 diff（`GitDiffPane` conflict 分支与 `fetchConflictDiff`）移除
+- 新增 [OpenIDEA vs Lithe vs Terax 三方对比](docs/architecture/ade-competitor-comparison_zh.md) 产品调研文档
+- 版本递增至 v0.9.24（同步所有版本清单）
+
+---
+
+
 
 ### 修复
 - **编辑器修改标识改为后端计算，修复 CRLF 行尾误标**：行号左侧的修改指示条与修改概览色条不再由前端 JS 增量 diff 计算，改为 Rust 后端直接 diff「已提交的 HEAD 版本」与「当前未保存内容」并返回结构化改动块。修复了一个关键 bug：当文件以 CRLF 行尾提交（如 Windows 上开发）时，旧实现会把整个文件误标为「已删除」。现在后端先做行尾归一化再比对，CRLF 文件不再误报。未跟踪新文件显示为「全部新增」，二进制文件不显示标记
