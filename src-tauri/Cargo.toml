@@ -17,7 +17,13 @@ version = "0.9.26"
 edition = "2021"
 license = "Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# A developer feature that turns on the Web Inspector (DevTools) in release
+# builds via the tauri/devtools feature. On by default so shipped builds can
+# open the inspector from the app menu (macOS private API - not App Store safe,
+# but Terax is not distributed there).
+[features]
+default = ["devtools"]
+devtools = ["tauri/devtools"]
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary

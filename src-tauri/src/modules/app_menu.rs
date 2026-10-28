@@ -6,6 +6,7 @@ use tauri::{
 };
 
 const GUARDED_QUIT_MENU_ID: &str = "terax.quit";
+const TOGGLE_DEVTOOLS_MENU_ID: &str = "terax.toggle-devtools";
 const QUIT_ACCELERATOR: &str = "Command+Q";
 
 fn invalid_default_menu(message: &'static str) -> tauri::Error {
@@ -39,20 +40,66 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ));
     }
 
-    let guarded_quit = MenuItem::with_id(
-        app,
-        GUARDED_QUIT_MENU_ID,
-        quit_text,
-        true,
-        Some(QUIT_ACCELERATOR),
-    )?;
+    // Tear out the native quit so we can rebuild the tail of the menu. The
+    // insertion order below matters: positions are 0-based and every insert
+    // shifts the items that follow, so always remove first, then re-insert in
+    // ascending position order.
     app_menu.remove_at(quit_index)?;
-    app_menu.insert(&guarded_quit, quit_index)?;
+
+    #[cfg(any(debug_assertions, feature = "devtools"))]
+    {
+        // A developer menu to open/close the Web Inspector. Release builds
+        // only ship it when the devtools feature is on, so normal users never
+        // see it. (macOS private API - kept out of the App Store.)
+        let toggle_devtools = MenuItem::with_id(
+            app,
+            TOGGLE_DEVTOOLS_MENU_ID,
+            "Toggle Developer Tools",
+            true,
+            Some("Command+Alt+I"),
+        )?;
+        app_menu.insert(&toggle_devtools, quit_index)?;
+        let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
+        app_menu.insert(&separator, quit_index + 1)?;
+
+        let guarded_quit = MenuItem::with_id(
+            app,
+            GUARDED_QUIT_MENU_ID,
+            quit_text,
+            true,
+            Some(QUIT_ACCELERATOR),
+        )?;
+        app_menu.insert(&guarded_quit, quit_index + 2)?;
+    }
+
+    #[cfg(not(any(debug_assertions, feature = "devtools")))]
+    {
+        let guarded_quit = MenuItem::with_id(
+            app,
+            GUARDED_QUIT_MENU_ID,
+            quit_text,
+            true,
+            Some(QUIT_ACCELERATOR),
+        )?;
+        app_menu.insert(&guarded_quit, quit_index)?;
+    }
 
     Ok(menu)
 }
 
 pub fn handle_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
+    #[cfg(any(debug_assertions, feature = "devtools"))]
+    if event.id() == TOGGLE_DEVTOOLS_MENU_ID {
+        if let Some(main) = app.get_webview_window("main") {
+            if main.is_devtools_open() {
+                main.close_devtools();
+            } else {
+                main.open_devtools();
+            }
+        }
+        return;
+    }
+
     if !is_guarded_quit(event.id()) {
         return;
     }
