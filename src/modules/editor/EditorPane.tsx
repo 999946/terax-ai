@@ -60,6 +60,8 @@ import { setConflictEffect } from "./lib/conflictLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
 import { invalidateWorkingDiffForPath } from "./lib/diffCache";
 import { fetchGitHunks } from "./lib/gitBaselineCache";
+import { editorDiagnosticsEnabled } from "./lib/editorDiagnosticsEnabled";
+import { changeLaneMarkers } from "./lib/lanes";
 import {
   buildSharedExtensions,
   DEFAULT_INDENT,
@@ -727,6 +729,23 @@ export const EditorPane = memo(
           if (cmRef.current?.view !== view) return;
           if (pathRef.current !== filePath) return;
           view.dispatch({ effects: setHunksEffect.of(hunks) });
+          if (editorDiagnosticsEnabled()) {
+            const bars = view.state.facet(changeLaneMarkers);
+            const renderedMarks =
+              view.dom.querySelectorAll(".cm-lane-mark").length;
+            const overviewBands = view.dom.querySelectorAll(
+              ".cm-editor-overview-band",
+            ).length;
+            console.warn("[terax:editor] hunks fetched", {
+              filePath,
+              backendHunks: hunks.length,
+              facetBars: bars.length,
+              renderedMarks,
+              overviewBands,
+              laneMounted: !!view.dom.querySelector(".cm-lane"),
+              overviewMounted: !!view.dom.querySelector(".cm-editor-overview"),
+            });
+          }
         })();
       },
       [docStatus, docSize],
