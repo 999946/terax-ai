@@ -4,6 +4,16 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.27] - 2026-10-28
+
+### 新增
+- **release 版开放开发者工具（DevTools）**：此前 release 构建未启用 Web Inspector（Tauri 的 open_devtools 被编译期门控），现在新增 `terax` 包的 `devtools` cargo feature（默认开启，转发到 `tauri/devtools`），并在 macOS 应用菜单加入「Toggle Developer Tools」项（快捷键 `Cmd+Alt+I`），可随时开关 Web Inspector 查看 DOM/控制台/网络——方便排查编辑器修改标识等前端问题。该菜单项在未启用 devtools feature 的构建中不出现（macOS 私有 API，不涉及 App Store 分发）
+
+### 工程
+- 版本递增至 v0.9.27（同步所有版本清单）
+
+---
+
 ## [v0.9.26] - 2026-10-28
 
 ### 工程
