@@ -4,6 +4,19 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.28] - 2026-10-28
+
+### 变更
+- **编辑器修改标识诊断默认开启**：移除 `terax:editor-diagnostics` 开关，前端渲染统计（backendHunks / facetBars / renderedMarks / overviewBands / laneMounted / overviewMounted）改为无条件写入落盘日志，无需任何设置即可在日志文件夹查看，方便排查修改标识不显示问题
+
+### 修复
+- **设置页「打开日志文件夹」not allowed**：设置是独立 WebviewWindow，但此前没有为其授予 opener 权限，导致从设置页打开日志文件夹 / 外链提示 not allowed。新增 settings 窗口专属 capability（opener / os / dialog / autostart / store / updater），开日志文件夹与外链功能恢复正常
+
+### 工程
+- 版本递增至 v0.9.28（同步所有版本清单）
+
+---
+
 ## [v0.9.27] - 2026-10-28
 
 ### 新增
