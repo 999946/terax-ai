@@ -18,6 +18,7 @@ import { Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { warn as logWarn } from "@tauri-apps/plugin-log";
 import { useTranslation } from "react-i18next";
 import {
   ContextMenu,
@@ -736,15 +737,22 @@ export const EditorPane = memo(
             const overviewBands = view.dom.querySelectorAll(
               ".cm-editor-overview-band",
             ).length;
-            console.warn("[terax:editor] hunks fetched", {
-              filePath,
-              backendHunks: hunks.length,
-              facetBars: bars.length,
-              renderedMarks,
-              overviewBands,
-              laneMounted: !!view.dom.querySelector(".cm-lane"),
-              overviewMounted: !!view.dom.querySelector(".cm-editor-overview"),
-            });
+            void logWarn(
+              "[terax:editor] frontend render path=" +
+                filePath +
+                " backendHunks=" +
+                hunks.length +
+                " facetBars=" +
+                bars.length +
+                " renderedMarks=" +
+                renderedMarks +
+                " overviewBands=" +
+                overviewBands +
+                " laneMounted=" +
+                !!view.dom.querySelector(".cm-lane") +
+                " overviewMounted=" +
+                !!view.dom.querySelector(".cm-editor-overview"),
+            );
           }
         })();
       },

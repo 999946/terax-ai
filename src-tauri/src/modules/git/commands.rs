@@ -126,7 +126,24 @@ pub async fn git_line_hunks(
 ) -> Result<Vec<LineHunk>, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     blocking(app, move |r| {
-        operations::line_hunks(r, &repo_root, &path, &current_text, &workspace).map_err(Into::into)
+        let result =
+            operations::line_hunks(r, &repo_root, &path, &current_text, &workspace);
+        // Land the backend-side diagnostics on disk so the user can correlate
+        // them with what the frontend renders (see terax:editor-diagnostics).
+        // Without DevTools in release builds this is the only observable
+        // record of the backend hunk computation.
+        match &result {
+            Ok(hunks) => log::warn!(
+                "[terax:editor] backend hunk computation path={} repo={} hunks={}",
+                path,
+                repo_root,
+                hunks.len()
+            ),
+            Err(e) => {
+                log::warn!("[terax:editor] backend hunk computation failed path={path}: {e}")
+            }
+        }
+        result.map_err(Into::into)
     })
     .await
 }
