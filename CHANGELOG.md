@@ -4,6 +4,14 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.26] - 2026-10-28
+
+### 工程
+- **编辑器修改标识诊断改为落盘日志**：上一版的前端诊断依赖 DevTools，但 release 版无 DevTools 无法查看，现改为走应用已有的落盘日志体系。Rust 端 `git_line_hunks` 每次计算都无条件写一条日志（含文件路径、仓库与 hunk 数，失败也记录）；前端渲染统计（后端 hunks / facet bars / 实际渲染 DOM 标识数 / lane 是否挂载）在打开 `terax:editor-diagnostics` 开关后经 `@tauri-apps/plugin-log` 写入同一日志。日志位置：macOS `~/Library/Logs/<应用标识>/terax-0.9.26.log`，可在「设置 → 关于 → 打开日志文件夹」直达
+- 版本递增至 v0.9.26（同步所有版本清单）
+
+---
+
 ## [v0.9.25] - 2026-10-28
 
 ### 工程
