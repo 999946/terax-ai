@@ -1,6 +1,6 @@
 import { endpointIdFromCompatModel } from "@/modules/ai/config";
 import { getCustomEndpointKey, getKey } from "@/modules/ai/lib/keyring";
-import { native } from "@/modules/ai/lib/native";
+import { native, type GitLineHunk } from "@/modules/ai/lib/native";
 import { lspFormatDocument, useLspExtension } from "@/modules/lsp";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
@@ -61,7 +61,6 @@ import { setConflictEffect } from "./lib/conflictLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
 import { invalidateWorkingDiffForPath } from "./lib/diffCache";
 import { fetchGitHunks } from "./lib/gitBaselineCache";
-import { editorDiagnosticsEnabled } from "./lib/editorDiagnosticsEnabled";
 import { changeLaneMarkers } from "./lib/lanes";
 import {
   buildSharedExtensions,
@@ -159,6 +158,39 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * Write the change-indicator diagnostics to the on-disk log (no localStorage
+ * switch - always on, so a release build without DevTools can still correlate
+ * the backend hunks with what rendered).
+ */
+function logEditorRenderDiagnostics(
+  view: EditorView,
+  filePath: string,
+  hunks: GitLineHunk[],
+): void {
+  const bars = view.state.facet(changeLaneMarkers);
+  const renderedMarks = view.dom.querySelectorAll(".cm-lane-mark").length;
+  const overviewBands = view.dom.querySelectorAll(
+    ".cm-editor-overview-band",
+  ).length;
+  void logWarn(
+    "[terax:editor] frontend render path=" +
+      filePath +
+      " backendHunks=" +
+      hunks.length +
+      " facetBars=" +
+      bars.length +
+      " renderedMarks=" +
+      renderedMarks +
+      " overviewBands=" +
+      overviewBands +
+      " laneMounted=" +
+      !!view.dom.querySelector(".cm-lane") +
+      " overviewMounted=" +
+      !!view.dom.querySelector(".cm-editor-overview"),
+  );
 }
 
 // memo: EditorStack passes identity-stable props, so background editors
@@ -730,30 +762,7 @@ export const EditorPane = memo(
           if (cmRef.current?.view !== view) return;
           if (pathRef.current !== filePath) return;
           view.dispatch({ effects: setHunksEffect.of(hunks) });
-          if (editorDiagnosticsEnabled()) {
-            const bars = view.state.facet(changeLaneMarkers);
-            const renderedMarks =
-              view.dom.querySelectorAll(".cm-lane-mark").length;
-            const overviewBands = view.dom.querySelectorAll(
-              ".cm-editor-overview-band",
-            ).length;
-            void logWarn(
-              "[terax:editor] frontend render path=" +
-                filePath +
-                " backendHunks=" +
-                hunks.length +
-                " facetBars=" +
-                bars.length +
-                " renderedMarks=" +
-                renderedMarks +
-                " overviewBands=" +
-                overviewBands +
-                " laneMounted=" +
-                !!view.dom.querySelector(".cm-lane") +
-                " overviewMounted=" +
-                !!view.dom.querySelector(".cm-editor-overview"),
-            );
-          }
+          logEditorRenderDiagnostics(view, filePath, hunks);
         })();
       },
       [docStatus, docSize],
