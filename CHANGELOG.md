@@ -4,6 +4,14 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.25] - 2026-10-28
+
+### 工程
+- **编辑器修改标识显示排查加固**：针对「后端 hunk 计算正常但前端未显示修改标识」的怀疑，新增渲染级单测与诊断开关。新增 `happy-dom` 渲染测试环境，真实挂载 CodeMirror 视图断言左侧修改色条（gutter bar）与修改概览色条（overview band）在标准装配（行号 + fold gutter + lint gutter）下确实渲染进 DOM；行定位、颜色、清空逻辑均有断言覆盖。新增 `terax:editor-diagnostics` 诊断开关（DEV 默认开启，生产版 `localStorage.setItem("terax:editor-diagnostics","1")` 后重载开启），拉取 hunk 后打印 `backendHunks / facetBars / renderedMarks / overviewBands / laneMounted / overviewMounted` 六项，真机可定位断在后端计算、状态派发还是 gutter 渲染
+- 版本递增至 v0.9.25（同步所有版本清单）
+
+---
+
 ## [v0.9.24] - 2026-10-27
 
 ### 新增
