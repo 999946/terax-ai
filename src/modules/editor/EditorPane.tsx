@@ -190,7 +190,7 @@ function logEditorRenderDiagnostics(
       !!view.dom.querySelector(".cm-lane") +
       " overviewMounted=" +
       !!view.dom.querySelector(".cm-editor-overview"),
-  );
+  ).catch(() => undefined);
 }
 
 // memo: EditorStack passes identity-stable props, so background editors
@@ -742,27 +742,44 @@ export const EditorPane = memo(
       (isCancelled: () => boolean): void => {
         const filePath = pathRef.current;
         const view = cmRef.current?.view;
-        if (docStatus !== "ready" || !view) return;
+        if (docStatus !== "ready" || !view) {
+          void logWarn(
+            `[terax:editor] frontend hunk fetch skipped path=${filePath} status=${docStatus} view=${!!view}`,
+          ).catch(() => undefined);
+          return;
+        }
         const currentText = view.state.doc.toString();
         if (docSize > SYNTAX_MAX_BYTES) {
+          void logWarn(
+            `[terax:editor] frontend hunk fetch skipped path=${filePath} reason=file-too-large bytes=${docSize}`,
+          ).catch(() => undefined);
           view.dispatch({ effects: setHunksEffect.of([]) });
           return;
         }
         void (async () => {
-          const repo = await native.gitResolveRepo(filePath);
-          if (isCancelled()) return;
-          const hunks = await fetchGitHunks(
-            repo?.repoRoot ?? filePath,
-            filePath,
-            currentText,
-          );
-          if (isCancelled()) return;
-          // The buffer may have switched to another file while the fetch was in
-          // flight - never feed one file's hunks into another's view.
-          if (cmRef.current?.view !== view) return;
-          if (pathRef.current !== filePath) return;
-          view.dispatch({ effects: setHunksEffect.of(hunks) });
-          logEditorRenderDiagnostics(view, filePath, hunks);
+          void logWarn(
+            `[terax:editor] frontend hunk fetch started path=${filePath} bytes=${currentText.length}`,
+          ).catch(() => undefined);
+          try {
+            const repo = await native.gitResolveRepo(filePath);
+            if (isCancelled()) return;
+            const hunks = await fetchGitHunks(
+              repo?.repoRoot ?? filePath,
+              filePath,
+              currentText,
+            );
+            if (isCancelled()) return;
+            // The buffer may have switched to another file while the fetch was in
+            // flight - never feed one file's hunks into another's view.
+            if (cmRef.current?.view !== view) return;
+            if (pathRef.current !== filePath) return;
+            view.dispatch({ effects: setHunksEffect.of(hunks) });
+            logEditorRenderDiagnostics(view, filePath, hunks);
+          } catch (error) {
+            void logWarn(
+              `[terax:editor] frontend hunk fetch failed path=${filePath} error=${String(error)}`,
+            ).catch(() => undefined);
+          }
         })();
       },
       [docStatus, docSize],

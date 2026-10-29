@@ -213,7 +213,7 @@ pub fn run() {
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-                        file_name: Some(concat!("terax-", env!("CARGO_PKG_VERSION")).into()),
+                        file_name: Some("terax.log".into()),
                     }),
                 ])
                 .build(),
