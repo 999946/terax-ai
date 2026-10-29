@@ -739,9 +739,9 @@ export const EditorPane = memo(
     // whole file. The editor only maps hunk offsets; edits remap them
     // locally until a refetch re-aligns.
     const fetchAndApplyHunks = useCallback(
-      (isCancelled: () => boolean): void => {
+      (isCancelled: () => boolean, viewOverride?: EditorView): void => {
         const filePath = pathRef.current;
-        const view = cmRef.current?.view;
+        const view = viewOverride ?? cmRef.current?.view;
         if (docStatus !== "ready" || !view) {
           void logWarn(
             `[terax:editor] frontend hunk fetch skipped path=${filePath} status=${docStatus} view=${!!view}`,
@@ -1082,6 +1082,12 @@ export const EditorPane = memo(
               ref={cmRef}
               value={doc.content}
               onChange={onChange}
+              onCreateEditor={(createdView) => {
+                // react-codemirror invokes this before its ref state is
+                // committed. Pass the created view directly so the first Git
+                // hunk fetch cannot lose a race with cmRef.current.view.
+                fetchAndApplyHunks(() => false, createdView);
+              }}
               theme={themeExt}
               extensions={extensions}
               height="100%"
