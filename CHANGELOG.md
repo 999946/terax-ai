@@ -4,6 +4,16 @@ Terax 产品发布记录（版本由新到旧）。记录每个版本面向用�
 
 ---
 
+## [v0.9.30] - 2026-10-29
+
+### 修复
+- **编辑器修改标识首次拉取与时序修复**：经落盘日志定位（`terax.log` 中 `frontend hunk fetch skipped ... status=ready view=false`），首次 hunk 拉取与 CodeMirror 视图初始化存在竞态——react-codemirror 先触发 `onCreateEditor` 再提交 ref，导致首帧时 `cmRef.current.view` 仍为空，拉取提前退出，`git_line_hunks` 从未被调用，修改标识（行号左侧色条 / 右侧概览条）因此始终不显示。现改为在 `onCreateEditor` 回调中直接传入已创建的 EditorView 触发拉取，绕过 ref 时序；原 docStatus 驱动的 effect 继续承担后续刷新
+
+### 工程
+- 版本递增至 v0.9.30（同步所有版本清单）
+
+---
+
 ## [v0.9.29] - 2026-10-29
 
 ### 修复
