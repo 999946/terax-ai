@@ -132,19 +132,6 @@ export function TabBar({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [showAllLanguages, setShowAllLanguages] = useState(false);
-  const pointerSensor = useSensor(PointerSensor, {
-    // A plain click must never start a drag. A pure `distance` constraint
-    // fires as soon as the pointer moves past the threshold, and a click
-    // routinely carries a few px of hand jitter — so clicks kept turning
-    // into drags no matter how high the threshold went. Require the press to
-    // be held (`delay`) and only then allow a drag; moving past `tolerance`
-    // while still inside the delay cancels activation, so a fast swipe is a
-    // click, not a drag.
-    activationConstraint: { delay: 120, tolerance: 10 },
-  });
-  // Users on trackpads where a light tap can still trigger a drag-cancel can
-  // turn tab drag-reordering off entirely via Settings → Terminal.
-  const sensors = useSensors(tabDrag ? pointerSensor : null);
   const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
   const activeDragTab =
     draggingId != null ? tabs.find((t) => t.id === draggingId) : undefined;
@@ -246,6 +233,341 @@ export function TabBar({
     active?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeId]);
 
+  const pillSpan = (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute left-0 top-1/2 h-7 rounded-md bg-foreground/[0.07] shadow-sm ring-1 ring-inset ring-foreground/[0.05]"
+      style={
+        pill
+          ? {
+              width: pill.width,
+              transform: `translate(${pill.left}px, -50%)`,
+              transitionProperty: pillReady ? "transform, width" : "none",
+              transitionDuration: "var(--dur-base)",
+              transitionTimingFunction: "var(--ease-premium)",
+            }
+          : { opacity: 0 }
+      }
+    />
+  );
+
+  const renderTabs = (draggable: boolean): ReactNode[] =>
+    tabs.map((tab, i) => {
+      const isPreview =
+        (tab.kind === "editor" || tab.kind === "git-diff") && tab.preview;
+      const isActive = tab.id === activeId;
+      const isNew = !firstRender && !seen.has(tab.id);
+
+      // While renaming, render a non-button cell so the <input> is not
+      // nested inside the trigger <button> (invalid HTML, and WebKit
+      // blocks focus/selection on inputs inside buttons).
+      if (editingId === tab.id && tab.kind === "terminal") {
+        const renameCell = (
+          <div
+            data-tab-id={tab.id}
+            className={cn(
+              "flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-accent text-xs text-foreground",
+              compact ? "px-1.5" : "px-2",
+            )}
+          >
+            <TabIcon tab={tab} />
+            <TabRenameInput
+              initial={labelFor(tab)}
+              onCommit={(value) => {
+                onRename(tab.id, value);
+                setEditingId(null);
+              }}
+              onCancel={() => setEditingId(null)}
+            />
+          </div>
+        );
+        return draggable ? (
+          <SortableTabNode key={tab.id} id={tab.id}>
+            {renameCell}
+          </SortableTabNode>
+        ) : (
+          <div key={tab.id} className="shrink-0">
+            {renameCell}
+          </div>
+        );
+      }
+
+      const trigger = (
+        <TabsTrigger
+          value={String(tab.id)}
+          data-tab-id={tab.id}
+          data-tab-active={isActive ? "true" : undefined}
+          onDoubleClick={() => isPreview && onPin(tab.id)}
+          onAuxClick={(e) => {
+            if (e.button === 1) {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose(tab.id);
+            }
+          }}
+          // Only suppress the middle-click default; the left click lets
+          // Radix activate normally (selection on mousedown), while
+          // dragging is handled by dnd-kit's pointer sensor.
+          onMouseDown={(e) => {
+            if (e.button === 1) e.preventDefault();
+          }}
+          className={cn(
+            "group relative z-[1] h-7 shrink-0 justify-between gap-1.5 rounded-md bg-transparent text-xs transition-colors data-active:bg-transparent dark:data-active:bg-transparent",
+            isNew && "terax-tab-in",
+            isActive
+              ? "text-foreground dark:text-foreground"
+              : "text-muted-foreground hover:text-foreground/80 dark:text-muted-foreground",
+            draggingId === tab.id && "opacity-50",
+            compact ? "px-1.5!" : tabs.length === 1 ? "px-2!" : "ps-2! pe-1!",
+          )}
+        >
+          <span
+            className={cn(
+              "flex min-w-0 items-center gap-1.5",
+              compact ? "max-w-48" : "max-w-80",
+            )}
+          >
+            {tab.kind === "editor" ? (
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (!open) setShowAllLanguages(false);
+                }}
+              >
+                <DropdownMenuTrigger asChild>
+                  {/* span, not button: a button nested in the TabsTrigger button is invalid DOM and breaks WebKit focus. */}
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    data-no-drag
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm p-1 -m-1 transition-all hover:bg-accent hover:text-accent-foreground hover:ring-1 hover:ring-primary/30 hover:shadow-[0_0_4px_var(--color-popover-foreground)]"
+                  >
+                    <TabIcon tab={tab} />
+                  </span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  side="bottom"
+                  sideOffset={6}
+                  alignOffset={-4}
+                  className="max-h-75 w-48 overflow-y-auto rounded-xl border border-border/40 bg-popover/90 p-1 backdrop-blur-md shadow-lg"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      onOverrideLanguage?.(tab.id, null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-default focus:bg-accent focus:text-accent-foreground"
+                  >
+                    <img
+                      src={fileIconUrl(tab.title)}
+                      className="size-3.5 shrink-0 object-contain"
+                      alt=""
+                    />
+                    <div className="flex flex-1 flex-col">
+                      <span>{t("tabs.autoDetect")}</span>
+                      <span className="text-[10px] text-muted-foreground italic">
+                        {t("tabs.mode", {
+                          language: resolveDisplayName(tab.title),
+                        })}
+                      </span>
+                    </div>
+                    {!(tab as EditorTab).overrideLanguage && (
+                      <HugeiconsIcon
+                        icon={Tick02Icon}
+                        className="size-3.5 text-primary"
+                      />
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setShowAllLanguages((v) => !v);
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left text-xs text-primary/60 hover:text-primary rounded-lg transition-colors hover:bg-accent"
+                  >
+                    {showAllLanguages
+                      ? t("tabs.fewerLanguages")
+                      : t("tabs.allLanguages")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 border-t border-border/30" />
+                  {(showAllLanguages ? ALL_LANGUAGES : EXPOSED_LANGUAGES).map(
+                    (lang) => {
+                      const isSelected =
+                        (tab as EditorTab).overrideLanguage === lang.ext;
+                      return (
+                        <DropdownMenuItem
+                          key={lang.ext}
+                          onSelect={() =>
+                            onOverrideLanguage?.(tab.id, lang.ext)
+                          }
+                          className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-default focus:bg-accent focus:text-accent-foreground"
+                        >
+                          <img
+                            src={fileIconUrl(`dummy.${lang.ext}`)}
+                            className="size-3.5 shrink-0 object-contain"
+                            alt=""
+                          />
+                          <span className="flex-1">{lang.name}</span>
+                          {isSelected && (
+                            <HugeiconsIcon
+                              icon={Tick02Icon}
+                              className="size-3.5 text-primary"
+                            />
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    },
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <TabIcon tab={tab} />
+            )}
+            {/* Preview tabs use italic to signal the transient state,
+      matching the visual convention from VSCode. A deleted
+      editor tab gets a strikethrough on the title. */}
+            <span
+              className={cn(
+                "truncate",
+                isPreview && "italic",
+                tab.kind === "editor" &&
+                  tab.deleted &&
+                  "line-through text-muted-foreground/70",
+              )}
+            >
+              {labelFor(tab)}
+            </span>
+            {tab.kind === "editor" && tab.conflict ? (
+              <span
+                aria-label={t("tabs.externalConflict")}
+                title={t("tabs.externalConflict")}
+                className="size-1.5 shrink-0 rounded-full bg-amber-500"
+              />
+            ) : null}
+            {tab.kind === "editor" && tab.dirty ? (
+              <span
+                aria-label={t("tabs.unsavedChanges")}
+                className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+              />
+            ) : null}
+          </span>
+          <span
+            role="button"
+            aria-label={t("tabs.closeTab")}
+            data-no-drag
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(tab.id);
+            }}
+            className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+          </span>
+        </TabsTrigger>
+      );
+
+      const hasTabsToRight = i < tabs.length - 1;
+
+      const tabNode = (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
+          <ContextMenuContent
+            className="min-w-32 p-1"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            {tab.kind === "terminal" && (
+              <>
+                <ContextMenuItem
+                  className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+                  onSelect={() => setEditingId(tab.id)}
+                >
+                  <HugeiconsIcon
+                    icon={PencilEdit02Icon}
+                    size={13}
+                    strokeWidth={1.75}
+                  />
+                  <span className="flex-1">{t("tabs.rename")}</span>
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+                  onSelect={() => onClose(tab.id)}
+                >
+                  <HugeiconsIcon
+                    icon={Cancel01Icon}
+                    size={13}
+                    strokeWidth={1.75}
+                  />
+                  <span className="flex-1">{t("tabs.close")}</span>
+                </ContextMenuItem>
+              </>
+            )}
+            <ContextMenuItem
+              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+              disabled={!hasTabsToRight}
+              onSelect={() => onCloseTabsToRight(tab.id)}
+            >
+              <HugeiconsIcon
+                icon={ArrowRight01Icon}
+                size={13}
+                strokeWidth={1.75}
+              />
+              <span className="flex-1">{t("tabs.closeTabsToRight")}</span>
+            </ContextMenuItem>
+            <ContextMenuItem
+              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+              disabled={tabs.length <= 1}
+              onSelect={() => onCloseOtherTabs(tab.id)}
+            >
+              <HugeiconsIcon
+                icon={CancelCircleIcon}
+                size={13}
+                strokeWidth={1.75}
+              />
+              <span className="flex-1">{t("tabs.closeOtherTabs")}</span>
+            </ContextMenuItem>
+            <ContextMenuItem
+              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+              disabled={tabs.length === 0}
+              onSelect={() => onCloseAll(tab.id)}
+            >
+              <HugeiconsIcon
+                icon={CancelCircleIcon}
+                size={13}
+                strokeWidth={1.75}
+              />
+              <span className="flex-1">{t("tabs.closeAllTabs")}</span>
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      );
+
+      return draggable ? (
+        <SortableTabNode key={tab.id} id={tab.id}>
+          {tabNode}
+        </SortableTabNode>
+      ) : (
+        <div key={tab.id} data-tab-id={tab.id} className="shrink-0">
+          {tabNode}
+        </div>
+      );
+    });
+
   return (
     <div
       ref={scrollRef}
@@ -261,367 +583,23 @@ export function TabBar({
             ref={listRef}
             className="relative h-7 w-max gap-0.5 bg-transparent p-0"
           >
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragCancel={handleDragCancel}
-            >
-              <SortableContext
-                items={tabIds}
-                strategy={horizontalListSortingStrategy}
+            {tabDrag ? (
+              <SortableTabStrip
+                tabIds={tabIds}
+                activeDragTab={activeDragTab}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
               >
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute left-0 top-1/2 h-7 rounded-md bg-foreground/[0.07] shadow-sm ring-1 ring-inset ring-foreground/[0.05]"
-                  style={
-                    pill
-                      ? {
-                          width: pill.width,
-                          transform: `translate(${pill.left}px, -50%)`,
-                          transitionProperty: pillReady
-                            ? "transform, width"
-                            : "none",
-                          transitionDuration: "var(--dur-base)",
-                          transitionTimingFunction: "var(--ease-premium)",
-                        }
-                      : { opacity: 0 }
-                  }
-                />
-                {tabs.map((tab, i) => {
-                  const isPreview =
-                    (tab.kind === "editor" || tab.kind === "git-diff") &&
-                    tab.preview;
-                  const isActive = tab.id === activeId;
-                  const isNew = !firstRender && !seen.has(tab.id);
-
-                  // While renaming, render a non-button cell so the <input> is not
-                  // nested inside the trigger <button> (invalid HTML, and WebKit
-                  // blocks focus/selection on inputs inside buttons).
-                  if (editingId === tab.id && tab.kind === "terminal") {
-                    return (
-                      <SortableTabNode key={tab.id} id={tab.id}>
-                        <div
-                          data-tab-id={tab.id}
-                          className={cn(
-                            "flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-accent text-xs text-foreground",
-                            compact ? "px-1.5" : "px-2",
-                          )}
-                        >
-                          <TabIcon tab={tab} />
-                          <TabRenameInput
-                            initial={labelFor(tab)}
-                            onCommit={(value) => {
-                              onRename(tab.id, value);
-                              setEditingId(null);
-                            }}
-                            onCancel={() => setEditingId(null)}
-                          />
-                        </div>
-                      </SortableTabNode>
-                    );
-                  }
-
-                  const trigger = (
-                    <TabsTrigger
-                      value={String(tab.id)}
-                      data-tab-id={tab.id}
-                      data-tab-active={isActive ? "true" : undefined}
-                      onDoubleClick={() => isPreview && onPin(tab.id)}
-                      onAuxClick={(e) => {
-                        if (e.button === 1) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onClose(tab.id);
-                        }
-                      }}
-                      // Only suppress the middle-click default; the left click lets
-                      // Radix activate normally (selection on mousedown), while
-                      // dragging is handled by dnd-kit's pointer sensor.
-                      onMouseDown={(e) => {
-                        if (e.button === 1) e.preventDefault();
-                      }}
-                      className={cn(
-                        "group relative z-[1] h-7 shrink-0 justify-between gap-1.5 rounded-md bg-transparent text-xs transition-colors data-active:bg-transparent dark:data-active:bg-transparent",
-                        isNew && "terax-tab-in",
-                        isActive
-                          ? "text-foreground dark:text-foreground"
-                          : "text-muted-foreground hover:text-foreground/80 dark:text-muted-foreground",
-                        draggingId === tab.id && "opacity-50",
-                        compact
-                          ? "px-1.5!"
-                          : tabs.length === 1
-                            ? "px-2!"
-                            : "ps-2! pe-1!",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex min-w-0 items-center gap-1.5",
-                          compact ? "max-w-48" : "max-w-80",
-                        )}
-                      >
-                        {tab.kind === "editor" ? (
-                          <DropdownMenu
-                            onOpenChange={(open) => {
-                              if (!open) setShowAllLanguages(false);
-                            }}
-                          >
-                            <DropdownMenuTrigger asChild>
-                              {/* span, not button: a button nested in the TabsTrigger button is invalid DOM and breaks WebKit focus. */}
-                              <span
-                                role="button"
-                                tabIndex={-1}
-                                data-no-drag
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                }}
-                                className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm p-1 -m-1 transition-all hover:bg-accent hover:text-accent-foreground hover:ring-1 hover:ring-primary/30 hover:shadow-[0_0_4px_var(--color-popover-foreground)]"
-                              >
-                                <TabIcon tab={tab} />
-                              </span>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="start"
-                              side="bottom"
-                              sideOffset={6}
-                              alignOffset={-4}
-                              className="max-h-75 w-48 overflow-y-auto rounded-xl border border-border/40 bg-popover/90 p-1 backdrop-blur-md shadow-lg"
-                              onClick={(e) => e.stopPropagation()}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onPointerUp={(e) => e.stopPropagation()}
-                            >
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  onOverrideLanguage?.(tab.id, null);
-                                }}
-                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-default focus:bg-accent focus:text-accent-foreground"
-                              >
-                                <img
-                                  src={fileIconUrl(tab.title)}
-                                  className="size-3.5 shrink-0 object-contain"
-                                  alt=""
-                                />
-                                <div className="flex flex-1 flex-col">
-                                  <span>{t("tabs.autoDetect")}</span>
-                                  <span className="text-[10px] text-muted-foreground italic">
-                                    {t("tabs.mode", {
-                                      language: resolveDisplayName(tab.title),
-                                    })}
-                                  </span>
-                                </div>
-                                {!(tab as EditorTab).overrideLanguage && (
-                                  <HugeiconsIcon
-                                    icon={Tick02Icon}
-                                    className="size-3.5 text-primary"
-                                  />
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={(e) => {
-                                  e.preventDefault();
-                                  setShowAllLanguages((v) => !v);
-                                }}
-                                className="w-full px-2.5 py-1.5 text-left text-xs text-primary/60 hover:text-primary rounded-lg transition-colors hover:bg-accent"
-                              >
-                                {showAllLanguages
-                                  ? t("tabs.fewerLanguages")
-                                  : t("tabs.allLanguages")}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className="my-1 border-t border-border/30" />
-                              {(showAllLanguages
-                                ? ALL_LANGUAGES
-                                : EXPOSED_LANGUAGES
-                              ).map((lang) => {
-                                const isSelected =
-                                  (tab as EditorTab).overrideLanguage ===
-                                  lang.ext;
-                                return (
-                                  <DropdownMenuItem
-                                    key={lang.ext}
-                                    onSelect={() =>
-                                      onOverrideLanguage?.(tab.id, lang.ext)
-                                    }
-                                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg cursor-default focus:bg-accent focus:text-accent-foreground"
-                                  >
-                                    <img
-                                      src={fileIconUrl(`dummy.${lang.ext}`)}
-                                      className="size-3.5 shrink-0 object-contain"
-                                      alt=""
-                                    />
-                                    <span className="flex-1">{lang.name}</span>
-                                    {isSelected && (
-                                      <HugeiconsIcon
-                                        icon={Tick02Icon}
-                                        className="size-3.5 text-primary"
-                                      />
-                                    )}
-                                  </DropdownMenuItem>
-                                );
-                              })}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : (
-                          <TabIcon tab={tab} />
-                        )}
-                        {/* Preview tabs use italic to signal the transient state,
-                        matching the visual convention from VSCode. A deleted
-                        editor tab gets a strikethrough on the title. */}
-                        <span
-                          className={cn(
-                            "truncate",
-                            isPreview && "italic",
-                            tab.kind === "editor" &&
-                              tab.deleted &&
-                              "line-through text-muted-foreground/70",
-                          )}
-                        >
-                          {labelFor(tab)}
-                        </span>
-                        {tab.kind === "editor" && tab.conflict ? (
-                          <span
-                            aria-label={t("tabs.externalConflict")}
-                            title={t("tabs.externalConflict")}
-                            className="size-1.5 shrink-0 rounded-full bg-amber-500"
-                          />
-                        ) : null}
-                        {tab.kind === "editor" && tab.dirty ? (
-                          <span
-                            aria-label={t("tabs.unsavedChanges")}
-                            className="size-1.5 shrink-0 rounded-full bg-foreground/70"
-                          />
-                        ) : null}
-                      </span>
-                      <span
-                        role="button"
-                        aria-label={t("tabs.closeTab")}
-                        data-no-drag
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onClose(tab.id);
-                        }}
-                        className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
-                      >
-                        <HugeiconsIcon
-                          icon={Cancel01Icon}
-                          size={11}
-                          strokeWidth={2}
-                        />
-                      </span>
-                    </TabsTrigger>
-                  );
-
-                  const hasTabsToRight = i < tabs.length - 1;
-
-                  const tabNode = (
-                    <ContextMenu>
-                      <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
-                      <ContextMenuContent
-                        className="min-w-32 p-1"
-                        onCloseAutoFocus={(e) => e.preventDefault()}
-                      >
-                        {tab.kind === "terminal" && (
-                          <>
-                            <ContextMenuItem
-                              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                              onSelect={() => setEditingId(tab.id)}
-                            >
-                              <HugeiconsIcon
-                                icon={PencilEdit02Icon}
-                                size={13}
-                                strokeWidth={1.75}
-                              />
-                              <span className="flex-1">{t("tabs.rename")}</span>
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                              className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                              onSelect={() => onClose(tab.id)}
-                            >
-                              <HugeiconsIcon
-                                icon={Cancel01Icon}
-                                size={13}
-                                strokeWidth={1.75}
-                              />
-                              <span className="flex-1">{t("tabs.close")}</span>
-                            </ContextMenuItem>
-                          </>
-                        )}
-                        <ContextMenuItem
-                          className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                          disabled={!hasTabsToRight}
-                          onSelect={() => onCloseTabsToRight(tab.id)}
-                        >
-                          <HugeiconsIcon
-                            icon={ArrowRight01Icon}
-                            size={13}
-                            strokeWidth={1.75}
-                          />
-                          <span className="flex-1">
-                            {t("tabs.closeTabsToRight")}
-                          </span>
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                          className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                          disabled={tabs.length <= 1}
-                          onSelect={() => onCloseOtherTabs(tab.id)}
-                        >
-                          <HugeiconsIcon
-                            icon={CancelCircleIcon}
-                            size={13}
-                            strokeWidth={1.75}
-                          />
-                          <span className="flex-1">
-                            {t("tabs.closeOtherTabs")}
-                          </span>
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                          className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
-                          disabled={tabs.length === 0}
-                          onSelect={() => onCloseAll(tab.id)}
-                        >
-                          <HugeiconsIcon
-                            icon={CancelCircleIcon}
-                            size={13}
-                            strokeWidth={1.75}
-                          />
-                          <span className="flex-1">
-                            {t("tabs.closeAllTabs")}
-                          </span>
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  );
-
-                  return (
-                    <SortableTabNode key={tab.id} id={tab.id}>
-                      {tabNode}
-                    </SortableTabNode>
-                  );
-                })}
-              </SortableContext>
-              <DragOverlay dropAnimation={null}>
-                {activeDragTab ? (
-                  <div className="flex h-7 w-max items-center gap-1.5 rounded-md bg-card px-2 text-xs text-foreground shadow-lg ring-1 ring-border/70">
-                    <TabIcon tab={activeDragTab} />
-                    <span className="whitespace-nowrap">
-                      {labelFor(activeDragTab)}
-                    </span>
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
+                {pillSpan}
+                {renderTabs(true)}
+              </SortableTabStrip>
+            ) : (
+              <>
+                {pillSpan}
+                {renderTabs(false)}
+              </>
+            )}
           </TabsList>
         </Tabs>
         <NewTabMenu
@@ -635,6 +613,59 @@ export function TabBar({
         />
       </div>
     </div>
+  );
+}
+
+// dnd-kit is isolated in this subtree. When tab dragging is disabled,
+// TabBar renders the plain branch and this component (with its dnd-kit hooks)
+// is not mounted at all.
+function SortableTabStrip({
+  tabIds,
+  activeDragTab,
+  onDragStart,
+  onDragEnd,
+  onDragCancel,
+  children,
+}: {
+  tabIds: number[];
+  activeDragTab: Tab | undefined;
+  onDragStart: ({ active }: { active: Active }) => void;
+  onDragEnd: ({ active, over }: { active: Active; over: Over | null }) => void;
+  onDragCancel: () => void;
+  children: ReactNode;
+}) {
+  const pointerSensor = useSensor(PointerSensor, {
+    // A plain click must never start a drag. A pure `distance` constraint
+    // fires as soon as the pointer moves past the threshold, and a click
+    // routinely carries a few px of hand jitter — so clicks kept turning
+    // into drags no matter how high the threshold went. Require the press to
+    // be held (`delay`) and only then allow a drag; moving past `tolerance`
+    // while still inside the delay cancels activation, so a fast swipe is a
+    // click, not a drag.
+    activationConstraint: { delay: 120, tolerance: 10 },
+  });
+  const sensors = useSensors(pointerSensor);
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
+      <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+        {children}
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {activeDragTab ? (
+          <div className="flex h-7 w-max items-center gap-1.5 rounded-md bg-card px-2 text-xs text-foreground shadow-lg ring-1 ring-border/70">
+            <TabIcon tab={activeDragTab} />
+            <span className="whitespace-nowrap">{labelFor(activeDragTab)}</span>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 
