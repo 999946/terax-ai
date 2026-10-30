@@ -6,6 +6,14 @@ import type {
 
 type SelectionMode = "character" | "word" | "line";
 
+/**
+ * Minimum pointer travel (in CSS pixels) before a press becomes a selection
+ * drag. Below this a press is a plain click: tap-to-click on a trackpad often
+ * carries a few pixels of micro-motion, and without a threshold that motion
+ * immediately turned the tap into a selection drag.
+ */
+const DRAG_ACTIVATE_DISTANCE = 5;
+
 export type TerminalSelectionBounds = {
   readonly startLine: number;
   readonly startColumn: number;
@@ -31,8 +39,15 @@ export class TerminalSelectionController {
   private mode: SelectionMode = "character";
   private pointerId: number | null = null;
   private meaningful = false;
+  private dragActive = false;
+  private startClientX = 0;
+  private startClientY = 0;
   private lastClientX = 0;
   private lastClientY = 0;
+  // The anchor + mode of a press that has not yet crossed the drag threshold.
+  // Kept separately from `selection` because a render-frame reconcile may clear
+  // the (uncommitted) selection before the first qualifying pointermove.
+  private pendingAnchor: TerminalBufferPoint | null = null;
   private autoScrollFrame: number | null = null;
   private disposed = false;
 
@@ -94,6 +109,8 @@ export class TerminalSelectionController {
     this.selection = null;
     this.anchorRange = null;
     this.meaningful = false;
+    this.dragActive = false;
+    this.pendingAnchor = null;
     this.stopAutoScroll();
     this.options.model.setSelection?.(null);
     this.options.onChange();
@@ -117,6 +134,8 @@ export class TerminalSelectionController {
     const { target } = this.options;
     const pointerId = this.pointerId;
     this.pointerId = null;
+    this.dragActive = false;
+    this.pendingAnchor = null;
     if (!this.meaningful) this.clear();
     if (pointerId !== null && target.hasPointerCapture(pointerId)) {
       target.releasePointerCapture(pointerId);
@@ -146,6 +165,10 @@ export class TerminalSelectionController {
     this.options.target.setPointerCapture(event.pointerId);
     this.lastClientX = event.clientX;
     this.lastClientY = event.clientY;
+    this.startClientX = event.clientX;
+    this.startClientY = event.clientY;
+    this.dragActive = false;
+    this.pendingAnchor = point;
 
     const existingAnchor = event.shiftKey ? this.selection?.anchor : undefined;
     this.mode =
@@ -161,12 +184,41 @@ export class TerminalSelectionController {
       event.altKey,
     );
     this.meaningful = event.shiftKey || this.mode !== "character";
+    // Always commit a zero-width candidate so render-frame reconciles stay
+    // consistent (they compare against the committed selection). It is
+    // invisible, so a plain click never flashes a selection; movement past
+    // DRAG_ACTIVATE_DISTANCE turns it into the real drag below.
     this.commitSelection();
     this.options.onChange();
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (event.pointerId !== this.pointerId || !this.selection) return;
+    if (event.pointerId !== this.pointerId) return;
+    if (!this.dragActive) {
+      const dx = event.clientX - this.startClientX;
+      const dy = event.clientY - this.startClientY;
+      if (Math.hypot(dx, dy) < DRAG_ACTIVATE_DISTANCE) return;
+      // First move past the threshold: the press becomes a real drag. Prefer
+      // the live selection anchor if the model restored/replaced it (external
+      // code can pin a new anchor across a reflow); otherwise fall back to the
+      // down-point saved above.
+      const anchor = this.selection?.anchor ?? this.pendingAnchor;
+      if (!anchor) return;
+      this.dragActive = true;
+      this.meaningful = true;
+      this.pendingAnchor = null;
+      this.anchorRange = this.rangeForPoint(anchor, this.mode);
+      this.selection = selectionForRanges(
+        anchor,
+        anchor,
+        this.anchorRange,
+        this.anchorRange,
+        false,
+      );
+      this.commitSelection();
+      this.options.onChange();
+    }
+    if (!this.selection) return;
     event.preventDefault();
     this.lastClientX = event.clientX;
     this.lastClientY = event.clientY;
@@ -177,7 +229,34 @@ export class TerminalSelectionController {
   private readonly handlePointerUp = (event: PointerEvent): void => {
     if (event.pointerId !== this.pointerId) return;
     event.preventDefault();
-    this.updateFocus(event);
+    // A press-released drag may deliver its travel only on the up event (the
+    // runtime can coalesce motion), so honor the threshold here too before
+    // treating the interaction as a click.
+    if (!this.dragActive) {
+      const dx = event.clientX - this.startClientX;
+      const dy = event.clientY - this.startClientY;
+      if (Math.hypot(dx, dy) >= DRAG_ACTIVATE_DISTANCE) {
+        const anchor = this.selection?.anchor ?? this.pendingAnchor;
+        if (anchor) {
+          this.dragActive = true;
+          this.meaningful = true;
+          this.pendingAnchor = null;
+          this.anchorRange = this.rangeForPoint(anchor, this.mode);
+          this.selection = selectionForRanges(
+            anchor,
+            anchor,
+            this.anchorRange,
+            this.anchorRange,
+            false,
+          );
+          this.commitSelection();
+          this.options.onChange();
+        }
+      }
+    }
+    if (this.dragActive) this.updateFocus(event);
+    // A plain click (never crossed the drag threshold) must not leave a
+    // selection behind — it also clears any pre-existing native selection.
     if (!this.meaningful) {
       this.selection = null;
       this.anchorRange = null;
@@ -188,6 +267,8 @@ export class TerminalSelectionController {
       this.options.target.releasePointerCapture(event.pointerId);
     }
     this.pointerId = null;
+    this.dragActive = false;
+    this.pendingAnchor = null;
     this.stopAutoScroll();
   };
 

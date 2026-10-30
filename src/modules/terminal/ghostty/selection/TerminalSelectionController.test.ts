@@ -269,6 +269,11 @@ function dragFixture(realModel?: GhosttyTerminalModelApi) {
       },
       bufferLineAtViewportRow: (row: number) => row,
       scrollBy: vi.fn(() => false),
+      selectionText: (sel: TerminalBufferSelection) =>
+        sel.anchor.line === sel.focus.line &&
+        sel.anchor.column === sel.focus.column
+          ? "hello"
+          : `lines ${sel.anchor.line}->${sel.focus.line}`,
     } as unknown as GhosttyTerminalModelApi);
   const onChange = vi.fn();
   const controller = new TerminalSelectionController({
@@ -337,5 +342,50 @@ describe("terminal selection geometry", () => {
     expect(selectionContains(selection, { line: 4, column: 6 })).toBe(true);
     expect(selectionContains(selection, { line: 5, column: 9 })).toBe(false);
     expect(selectionContains(selection, { line: 1, column: 6 })).toBe(false);
+  });
+});
+
+describe("terminal selection drag activation threshold", () => {
+  it("a plain click (no movement) leaves no selection", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 50);
+    fixture.pointer("pointerup", 50);
+    expect(fixture.controller.value).toBeNull();
+    expect(fixture.tracked()).toBeNull();
+  });
+
+  it("micro-motion below the threshold stays a click, not a drag", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 50);
+    // 3px of trackpad jitter — must not activate a selection drag.
+    fixture.pointer("pointermove", 53);
+    expect(fixture.controller.value).toBeNull();
+    fixture.pointer("pointerup", 53);
+    expect(fixture.controller.value).toBeNull();
+    expect(fixture.tracked()).toBeNull();
+  });
+
+  it("movement past the threshold selects like a drag", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 5);
+    fixture.pointer("pointermove", 45); // 40px > 5px threshold
+    fixture.pointer("pointerup", 45);
+    expect(fixture.controller.value).not.toBeNull();
+  });
+
+  it("a drag can start after a short pause (move arrives late)", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 30);
+    fixture.pointer("pointermove", 35); // 5px is below (<5) so still plain
+    fixture.pointer("pointermove", 60); // now clearly a drag
+    fixture.pointer("pointerup", 60);
+    expect(fixture.controller.value).not.toBeNull();
+  });
+
+  it("a press-release with travel only on pointerup still selects", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 5);
+    fixture.pointer("pointerup", 45); // travel arrives on the up event
+    expect(fixture.controller.value).not.toBeNull();
   });
 });
