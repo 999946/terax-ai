@@ -31,6 +31,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { AgentIcon } from "@/modules/agents/lib/agentIcon";
 import type { AgentLaunchRequest } from "@/modules/agents/lib/launcher";
 import {
@@ -125,23 +126,25 @@ export function TabBar({
   compact,
 }: Props) {
   const { t } = useTranslation();
+  const tabDrag = usePreferencesStore((s) => s.tabDrag);
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [showAllLanguages, setShowAllLanguages] = useState(false);
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      // A plain click must never start a drag. A pure `distance` constraint
-      // fires as soon as the pointer moves past the threshold, and a click
-      // routinely carries a few px of hand jitter — so clicks kept turning
-      // into drags no matter how high the threshold went. Require the press to
-      // be held (`delay`) and only then allow a drag; moving past `tolerance`
-      // while still inside the delay cancels activation, so a fast swipe is a
-      // click, not a drag.
-      activationConstraint: { delay: 120, tolerance: 10 },
-    }),
-  );
+  const pointerSensor = useSensor(PointerSensor, {
+    // A plain click must never start a drag. A pure `distance` constraint
+    // fires as soon as the pointer moves past the threshold, and a click
+    // routinely carries a few px of hand jitter — so clicks kept turning
+    // into drags no matter how high the threshold went. Require the press to
+    // be held (`delay`) and only then allow a drag; moving past `tolerance`
+    // while still inside the delay cancels activation, so a fast swipe is a
+    // click, not a drag.
+    activationConstraint: { delay: 120, tolerance: 10 },
+  });
+  // Users on trackpads where a light tap can still trigger a drag-cancel can
+  // turn tab drag-reordering off entirely via Settings → Terminal.
+  const sensors = useSensors(tabDrag ? pointerSensor : null);
   const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
   const activeDragTab =
     draggingId != null ? tabs.find((t) => t.id === draggingId) : undefined;

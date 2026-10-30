@@ -652,6 +652,9 @@ export const zhCN: Record<string, string> = {
   "settings.general.restoreWindowDescription":
     "在上次离开的位置重新打开主窗口。下次启动时生效。",
   "settings.general.scrollback": "回滚行数",
+  "settings.general.tabDrag": "拖动标签页排序",
+  "settings.general.tabDragDescription":
+    "可拖动标签页排序。若触控板轻点会误触发拖动，请关闭此开关。",
   "settings.general.scrollbackDescription":
     "每个终端保留的历史行数。数值越高占用的内存越多（约每行 3 KB）。",
   "settings.general.showHiddenFiles": "显示隐藏文件",

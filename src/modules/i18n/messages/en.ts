@@ -669,6 +669,9 @@ export const en: Record<string, string> = {
   "settings.general.restoreWindowDescription":
     "Reopen the main window where you left it. Applies on next launch.",
   "settings.general.scrollback": "Scrollback",
+  "settings.general.tabDrag": "Drag tabs to reorder",
+  "settings.general.tabDragDescription":
+    "Drag tabs to reorder them. Disable if trackpad taps accidentally start drags.",
   "settings.general.scrollbackDescription":
     "Lines of history kept per terminal. Higher uses more RAM (~3 KB / line).",
   "settings.general.showHiddenFiles": "Show hidden files",

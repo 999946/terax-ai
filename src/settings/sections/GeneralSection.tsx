@@ -41,6 +41,7 @@ import {
   setTerminalShell,
   setTerminalRenderer,
   setTerminalScreenReader,
+  setTabDrag,
   setZoomLevel,
   TERMINAL_FONT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
@@ -117,6 +118,7 @@ export function GeneralSection() {
   const terminalScreenReader = usePreferencesStore(
     (s) => s.terminalScreenReader,
   );
+  const tabDrag = usePreferencesStore((s) => s.tabDrag);
   const terminalCursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
@@ -404,6 +406,15 @@ export function GeneralSection() {
           <Switch
             checked={terminalScreenReader}
             onCheckedChange={(value) => void setTerminalScreenReader(value)}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t("settings.general.tabDrag")}
+          description={t("settings.general.tabDragDescription")}
+        >
+          <Switch
+            checked={tabDrag}
+            onCheckedChange={(value) => void setTabDrag(value)}
           />
         </SettingRow>
         <SettingRow
