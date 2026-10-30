@@ -56,6 +56,10 @@ import {
 import { diagnosticsReporter } from "./lib/diagnosticsReporter";
 import { useDiagnosticsStore } from "./lib/diagnosticsStore";
 import { setBlameEffect, setBlameContextEffect } from "./lib/blameBadge";
+import {
+  blameAnnotationsCompartment,
+  blameAnnotationsExtension,
+} from "./lib/blameAnnotations";
 import { setHunksEffect } from "./lib/modifiedLines";
 import { setConflictEffect } from "./lib/conflictLines";
 import { fetchBlame, invalidateBlameForPath } from "./lib/blameCache";
@@ -235,6 +239,8 @@ export const EditorPane = memo(
     const statusApiRef = useRef<{ refresh: () => void } | null>(null);
     const [status, setStatus] = useState<EditorStatusInfo | null>(null);
     const breadcrumbApiRef = useRef<{ refresh: () => void } | null>(null);
+    const [blameAnnotationsEnabled, setBlameAnnotationsEnabled] =
+      useState(false);
     const [breadcrumb, setBreadcrumb] = useState<BreadcrumbSegment[] | null>(
       null,
     );
@@ -675,6 +681,42 @@ export const EditorPane = memo(
       breadcrumbApiRef.current?.refresh();
     }, [doc, langId, dirty]);
 
+    const toggleBlameAnnotations = useCallback(async () => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      if (blameAnnotationsEnabled) {
+        view.dispatch({ effects: blameAnnotationsCompartment.reconfigure([]) });
+        setBlameAnnotationsEnabled(false);
+        return;
+      }
+      const filePath = pathRef.current;
+      const repo = await native.gitResolveRepo(filePath);
+      if (!repo?.repoRoot) {
+        toast.error(t("editor.annotateNoRepo"));
+        return;
+      }
+      const map = await fetchBlame(repo.repoRoot, filePath);
+      const clickHandler = onOpenCommitHistory
+        ? (sha: string) =>
+            onOpenCommitHistory({
+              repoRoot: repo.repoRoot,
+              path: filePath,
+              sha,
+            })
+        : undefined;
+      const live = cmRef.current?.view;
+      if (!live) return;
+      live.dispatch({
+        effects: [
+          blameAnnotationsCompartment.reconfigure(
+            blameAnnotationsExtension(clickHandler),
+          ),
+          setBlameEffect.of(map),
+        ],
+      });
+      setBlameAnnotationsEnabled(true);
+    }, [blameAnnotationsEnabled, onOpenCommitHistory]);
+
     // Git blame: show the active line's commit badge at the line end (GitLens
     // style). Resolve the repo root for the current file, fetch its blame map,
     // and feed it into the editor via the blame StateField effect. Also set the
@@ -725,6 +767,18 @@ export const EditorPane = memo(
         cancelled = true;
       };
     }, [path, onOpenCommitHistory]);
+
+    // Switching to a different file must drop any active blame annotations —
+    // the gutter would otherwise keep showing the previous file's blame map.
+    // Unconditional: reconfigure([]) is a no-op when the gutter is already off,
+    // and resetting the flag keeps the context-menu label in sync.
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (view) {
+        view.dispatch({ effects: blameAnnotationsCompartment.reconfigure([]) });
+      }
+      setBlameAnnotationsEnabled(false);
+    }, [path]);
 
     // Git change-marker baseline: the gutter highlights lines that differ from
     // the file's committed (HEAD) text - markers persist across save and clear
@@ -1170,6 +1224,17 @@ export const EditorPane = memo(
             onSelect={() => pasteAtCursor()}
           >
             <span className="flex-1">{t("editor.paste")}</span>
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="gap-2 rounded-xl px-2.5 py-1.5 text-[13px]"
+            onSelect={() => void toggleBlameAnnotations()}
+          >
+            <span className="flex-1">
+              {blameAnnotationsEnabled
+                ? t("editor.annotateClose")
+                : t("editor.annotate")}
+            </span>
           </ContextMenuItem>
           <ContextMenuSeparator />
           {onOpenFileHistory && (

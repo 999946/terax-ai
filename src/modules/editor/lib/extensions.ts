@@ -10,6 +10,7 @@ import {
   rectangularSelection,
 } from "@codemirror/view";
 import { blameBadge } from "./blameBadge";
+import { blameAnnotationsCompartment } from "./blameAnnotations";
 import { chromeTheme } from "./chromeTheme";
 import { conflictLines } from "./conflictLines";
 import { changeLane, overviewLane } from "./lanes";
@@ -86,6 +87,7 @@ const SHARED_EXTENSIONS: readonly Extension[] = Object.freeze([
   search({ top: true }),
   lintGutter(),
   blameBadge(),
+  blameAnnotationsCompartment.of([]),
   changeLane(),
   overviewLane(),
   modifiedLines(),
