@@ -36,6 +36,7 @@ describe("selection across renderer replacement", () => {
         cellSize: () => ({ width: 8, height: 16 }),
         shouldIgnoreTarget: () => false,
         onChange: vi.fn(),
+        logger: vi.fn(),
       });
     const original = create();
     original.dispose();
@@ -284,6 +285,7 @@ function dragFixture(realModel?: GhosttyTerminalModelApi) {
           : `lines ${sel.anchor.line}->${sel.focus.line}`,
     } as unknown as GhosttyTerminalModelApi);
   const onChange = vi.fn();
+  const logger = vi.fn();
   const controller = new TerminalSelectionController({
     model,
     target: target as unknown as HTMLElement,
@@ -291,11 +293,13 @@ function dragFixture(realModel?: GhosttyTerminalModelApi) {
     shouldIgnoreTarget: () => false,
     onChange,
     now: () => elapsed,
+    logger,
   });
   return {
     controller,
     model,
     onChange,
+    logger,
     tracked: () => tracked,
     advance,
     pointer: (
@@ -431,5 +435,44 @@ describe("terminal selection drag activation threshold", () => {
     fixture.pointer("pointerdown", 5);
     fixture.pointer("pointerup", 45); // travel arrives on the up event
     expect(fixture.controller.value).not.toBeNull();
+  });
+
+  it("emits diagnostic trails for down/move/up transitions", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 30, 10, 0);
+    fixture.advance(200); // park past the hold window so the next move activates
+    fixture.pointer("pointermove", 60, 10, 0); // 30px travel -> real drag
+    fixture.pointer("pointermove", 75, 10, 0); // post-activation move
+    fixture.pointer("pointerup", 75, 10, 0);
+    const calls = fixture.logger.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((m) => m.startsWith("pointerdown id="))).toBe(true);
+    expect(
+      calls.some(
+        (m) =>
+          m.startsWith("pointermove DRAG-ACTIVATED id=") &&
+          m.includes("held=") &&
+          m.includes("dist="),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (m) =>
+          m.startsWith("pointerup END-DRAG id=") && m.includes("selection="),
+      ),
+    ).toBe(true);
+  });
+
+  it("logs a quick swipe cancel when the press is too young", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 30, 10, 0);
+    fixture.pointer("pointermove", 60, 10, 0); // 30px but 0ms hold -> swipe
+    const calls = fixture.logger.mock.calls.map((c) => c[0] as string);
+    expect(
+      calls.some(
+        (m) =>
+          m.startsWith("pointermove QUICK-SWIPE-CANCEL id=") &&
+          m.includes("tol=10px"),
+      ),
+    ).toBe(true);
   });
 });

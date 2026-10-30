@@ -3,6 +3,7 @@ import type {
   TerminalBufferPoint,
   TerminalBufferSelection,
 } from "../GhosttyTerminalModel";
+import { warn as logWarn } from "@tauri-apps/plugin-log";
 
 type SelectionMode = "character" | "word" | "line";
 
@@ -44,6 +45,8 @@ export type TerminalSelectionControllerOptions = {
   readonly onChange: () => void;
   /** Injectable clock for tests; falls back to performance.now(). */
   readonly now?: () => number;
+  /** Injectable logger for tests; falls back to the native plugin-log writer. */
+  readonly logger?: (message: string) => void;
 };
 
 export class TerminalSelectionController {
@@ -67,9 +70,19 @@ export class TerminalSelectionController {
   private disposed = false;
 
   private readonly now: () => number;
+  private readonly log: (message: string) => void;
 
   constructor(private readonly options: TerminalSelectionControllerOptions) {
     this.now = options.now ?? (() => performance.now());
+    this.log =
+      options.logger ??
+      ((message: string) => {
+        // Fire-and-forget: the native bridge may be unavailable (unit tests,
+        // pre-mount), and the log must never alter selection behavior.
+        void logWarn("[terax:terminal:selection] " + message).catch(
+          () => undefined,
+        );
+      });
     this.selection = options.model.trackedSelection?.() ?? null;
     this.meaningful = this.selection !== null;
     options.target.addEventListener("pointerdown", this.handlePointerDown);
@@ -168,6 +181,10 @@ export class TerminalSelectionController {
   private cancelPending(): void {
     const { target } = this.options;
     const pointerId = this.pointerId;
+    this.log(
+      `cancelPending id=${pointerId} dragActive=${this.dragActive} ` +
+        `meaningful=${this.meaningful}`,
+    );
     this.pointerId = null;
     this.dragActive = false;
     this.pendingAnchor = null;
@@ -222,6 +239,11 @@ export class TerminalSelectionController {
     // DRAG_ACTIVATE_DISTANCE turns it into the real drag below.
     this.commitSelection();
     this.options.onChange();
+    this.log(
+      `pointerdown id=${event.pointerId} xy=${event.clientX},${event.clientY} ` +
+        `cell=${point.line}:${point.column} detail=${event.detail} ` +
+        `mode=${this.mode} shift=${event.shiftKey} alt=${event.altKey}`,
+    );
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
@@ -237,20 +259,43 @@ export class TerminalSelectionController {
         heldMs < PRESS_HOLD_MS &&
         Math.hypot(dx, dy) > QUICK_SWIPE_TOLERANCE
       ) {
+        this.log(
+          `pointermove QUICK-SWIPE-CANCEL id=${event.pointerId} ` +
+            `held=${heldMs.toFixed(0)}ms dist=${Math.hypot(dx, dy).toFixed(1)}px ` +
+            `tol=${QUICK_SWIPE_TOLERANCE}px`,
+        );
         this.cancelPending();
         return;
       }
-      if (Math.hypot(dx, dy) < DRAG_ACTIVATE_DISTANCE || heldMs < PRESS_HOLD_MS)
+      if (
+        Math.hypot(dx, dy) < DRAG_ACTIVATE_DISTANCE ||
+        heldMs < PRESS_HOLD_MS
+      ) {
+        this.log(
+          `pointermove PENDING id=${event.pointerId} ` +
+            `held=${heldMs.toFixed(0)}ms dist=${Math.hypot(dx, dy).toFixed(1)}px ` +
+            `actDist=${DRAG_ACTIVATE_DISTANCE}px`,
+        );
         return;
+      }
       // First move past the threshold after a sufficient hold: the press
       // becomes a real drag. Prefer the live selection anchor if the model
       // restored/replaced it (external code can pin a new anchor across a
       // reflow); otherwise fall back to the down-point saved above.
       const anchor = this.selection?.anchor ?? this.pendingAnchor;
       if (!anchor) {
+        this.log(
+          `pointermove NO-ANCHOR-CANCEL id=${event.pointerId} ` +
+            `held=${heldMs.toFixed(0)}ms dist=${Math.hypot(dx, dy).toFixed(1)}px`,
+        );
         this.cancelPending();
         return;
       }
+      this.log(
+        `pointermove DRAG-ACTIVATED id=${event.pointerId} ` +
+          `held=${heldMs.toFixed(0)}ms dist=${Math.hypot(dx, dy).toFixed(1)}px ` +
+          `anchor=${anchor.line}:${anchor.column} mode=${this.mode}`,
+      );
       this.dragActive = true;
       this.meaningful = true;
       this.pendingAnchor = null;
@@ -283,13 +328,15 @@ export class TerminalSelectionController {
     if (!this.dragActive) {
       const dx = event.clientX - this.startClientX;
       const dy = event.clientY - this.startClientY;
+      const dist = Math.hypot(dx, dy);
       const heldMs = this.now() - this.pressStartTime;
       const anchor = this.selection?.anchor ?? this.pendingAnchor;
-      if (
-        heldMs >= PRESS_HOLD_MS &&
-        Math.hypot(dx, dy) >= DRAG_ACTIVATE_DISTANCE &&
-        anchor
-      ) {
+      if (heldMs >= PRESS_HOLD_MS && dist >= DRAG_ACTIVATE_DISTANCE && anchor) {
+        this.log(
+          `pointerup ACTIVATED-ON-UP id=${event.pointerId} ` +
+            `held=${heldMs.toFixed(0)}ms dist=${dist.toFixed(1)}px ` +
+            `anchor=${anchor.line}:${anchor.column} mode=${this.mode}`,
+        );
         this.dragActive = true;
         this.meaningful = true;
         this.pendingAnchor = null;
@@ -303,7 +350,17 @@ export class TerminalSelectionController {
         );
         this.commitSelection();
         this.options.onChange();
+      } else {
+        this.log(
+          `pointerup CLICK id=${event.pointerId} held=${heldMs.toFixed(0)}ms ` +
+            `dist=${dist.toFixed(1)}px actDist=${DRAG_ACTIVATE_DISTANCE}px ` +
+            `hold=${PRESS_HOLD_MS}ms dragActive=false`,
+        );
       }
+    } else {
+      this.log(
+        `pointerup END-DRAG id=${event.pointerId} selection=${this.meaningful}`,
+      );
     }
     if (this.dragActive) this.updateFocus(event);
     // A plain click (never crossed the drag threshold) must not leave a
