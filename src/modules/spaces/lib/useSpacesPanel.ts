@@ -36,6 +36,9 @@ export function useSpacesPanel() {
   const [width, setWidthState] = useState(readWidth);
   const timerRef = useRef<number | null>(null);
   // Mirror pinned so scheduleCollapse's callback closure never goes stale.
+  // Updated both at render time and synchronously in togglePinned, so a click
+  // followed by an immediate pointer-leave still sees the new value (React
+  // state is async — waiting for the next render would drop the collapse).
   const pinnedRef = useRef(pinned);
   pinnedRef.current = pinned;
 
@@ -61,41 +64,44 @@ export function useSpacesPanel() {
     }
   }, []);
 
-  const togglePinned = useCallback(() => {
-    setPinned((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(PINNED_KEY, String(next));
-      } catch {
-        // Storage is optional; pinning still works within the session.
-      }
-      return next;
-    });
-  }, []);
-
-  const expand = useCallback(() => {
+  const clearTimer = useCallback(() => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     timerRef.current = null;
-    persist(false);
-  }, [persist]);
-
-  const collapse = useCallback(() => persist(true), [persist]);
+  }, []);
 
   const scheduleCollapse = useCallback(() => {
     // A pinned panel stays expanded and is never auto-collapsed.
     if (pinnedRef.current) {
-      if (timerRef.current !== null) {
-        window.clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
+      clearTimer();
       return;
     }
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    clearTimer();
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      collapse();
+      persist(true);
     }, CLOSE_DELAY_MS);
-  }, [collapse]);
+  }, [clearTimer, persist]);
+
+  const expand = useCallback(() => {
+    clearTimer();
+    persist(false);
+  }, [clearTimer, persist]);
+
+  const collapse = useCallback(() => persist(true), [persist]);
+
+  const togglePinned = useCallback(() => {
+    const next = !pinnedRef.current;
+    // Sync the ref immediately so a pointer-leave that fires right after the
+    // click (before React's async render) still sees the unpinned value and
+    // schedules the auto-collapse. Waiting for the next render would drop it.
+    pinnedRef.current = next;
+    setPinned(next);
+    try {
+      localStorage.setItem(PINNED_KEY, String(next));
+    } catch {
+      // Storage is optional; pinning still works within the session.
+    }
+  }, []);
 
   useEffect(
     () => () => {

@@ -119,6 +119,13 @@ The themes below frame every scope decision.
 - [ ] Approval flow improvements (YOLO / auto-approve, project-scoped policies, per-tool trust)
 - [ ] Persistent terminal processes across app restarts
 
+### Bug backlog
+
+- [x] 新建终端路径：`+` 新建终端时其工作目录取当前 space root（无映射目录时回退继承 cwd）
+- [x] 输入法候选框：隐藏输入 textarea 固定 (0,0) 导致候选框不跟随光标，改为渲染时随光标单元格定位
+- [x] 修改标记重复：overview 竖条误置于编辑器左缘（`left:1px`）与 change lane 重叠，移至右缘
+- [x] 空格面板取消钉失效：`pinnedRef` 未与点击同步，取消钉后立即 pointer-leave 读到旧值跳过收起；改为 togglePinned 同步 ref
+
 ### Longer horizon
 
 - [ ] Selective TS → Rust migration where the profiler shows measurable wins

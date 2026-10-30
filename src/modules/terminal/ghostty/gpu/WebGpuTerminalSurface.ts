@@ -1,8 +1,12 @@
 import { terminalWindowFocused } from "@/modules/terminal/ghostty/renderScheduling";
+import { imePlacementForCell } from "../input/imePlacement";
 import { bindTerminalInteraction } from "@/modules/terminal/ghostty/input/terminalInteraction";
 import { TerminalScrollbarSync } from "@/modules/terminal/ghostty/gpu/terminalScrollbar";
 import { terminalWindowPresentation } from "@/modules/terminal/ghostty/windowPresentation";
-import type { TerminalSurface } from "@/modules/terminal/backend/contracts";
+import type {
+  TerminalCursor,
+  TerminalSurface,
+} from "@/modules/terminal/backend/contracts";
 import {
   subscribeTerminalResizeInteraction,
   terminalResizeInteractionActive,
@@ -385,6 +389,27 @@ export class WebGpuTerminalSurface
     this.updateScrollbar();
   }
 
+  /**
+   * Park the hidden input textarea on the cursor's cell so the OS IME candidate
+   * window (Chinese/Japanese/Korean input) anchors near where the user types.
+   * Both renderers fix the textarea at (0,0) by default, which keeps the
+   * candidate box pinned to the top-left corner regardless of the cursor.
+   */
+  private syncImePlacement(cursor: TerminalCursor): void {
+    const input = this.input;
+    const placement = imePlacementForCell(cursor, {
+      cols: this.options.model.cols,
+      rows: this.options.model.rows,
+      cellWidthPx: this.metrics.cellWidth,
+      cellHeightPx: this.metrics.cellHeight,
+    });
+    const left = `${placement.leftPx}px`;
+    const top = `${placement.topPx}px`;
+    if (input.style.left === left && input.style.top === top) return;
+    input.style.left = left;
+    input.style.top = top;
+  }
+
   cellSize(): { readonly width: number; readonly height: number } {
     return { width: this.metrics.cellWidth, height: this.metrics.cellHeight };
   }
@@ -452,6 +477,7 @@ export class WebGpuTerminalSurface
     this.selection.reconcile();
     this.search.refreshOverlay();
     this.updateScrollbar();
+    this.syncImePlacement(this.options.model.cursor());
     if (this.backingStore.commit()) {
       this.backingStoreResizeCount += 1;
       this.forceFullRedraw = true;

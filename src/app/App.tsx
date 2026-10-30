@@ -668,7 +668,13 @@ export default function App() {
   const askPresence = usePresence(Boolean(askPopup), 120);
 
   const openNewTab = useCallback(() => {
-    newTab(inheritedCwdForNewTab());
+    // A new terminal tab in an active space should open at that space's root
+    // (mapped workspace folder), not drift to whatever cwd the last terminal
+    // happened to be in. Spaces without a mapped root fall back to inherited.
+    const activeRoot = useSpaces
+      .getState()
+      .spaces.find((s) => s.id === activeSpaceIdRef.current)?.root;
+    newTab(activeRoot ?? inheritedCwdForNewTab());
   }, [newTab, inheritedCwdForNewTab]);
 
   const openNewPrivateTab = useCallback(() => {

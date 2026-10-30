@@ -267,10 +267,13 @@ class OverviewLane {
 }
 
 const overviewTheme = EditorView.theme({
+  // The overview strip rides the editor's right edge. It used to be pinned at
+  // left:1px — overlapping the change lane (left gutter 3px bars) so one edit
+  // looked like two markers with the overview one off-position.
   ".cm-editor-overview": {
     position: "absolute",
     top: "0",
-    left: "1px",
+    right: "2px",
     bottom: "0",
     width: "6px",
     zIndex: 20,
