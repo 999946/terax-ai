@@ -7,12 +7,24 @@ import type {
 type SelectionMode = "character" | "word" | "line";
 
 /**
- * Minimum pointer travel (in CSS pixels) before a press becomes a selection
- * drag. Below this a press is a plain click: tap-to-click on a trackpad often
- * carries a few pixels of micro-motion, and without a threshold that motion
- * immediately turned the tap into a selection drag.
+ * Minimum pointer travel (in CSS pixels) before a held press becomes a
+ * selection drag. A plain click must never select: tap-to-click on a trackpad
+ * often carries a few pixels of micro-motion, and without a threshold that
+ * motion immediately turned the tap into a selection drag.
  */
 const DRAG_ACTIVATE_DISTANCE = 5;
+/**
+ * How long (ms) a press must be held before it may become a selection drag.
+ * Real drags are held; a tap is released within this window. Without a hold
+ * requirement a light tap followed by a swipe would select text on trackpads.
+ */
+const PRESS_HOLD_MS = 120;
+/**
+ * Pointer travel (px) allowed inside PRESS_HOLD_MS. Moving past this while the
+ * press has not yet been held long enough is a fast swipe, not a selection
+ * drag, and cancels the press entirely (same idea as dnd-kit's tolerance).
+ */
+const QUICK_SWIPE_TOLERANCE = 10;
 
 export type TerminalSelectionBounds = {
   readonly startLine: number;
@@ -30,6 +42,8 @@ export type TerminalSelectionControllerOptions = {
   readonly cellSize: () => { readonly width: number; readonly height: number };
   readonly shouldIgnoreTarget: (target: EventTarget | null) => boolean;
   readonly onChange: () => void;
+  /** Injectable clock for tests; falls back to performance.now(). */
+  readonly now?: () => number;
 };
 
 export class TerminalSelectionController {
@@ -42,6 +56,7 @@ export class TerminalSelectionController {
   private dragActive = false;
   private startClientX = 0;
   private startClientY = 0;
+  private pressStartTime = 0;
   private lastClientX = 0;
   private lastClientY = 0;
   // The anchor + mode of a press that has not yet crossed the drag threshold.
@@ -51,7 +66,10 @@ export class TerminalSelectionController {
   private autoScrollFrame: number | null = null;
   private disposed = false;
 
+  private readonly now: () => number;
+
   constructor(private readonly options: TerminalSelectionControllerOptions) {
+    this.now = options.now ?? (() => performance.now());
     this.selection = options.model.trackedSelection?.() ?? null;
     this.meaningful = this.selection !== null;
     options.target.addEventListener("pointerdown", this.handlePointerDown);
@@ -146,6 +164,19 @@ export class TerminalSelectionController {
     if (event.pointerId === this.pointerId) this.suspend();
   };
 
+  /** Discard an unheld press without changing any committed selection. */
+  private cancelPending(): void {
+    const { target } = this.options;
+    const pointerId = this.pointerId;
+    this.pointerId = null;
+    this.dragActive = false;
+    this.pendingAnchor = null;
+    if (pointerId !== null && target.hasPointerCapture(pointerId)) {
+      target.releasePointerCapture(pointerId);
+    }
+    if (!this.meaningful) this.clear();
+  }
+
   private readonly handlePointerDown = (event: PointerEvent): void => {
     if (
       !shouldStartTerminalSelection(
@@ -167,6 +198,7 @@ export class TerminalSelectionController {
     this.lastClientY = event.clientY;
     this.startClientX = event.clientX;
     this.startClientY = event.clientY;
+    this.pressStartTime = this.now();
     this.dragActive = false;
     this.pendingAnchor = point;
 
@@ -197,13 +229,28 @@ export class TerminalSelectionController {
     if (!this.dragActive) {
       const dx = event.clientX - this.startClientX;
       const dy = event.clientY - this.startClientY;
-      if (Math.hypot(dx, dy) < DRAG_ACTIVATE_DISTANCE) return;
-      // First move past the threshold: the press becomes a real drag. Prefer
-      // the live selection anchor if the model restored/replaced it (external
-      // code can pin a new anchor across a reflow); otherwise fall back to the
-      // down-point saved above.
+      const heldMs = this.now() - this.pressStartTime;
+      // Moving fast while the press is still too young is a quick swipe, not a
+      // selection drag — cancel the press so a light tap + fling can never
+      // select on a trackpad.
+      if (
+        heldMs < PRESS_HOLD_MS &&
+        Math.hypot(dx, dy) > QUICK_SWIPE_TOLERANCE
+      ) {
+        this.cancelPending();
+        return;
+      }
+      if (Math.hypot(dx, dy) < DRAG_ACTIVATE_DISTANCE || heldMs < PRESS_HOLD_MS)
+        return;
+      // First move past the threshold after a sufficient hold: the press
+      // becomes a real drag. Prefer the live selection anchor if the model
+      // restored/replaced it (external code can pin a new anchor across a
+      // reflow); otherwise fall back to the down-point saved above.
       const anchor = this.selection?.anchor ?? this.pendingAnchor;
-      if (!anchor) return;
+      if (!anchor) {
+        this.cancelPending();
+        return;
+      }
       this.dragActive = true;
       this.meaningful = true;
       this.pendingAnchor = null;
@@ -230,28 +277,32 @@ export class TerminalSelectionController {
     if (event.pointerId !== this.pointerId) return;
     event.preventDefault();
     // A press-released drag may deliver its travel only on the up event (the
-    // runtime can coalesce motion), so honor the threshold here too before
-    // treating the interaction as a click.
+    // runtime can coalesce motion). It still counts as a real drag only when
+    // the press was held long enough and moved far enough; a quick tap with
+    // micro-motion — however the runtime delivers it — must stay a click.
     if (!this.dragActive) {
       const dx = event.clientX - this.startClientX;
       const dy = event.clientY - this.startClientY;
-      if (Math.hypot(dx, dy) >= DRAG_ACTIVATE_DISTANCE) {
-        const anchor = this.selection?.anchor ?? this.pendingAnchor;
-        if (anchor) {
-          this.dragActive = true;
-          this.meaningful = true;
-          this.pendingAnchor = null;
-          this.anchorRange = this.rangeForPoint(anchor, this.mode);
-          this.selection = selectionForRanges(
-            anchor,
-            anchor,
-            this.anchorRange,
-            this.anchorRange,
-            false,
-          );
-          this.commitSelection();
-          this.options.onChange();
-        }
+      const heldMs = this.now() - this.pressStartTime;
+      const anchor = this.selection?.anchor ?? this.pendingAnchor;
+      if (
+        heldMs >= PRESS_HOLD_MS &&
+        Math.hypot(dx, dy) >= DRAG_ACTIVATE_DISTANCE &&
+        anchor
+      ) {
+        this.dragActive = true;
+        this.meaningful = true;
+        this.pendingAnchor = null;
+        this.anchorRange = this.rangeForPoint(anchor, this.mode);
+        this.selection = selectionForRanges(
+          anchor,
+          anchor,
+          this.anchorRange,
+          this.anchorRange,
+          false,
+        );
+        this.commitSelection();
+        this.options.onChange();
       }
     }
     if (this.dragActive) this.updateFocus(event);

@@ -244,9 +244,17 @@ describe("terminal selection pointer ownership", () => {
   });
 });
 
+// How far the fake clock moves with each dispatched event by default, so
+// existing tests behave as "press held past PRESS_HOLD_MS" without changes.
+const EVENT_TIME_ADVANCE_MS = 250;
+
 function dragFixture(realModel?: GhosttyTerminalModelApi) {
   let tracked: TerminalBufferSelection | null = null;
   let capture: number | null = null;
+  let elapsed = 0;
+  const advance = (ms: number) => {
+    elapsed += Math.max(0, ms);
+  };
   const target = Object.assign(new EventTarget(), {
     setPointerCapture: (id: number) => {
       capture = id;
@@ -282,14 +290,22 @@ function dragFixture(realModel?: GhosttyTerminalModelApi) {
     cellSize: () => ({ width: 10, height: 20 }),
     shouldIgnoreTarget: () => false,
     onChange,
+    now: () => elapsed,
   });
   return {
     controller,
     model,
     onChange,
     tracked: () => tracked,
-    pointer: (type: string, clientX: number, clientY = 10) =>
-      target.dispatchEvent(
+    advance,
+    pointer: (
+      type: string,
+      clientX: number,
+      clientY = 10,
+      timeAdvanceMs: number = EVENT_TIME_ADVANCE_MS,
+    ) => {
+      elapsed += Math.max(0, timeAdvanceMs);
+      return target.dispatchEvent(
         Object.assign(new Event(type, { cancelable: true }), {
           pointerId: 1,
           button: 0,
@@ -299,7 +315,8 @@ function dragFixture(realModel?: GhosttyTerminalModelApi) {
           clientX,
           clientY,
         }),
-      ),
+      );
+    },
   };
 }
 
@@ -370,6 +387,33 @@ describe("terminal selection drag activation threshold", () => {
     fixture.pointer("pointerdown", 5);
     fixture.pointer("pointermove", 45); // 40px > 5px threshold
     fixture.pointer("pointerup", 45);
+    expect(fixture.controller.value).not.toBeNull();
+  });
+
+  it("a quick swipe before the hold window cancels the press", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 50, 10, 0);
+    fixture.pointer("pointermove", 70, 10, 0);
+    expect(fixture.controller.value).toBeNull();
+    fixture.pointer("pointerup", 70, 10, 0);
+    expect(fixture.controller.value).toBeNull();
+    expect(fixture.tracked()).toBeNull();
+  });
+
+  it("a quick tap with travel on pointerup never selects", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 50, 10, 0);
+    fixture.pointer("pointerup", 70, 10, 0);
+    expect(fixture.controller.value).toBeNull();
+    expect(fixture.tracked()).toBeNull();
+  });
+
+  it("a held press can still become a selection drag", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 5, 10, 0);
+    fixture.advance(130);
+    fixture.pointer("pointermove", 45, 10, 0);
+    fixture.pointer("pointerup", 45, 10, 0);
     expect(fixture.controller.value).not.toBeNull();
   });
 
