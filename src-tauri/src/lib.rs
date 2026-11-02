@@ -208,6 +208,10 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
+                // Timestamps are written in the machine's local timezone; the
+                // plugin default is UTC, which is confusing when correlating a
+                // user report against the clock on their own screen.
+                .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
                 // Per-version log file so each release gets a fresh log and old
                 // versions' records never pollute the current one while debugging.
                 .targets([

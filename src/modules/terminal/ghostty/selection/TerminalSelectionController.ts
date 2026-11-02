@@ -19,7 +19,7 @@ const DRAG_ACTIVATE_DISTANCE = 5;
  * Real drags are held; a tap is released within this window. Without a hold
  * requirement a light tap followed by a swipe would select text on trackpads.
  */
-const PRESS_HOLD_MS = 120;
+const PRESS_HOLD_MS = 200;
 /**
  * Pointer travel (px) allowed inside PRESS_HOLD_MS. Moving past this while the
  * press has not yet been held long enough is a fast swipe, not a selection

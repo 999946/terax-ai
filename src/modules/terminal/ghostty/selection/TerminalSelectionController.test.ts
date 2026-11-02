@@ -415,7 +415,7 @@ describe("terminal selection drag activation threshold", () => {
   it("a held press can still become a selection drag", () => {
     const fixture = dragFixture();
     fixture.pointer("pointerdown", 5, 10, 0);
-    fixture.advance(130);
+    fixture.advance(210); // past PRESS_HOLD_MS = 200ms
     fixture.pointer("pointermove", 45, 10, 0);
     fixture.pointer("pointerup", 45, 10, 0);
     expect(fixture.controller.value).not.toBeNull();
@@ -440,7 +440,7 @@ describe("terminal selection drag activation threshold", () => {
   it("emits diagnostic trails for down/move/up transitions", () => {
     const fixture = dragFixture();
     fixture.pointer("pointerdown", 30, 10, 0);
-    fixture.advance(200); // park past the hold window so the next move activates
+    fixture.advance(250); // park past the hold window so the next move activates
     fixture.pointer("pointermove", 60, 10, 0); // 30px travel -> real drag
     fixture.pointer("pointermove", 75, 10, 0); // post-activation move
     fixture.pointer("pointerup", 75, 10, 0);
