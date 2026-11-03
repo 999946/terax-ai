@@ -9,12 +9,7 @@
  * offsets.
  */
 import { Change, diff, type DiffConfig } from "@codemirror/merge";
-import {
-  type DiffHighlightPolicy,
-  type DiffIgnorePolicy,
-  highlightsWords,
-  ignoresWhitespace,
-} from "./diffOptions";
+import { type DiffIgnorePolicy, ignoresWhitespace } from "./diffOptions";
 
 const WHITESPACE = /\s/g;
 
@@ -30,11 +25,6 @@ type Projection = {
   text: string;
   offsetOf: number[];
 };
-
-/** Whether `policy` requires overriding the engine's default comparison. */
-export function needsWhitespaceOverride(policy: DiffIgnorePolicy): boolean {
-  return ignoresWhitespace(policy);
-}
 
 function project(text: string, policy: DiffIgnorePolicy): Projection {
   const dropEmptyLines = policy === "whitespaceAndLines";
@@ -102,23 +92,6 @@ function clampIndex(index: number, length: number): number {
 
 /** The `DiffConfig` to pass to a MergeView / unifiedMergeView. */
 export function diffConfigFor(policy: DiffIgnorePolicy): DiffConfig {
-  if (!needsWhitespaceOverride(policy)) return {};
+  if (!ignoresWhitespace(policy)) return {};
   return { override: whitespaceOverride(policy) };
-}
-
-/**
- * IDEA's word-level highlighting: when "Highlight words" is on, a merge view
- * with `highlightChanges: false` still highlights the inner fragments of each
- * chunk, in the chunk's own type. The engine's `changedText` marks are colour
- * themed in `GitDiffPane.DIFF_THEME`; setting `highlightChanges` false leaves
- * the whole-line painting to `ideaDiffPane`.
- */
-export function highlightChangesFor(policy: DiffHighlightPolicy): {
-  highlightChanges: boolean;
-  words: boolean;
-} {
-  return {
-    highlightChanges: highlightsWords(policy),
-    words: highlightsWords(policy),
-  };
 }

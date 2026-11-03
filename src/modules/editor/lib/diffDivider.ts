@@ -12,11 +12,7 @@ import { type MergePanes } from "./diffScrollSync";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** Pixel [top, bottom] of a chunk range in `view`; empty range is a boundary. */
-export function extent(
-  view: EditorView,
-  from: number,
-  to: number,
-): [number, number] {
+function extent(view: EditorView, from: number, to: number): [number, number] {
   const len = view.state.doc.length;
   if (from > len) {
     const end = view.lineBlockAt(len).bottom;
@@ -29,7 +25,7 @@ export function extent(
 }
 
 /** The divider band path between [a0,a1] on the left and [b0,b1] on the right. */
-export function bandPath(
+function bandPath(
   width: number,
   a0: number,
   a1: number,

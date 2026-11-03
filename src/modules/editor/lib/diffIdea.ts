@@ -99,14 +99,12 @@ export function changedLines(
  * The side a pane belongs to. Read from the merge facet, not the `cm-merge-*`
  * DOM class: plugins are constructed before the view applies its attributes.
  */
-export function mergeSide(state: EditorState): "a" | "b" | null {
+function mergeSide(state: EditorState): "a" | "b" | null {
   return getChunks(state)?.side ?? null;
 }
 
 /** How the viewer asks for colours; both policies are off for "Do not highlight". */
 export type IdeaDiffStyle = { words: boolean; lines: boolean };
-
-const NO_STYLE: IdeaDiffStyle = { words: false, lines: false };
 
 const lineDecorationsByKind = byKind((kind) => ({
   coarse: Decoration.line({ class: `cm-diffLine cm-diffLine-${kind}` }),
@@ -345,9 +343,6 @@ export function ideaDiffPane(style: IdeaDiffStyle): Extension {
     gutterField(style.words),
   ];
 }
-
-/** No styling at all, for "Do not highlight". */
-export const ideaDiffPaneNone = ideaDiffPane(NO_STYLE);
 
 /** The index of the change block holding `view`'s cursor, or -1. */
 export function currentChunkIndex(view: EditorView): number {

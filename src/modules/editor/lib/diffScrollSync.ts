@@ -16,7 +16,7 @@ import { EditorView } from "@codemirror/view";
 type Side = "a" | "b";
 
 /** A stretch of both documents in pixels: unchanged text, or a change. */
-export type Band = {
+type Band = {
   a0: number;
   a1: number;
   b0: number;
@@ -32,11 +32,7 @@ export type MergePanes = {
 };
 
 /** Pixel [top, bottom] of a chunk range in `view`; an empty range is a boundary. */
-export function extent(
-  view: EditorView,
-  from: number,
-  to: number,
-): [number, number] {
+function extent(view: EditorView, from: number, to: number): [number, number] {
   const max = view.state.doc.length;
   if (from > max) {
     const end = view.lineBlockAt(max).bottom;
@@ -64,7 +60,7 @@ function firstIndex(n: number, past: (index: number) => boolean): number {
  * The stretch of both documents around pixel `y` of side `from` (IDEA's
  * BaseSyncScrollable.processHelper). Only the chunks next to `y` are measured.
  */
-export function bandAt(
+function bandAt(
   chunks: readonly Chunk[],
   extentA: (chunk: Chunk) => [number, number],
   extentB: (chunk: Chunk) => [number, number],
@@ -107,11 +103,7 @@ export function bandAt(
  * in pixels): unchanged text maps proportionally, and inside a change the other
  * side follows line by line, then waits at the end of its shorter part.
  */
-export function transferY(
-  bands: readonly Band[],
-  y: number,
-  from: Side,
-): number {
+function transferY(bands: readonly Band[], y: number, from: Side): number {
   const fromA = from === "a";
   const band =
     bands.find((candidate) => y < (fromA ? candidate.a1 : candidate.b1)) ??
@@ -131,7 +123,7 @@ export function transferY(
 }
 
 /** Offset of the document's top within the pane's scrolled content. */
-export function docOffset(view: EditorView): number {
+function docOffset(view: EditorView): number {
   return (
     view.documentTop -
     view.scrollDOM.getBoundingClientRect().top +

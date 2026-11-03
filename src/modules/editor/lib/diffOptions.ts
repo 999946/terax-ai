@@ -3,7 +3,7 @@
  * `diffOptions.ts`): viewer kind, whitespace policy, highlighting, collapsed
  * unchanged fragments, synchronized scrolling and change alignment.
  */
-export type DiffViewerMode = "split" | "inline";
+type DiffViewerMode = "split" | "inline";
 export type DiffIgnorePolicy =
   | "none"
   | "trim"
@@ -114,9 +114,4 @@ export function ignoresWhitespace(policy: DiffIgnorePolicy): boolean {
 /** Whether the highlight policy asks for inner word fragments. */
 export function highlightsWords(policy: DiffHighlightPolicy): boolean {
   return policy === "words";
-}
-
-/** Whether changed lines get any background at all. */
-export function highlightsLines(policy: DiffHighlightPolicy): boolean {
-  return policy !== "none";
 }
