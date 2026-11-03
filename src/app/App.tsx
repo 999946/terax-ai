@@ -52,6 +52,10 @@ import {
   useEditorFileSync,
 } from "@/modules/editor";
 import { FileExplorer, type FileExplorerHandle } from "@/modules/explorer";
+import {
+  JUMP_TO_SOURCE_EVENT,
+  type JumpToSourceDetail,
+} from "@/modules/editor/lib/jumpToSource";
 import { invalidateGitBaselinesForPaths } from "@/modules/editor/lib/gitBaselineCache";
 import { invalidateBlameForPath } from "@/modules/editor/lib/blameCache";
 import { invalidateMergeStatus } from "@/modules/source-control/mergeStatusCache";
@@ -1604,6 +1608,18 @@ export default function App() {
   useEffect(() => {
     setLspNavigator({ openFile: openContentHit });
     return () => setLspNavigator(null);
+  }, [openContentHit]);
+
+  // "Jump to Source" from a diff viewer: open the file in an editor tab and
+  // put the cursor on the changed line.
+  useEffect(() => {
+    const onJump = (event: Event) => {
+      const detail = (event as CustomEvent<JumpToSourceDetail>).detail;
+      if (!detail?.path) return;
+      openContentHit(detail.path, detail.line ?? 1);
+    };
+    window.addEventListener(JUMP_TO_SOURCE_EVENT, onJump);
+    return () => window.removeEventListener(JUMP_TO_SOURCE_EVENT, onJump);
   }, [openContentHit]);
 
   const insertHistoryCommand = useMemo(

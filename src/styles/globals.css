@@ -565,3 +565,38 @@ html *::-webkit-scrollbar {
     background-position: 0% center;
   }
 }
+
+/* Diff viewer toolbar: when the pane is too narrow (a side-docked diff), the
+   whitespace and highlighting pickers fold into the gear menu, like IDEA. */
+@container (max-width: 640px) {
+  .terax-diff-select {
+    display: none !important;
+  }
+}
+
+/* IDEA-style git diff: unpadded panes each scroll on their own, the divider
+   rail between them carries the change bands (see editor/lib/diffDivider.ts). */
+.terax-diff-host > .cm-mergeView {
+  height: 100%;
+  overflow: hidden;
+}
+.terax-diff-host .cm-mergeViewEditors {
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+}
+.terax-diff-host .cm-mergeViewEditor {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+/* `html` outranks MergeView's base theme, which stretches the panes and leaves
+   scrolling to the outer view: these panes each scroll on their own. */
+html .terax-diff-host .cm-mergeViewEditor > .cm-editor,
+html .terax-diff-host .cm-mergeViewEditor > .cm-editor > .cm-scroller {
+  height: 100% !important;
+}
+html .terax-diff-host .cm-mergeViewEditor > .cm-editor > .cm-scroller {
+  overflow: auto !important;
+}
