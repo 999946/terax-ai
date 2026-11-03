@@ -1547,12 +1547,16 @@ export default function App() {
     Map<number, { line?: number; focus: boolean }>
   >(new Map());
   const openContentHit = useCallback(
-    (path: string, line: number) => {
+    (path: string, line: number, character?: number) => {
       const id = openFileTab(path, true);
       if (id == null) return;
       const h = editorRefs.current.get(id);
-      if (h) h.gotoLine(line);
-      else pendingEditorNavigation.current.set(id, { line, focus: true });
+      if (h) h.gotoLine(line, { character });
+      else
+        pendingEditorNavigation.current.set(id, {
+          line,
+          focus: true,
+        });
     },
     [openFileTab],
   );

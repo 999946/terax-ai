@@ -124,9 +124,9 @@ export async function acquireDocExtension(
       client: managed.client,
       documentUri: uri,
       rootPath: managed.root.replace(/\\/g, "/"),
-      onExternal: (extUri, line) => {
+      onExternal: (extUri, line, character) => {
         const target = fileUriToPath(extUri);
-        if (target) getLspNavigator()?.openFile(target, line);
+        if (target) getLspNavigator()?.openFile(target, line, character);
       },
     }),
     mod.languageServerWithTransport({

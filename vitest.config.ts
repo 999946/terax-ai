@@ -16,7 +16,14 @@ import viteConfig from "./vite.config";
 // directives (`on:click` → `DirectiveOn`), failing the Svelte tree assertion.
 // Routing just this file to a dedicated serial forks project keeps the rest of
 // the suite parallel-fast and makes the Svelte parse deterministic.
-const SERIAL_FILE = "src/modules/editor/lib/languageResolver.test.ts";
+const SERIAL_FILES = [
+  "src/modules/editor/lib/languageResolver.test.ts",
+  // `symbolBreadcrumb.test.ts` parses JavaScript/TypeScript trees through the
+  // same shared language singletons. Under the parallel pool the parser setup
+  // races and a class/method chain occasionally comes back empty, so it is
+  // routed to the serial project for the same reason as languageResolver.
+  "src/modules/editor/lib/symbolBreadcrumb.test.ts",
+];
 
 export default defineConfig(async (env) => {
   // The app's Vite config (aliases, plugins). Inline projects do NOT inherit
@@ -31,7 +38,7 @@ export default defineConfig(async (env) => {
       test: {
         ...commonTest,
         name: "main",
-        exclude: [...defaultExclude, ".claude/**", SERIAL_FILE],
+        exclude: [...defaultExclude, ".claude/**", ...SERIAL_FILES],
       },
     }),
     // Just the Svelte language test, isolated in its own serial process.
@@ -39,7 +46,7 @@ export default defineConfig(async (env) => {
       test: {
         ...commonTest,
         name: "languageResolver-serial",
-        include: [SERIAL_FILE],
+        include: SERIAL_FILES,
         pool: "forks",
         fileParallelism: false,
       },

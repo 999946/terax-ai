@@ -1,5 +1,6 @@
 export type LspNavigator = {
-  openFile: (path: string, line: number) => void;
+  /** `line` is 1-based; `character` is the 0-based column on that line. */
+  openFile: (path: string, line: number, character?: number) => void;
 };
 
 let current: LspNavigator | null = null;

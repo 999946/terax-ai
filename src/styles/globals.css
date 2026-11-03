@@ -69,6 +69,8 @@
     --ml-modified: #b45309;
     --ml-deleted: #dc2626;
     --ml-conflict: #b91c1c;
+    --lsp-occurrence: rgba(56, 132, 255, 0.18);
+    --lsp-occurrence-write: rgba(220, 38, 38, 0.55);
     --card-foreground: #111111;
     --popover: #ffffff;
     --popover-foreground: #111111;
@@ -112,6 +114,8 @@
     --ml-modified: #f59e0b;
     --ml-deleted: #f87171;
     --ml-conflict: #f94c4c;
+    --lsp-occurrence: rgba(96, 165, 250, 0.24);
+    --lsp-occurrence-write: rgba(248, 113, 113, 0.7);
     --card-foreground: #f7f7f7;
     --popover: #1d1d1d;
     --popover-foreground: #f7f7f7;

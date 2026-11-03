@@ -119,7 +119,10 @@ export type EditorPaneHandle = {
   /** Re-pull the git HEAD change-marker baseline (called after a commit). */
   refreshGitBaseline: () => void;
   /** Move the cursor to a 1-based line and center it, once content is ready. */
-  gotoLine: (line: number, options?: { focus?: boolean }) => void;
+  gotoLine: (
+    line: number,
+    options?: { focus?: boolean; character?: number },
+  ) => void;
   /** Apply CodeMirror's undo/redo commands. */
   undo: () => void;
   redo: () => void;
@@ -384,6 +387,7 @@ export const EditorPane = memo(
     const pendingLineRef = useRef<{
       path: string;
       line: number;
+      character: number;
       focus: boolean;
     } | null>(null);
     const pendingFocusRef = useRef<string | null>(null);
@@ -421,7 +425,8 @@ export const EditorPane = memo(
         return;
       }
       const target = Math.max(1, Math.min(pending.line, view.state.doc.lines));
-      const at = view.state.doc.line(target).from;
+      const lineObj = view.state.doc.line(target);
+      const at = Math.min(lineObj.from + pending.character, lineObj.to);
       view.dispatch({
         selection: { anchor: at },
         effects: EditorView.scrollIntoView(at, { y: "center" }),
@@ -966,6 +971,7 @@ export const EditorPane = memo(
           pendingLineRef.current = {
             path,
             line,
+            character: options?.character ?? 0,
             focus: options?.focus ?? true,
           };
           applyPendingGoto();
