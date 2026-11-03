@@ -26,6 +26,15 @@ const PRESS_HOLD_MS = 200;
  * drag, and cancels the press entirely (same idea as dnd-kit's tolerance).
  */
 const QUICK_SWIPE_TOLERANCE = 10;
+/**
+ * Safety net for a lost `pointerup`. Trackpads can swallow the release (system
+ * gestures, inertial scrolling, window focus changes, driver hiccups), leaving
+ * the controller believing a press is still in flight. Every later
+ * `pointermove` then looks like a very long hold and instantly activates a
+ * drag - the "light tap then swipe selects text" report. A press that outlives
+ * this window is abandoned.
+ */
+const PRESS_TIMEOUT_MS = 10_000;
 
 export type TerminalSelectionBounds = {
   readonly startLine: number;
@@ -67,6 +76,7 @@ export class TerminalSelectionController {
   // the (uncommitted) selection before the first qualifying pointermove.
   private pendingAnchor: TerminalBufferPoint | null = null;
   private autoScrollFrame: number | null = null;
+  private pressTimeout: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
   private readonly now: () => number;
@@ -93,6 +103,22 @@ export class TerminalSelectionController {
       "lostpointercapture",
       this.handleLostCapture,
     );
+    // A release can also be lost when the webview stops receiving pointer
+    // events entirely. Drop the press so stale state cannot turn a later
+    // hover movement into a selection drag.
+    if (
+      typeof window !== "undefined" &&
+      typeof window.addEventListener === "function"
+    )
+      window.addEventListener("blur", this.handleWindowBlur);
+    if (
+      typeof document !== "undefined" &&
+      typeof document.addEventListener === "function"
+    )
+      document.addEventListener(
+        "visibilitychange",
+        this.handleVisibilityChange,
+      );
   }
 
   get value(): TerminalBufferSelection | null {
@@ -158,9 +184,24 @@ export class TerminalSelectionController {
     target.removeEventListener("pointerup", this.handlePointerUp);
     target.removeEventListener("pointercancel", this.handleLostCapture);
     target.removeEventListener("lostpointercapture", this.handleLostCapture);
+    if (
+      typeof window !== "undefined" &&
+      typeof window.removeEventListener === "function"
+    )
+      window.removeEventListener("blur", this.handleWindowBlur);
+    if (
+      typeof document !== "undefined" &&
+      typeof document.removeEventListener === "function"
+    )
+      document.removeEventListener(
+        "visibilitychange",
+        this.handleVisibilityChange,
+      );
+    this.clearPressTimeout();
   }
 
   suspend(): void {
+    this.clearPressTimeout();
     this.stopAutoScroll();
     const { target } = this.options;
     const pointerId = this.pointerId;
@@ -174,8 +215,50 @@ export class TerminalSelectionController {
   }
 
   private readonly handleLostCapture = (event: PointerEvent): void => {
-    if (event.pointerId === this.pointerId) this.suspend();
+    if (event.pointerId === this.pointerId) {
+      this.log(`lost-capture id=${event.pointerId} type=${event.type}`);
+      this.suspend();
+    }
   };
+
+  private readonly handleWindowBlur = (): void => {
+    if (this.pointerId === null) return;
+    this.log(`window-blur id=${this.pointerId} dragActive=${this.dragActive}`);
+    this.suspend();
+  };
+
+  private readonly handleVisibilityChange = (): void => {
+    if (
+      this.pointerId === null ||
+      (typeof document !== "undefined" && !document.hidden)
+    )
+      return;
+    this.log(`visibility-hidden id=${this.pointerId}`);
+    this.suspend();
+  };
+
+  /**
+   * Arm the lost-release watchdog. Runs a single timer per press rather than
+   * checking on every move, so the hot path stays allocation free.
+   */
+  private armPressTimeout(): void {
+    this.clearPressTimeout();
+    this.pressTimeout = setTimeout(() => {
+      this.pressTimeout = null;
+      if (this.pointerId === null) return;
+      this.log(
+        `press-timeout id=${this.pointerId} dragActive=${this.dragActive} ` +
+          `meaningful=${this.meaningful} limit=${PRESS_TIMEOUT_MS}ms`,
+      );
+      this.suspend();
+    }, PRESS_TIMEOUT_MS);
+  }
+
+  private clearPressTimeout(): void {
+    if (this.pressTimeout === null) return;
+    clearTimeout(this.pressTimeout);
+    this.pressTimeout = null;
+  }
 
   /** Discard an unheld press without changing any committed selection. */
   private cancelPending(): void {
@@ -188,6 +271,7 @@ export class TerminalSelectionController {
     this.pointerId = null;
     this.dragActive = false;
     this.pendingAnchor = null;
+    this.clearPressTimeout();
     if (pointerId !== null && target.hasPointerCapture(pointerId)) {
       target.releasePointerCapture(pointerId);
     }
@@ -218,6 +302,7 @@ export class TerminalSelectionController {
     this.pressStartTime = this.now();
     this.dragActive = false;
     this.pendingAnchor = point;
+    this.armPressTimeout();
 
     const existingAnchor = event.shiftKey ? this.selection?.anchor : undefined;
     this.mode =
@@ -248,6 +333,18 @@ export class TerminalSelectionController {
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
     if (event.pointerId !== this.pointerId) return;
+    // Lost-release guard: if we still own a press but the runtime tells us no
+    // buttons are held, the pointerup was swallowed (trackpad/system gesture/
+    // blur). A press that no button is holding must not drive a selection.
+    if (event.buttons === 0) {
+      this.log(
+        `pointermove BUTTONS-0 id=${event.pointerId} type=${event.pointerType} ` +
+          `held=${(this.now() - this.pressStartTime).toFixed(0)}ms ` +
+          `dragActive=${this.dragActive} predicting-lost-release`,
+      );
+      this.suspend();
+      return;
+    }
     if (!this.dragActive) {
       const dx = event.clientX - this.startClientX;
       const dy = event.clientY - this.startClientY;
@@ -377,6 +474,7 @@ export class TerminalSelectionController {
     this.pointerId = null;
     this.dragActive = false;
     this.pendingAnchor = null;
+    this.clearPressTimeout();
     this.stopAutoScroll();
   };
 

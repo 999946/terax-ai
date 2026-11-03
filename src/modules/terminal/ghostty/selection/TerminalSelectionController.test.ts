@@ -307,12 +307,16 @@ function dragFixture(realModel?: GhosttyTerminalModelApi) {
       clientX: number,
       clientY = 10,
       timeAdvanceMs: number = EVENT_TIME_ADVANCE_MS,
+      buttons: number | undefined = undefined,
     ) => {
       elapsed += Math.max(0, timeAdvanceMs);
       return target.dispatchEvent(
         Object.assign(new Event(type, { cancelable: true }), {
           pointerId: 1,
           button: 0,
+          buttons:
+            buttons ??
+            (type === "pointerdown" ? 1 : type === "pointermove" ? 1 : 0),
           detail: 1,
           shiftKey: false,
           altKey: false,
@@ -460,6 +464,65 @@ describe("terminal selection drag activation threshold", () => {
           m.startsWith("pointerup END-DRAG id=") && m.includes("selection="),
       ),
     ).toBe(true);
+  });
+
+  it("abandons a press whose release was lost when a button-free move arrives", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 5, 10, 0);
+    // The trackpad swallowed pointerup: no buttons are held any more, yet the
+    // controller still owns the press. This move must not become a drag.
+    fixture.pointer("pointermove", 300, 10, 0, 0);
+    expect(fixture.controller.value).toBeNull();
+    expect(fixture.tracked()).toBeNull();
+    const calls = fixture.logger.mock.calls.map((c) => c[0] as string);
+    expect(
+      calls.some(
+        (m) =>
+          m.startsWith("pointermove BUTTONS-0 id=") &&
+          m.includes("predicting-lost-release"),
+      ),
+    ).toBe(true);
+  });
+
+  it("a button-free hover after a lost release cannot extend an existing drag", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 5, 10, 0);
+    fixture.advance(250);
+    fixture.pointer("pointermove", 60, 10, 0); // real drag, selection is live
+    expect(fixture.controller.value).not.toBeNull();
+    const before = fixture.controller.value;
+    // Release lost, then a hover move across the terminal.
+    fixture.pointer("pointermove", 400, 10, 0, 0);
+    expect(fixture.controller.value).toEqual(before);
+    // The stale press is gone, so a fresh hover is ignored entirely.
+    fixture.pointer("pointermove", 500, 10, 0, 0);
+    expect(fixture.controller.value).toEqual(before);
+  });
+
+  it("the watchdog drops a press that never receives a release", () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = dragFixture();
+      fixture.pointer("pointerdown", 5, 10, 0);
+      vi.advanceTimersByTime(10_001);
+      // Press abandoned; the move below cannot activate a drag any more.
+      fixture.pointer("pointermove", 300, 10, 0, 1);
+      expect(fixture.controller.value).toBeNull();
+      const calls = fixture.logger.mock.calls.map((c) => c[0] as string);
+      expect(calls.some((m) => m.startsWith("press-timeout id="))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a normal press still drags after the release-loss guards are armed", () => {
+    const fixture = dragFixture();
+    fixture.pointer("pointerdown", 5, 10, 0);
+    fixture.advance(250);
+    fixture.pointer("pointermove", 60, 10, 0, 1);
+    fixture.pointer("pointerup", 60, 10, 0, 0);
+    expect(fixture.controller.value).not.toBeNull();
+    expect(fixture.tracked()).not.toBeNull();
   });
 
   it("logs a quick swipe cancel when the press is too young", () => {
