@@ -13,4 +13,5 @@ export {
 } from "./lib/useGlobalShortcuts";
 export { useShortcutLabel } from "./lib/useShortcutLabel";
 export { shortcutLabel } from "./lib/shortcutLabel";
+export { matchesShortcut } from "./lib/matchesShortcut";
 export { shouldDisablePaneSwapShortcut } from "./lib/shortcutScope";

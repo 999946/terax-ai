@@ -12,7 +12,10 @@ import {
 import { EditorState, type Extension } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -56,6 +59,7 @@ import {
 import { changedLines } from "./lib/modifiedLines";
 import { requestJumpToSource } from "./lib/jumpToSource";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { matchesShortcut } from "@/modules/shortcuts";
 import { setGitDiffCollapseUnchanged } from "@/modules/settings/store";
 
 type WorkingSource = {
@@ -293,6 +297,9 @@ export function GitDiffPane({
   const { t } = useTranslation();
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const mergeRootRef = useRef<HTMLDivElement | null>(null);
+  // Bumped by ⇧⌥D so the toolbar opens its settings menu (its gear menu owns
+  // the open state; the shortcut is a request, not a second source of truth).
+  const [settingsRequest, setSettingsRequest] = useState(0);
   const mergeViewRef = useRef<MergeView | null>(null);
   const syncRef = useRef<SyncedPanes | null>(null);
   const themeExt = useEditorThemeExt();
@@ -828,6 +835,28 @@ export function GitDiffPane({
     requestJumpToSource({ path: absolute, line });
   }, [currentView, repoRoot, path]);
 
+  /** IDEA's diff keys, while focus is inside the pane: F7 / ⇧F7 step through
+   * the changes, F4 jumps to the source file, ⇧⌥D opens the viewer settings. */
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (useFallback) return;
+      if (matchesShortcut(e.nativeEvent, "diff.prevDifference")) {
+        e.preventDefault();
+        stepDiff(-1);
+      } else if (matchesShortcut(e.nativeEvent, "diff.nextDifference")) {
+        e.preventDefault();
+        stepDiff(1);
+      } else if (matchesShortcut(e.nativeEvent, "diff.jumpToSource")) {
+        e.preventDefault();
+        jumpToSource();
+      } else if (matchesShortcut(e.nativeEvent, "diff.showSettings")) {
+        e.preventDefault();
+        setSettingsRequest((n) => n + 1);
+      }
+    },
+    [useFallback, stepDiff, jumpToSource],
+  );
+
   const stats = useMemo(
     () =>
       useFallback ? countDiffLines(fallbackPatch) : { added: 0, removed: 0 },
@@ -877,6 +906,7 @@ export function GitDiffPane({
     <div
       className="@container/diff flex h-full min-h-0 flex-col bg-background"
       onClick={handlePaneClick}
+      onKeyDown={handleKeyDown}
     >
       <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-border/60 px-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -927,6 +957,7 @@ export function GitDiffPane({
           onRefresh={loadFresh}
           onJumpToSource={jumpToSource}
           differenceCount={diffCount}
+          settingsRequest={settingsRequest}
         />
       ) : null}
 

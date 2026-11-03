@@ -566,10 +566,17 @@ html *::-webkit-scrollbar {
   }
 }
 
-/* Diff viewer toolbar: when the pane is too narrow (a side-docked diff), the
-   whitespace and highlighting pickers fold into the gear menu, like IDEA. */
+/* Diff viewer toolbar, as IDEA folds it (see OpenIDEA's DiffEditor.module.css):
+   in a narrow pane (a side-docked diff) the whitespace and highlighting pickers
+   stay only in the gear menu, and at phone widths the separators go too so the
+   navigation arrows and the counter keep their room. */
 @container (max-width: 640px) {
   .terax-diff-select {
+    display: none !important;
+  }
+}
+@container (max-width: 380px) {
+  .terax-diff-toolbar .terax-diff-sep {
     display: none !important;
   }
 }

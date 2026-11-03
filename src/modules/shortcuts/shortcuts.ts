@@ -52,7 +52,11 @@ export type ShortcutId =
   | "editor.redo"
   | "editor.save"
   | "editor.aiComplete"
-  | "editor.codeComplete";
+  | "editor.codeComplete"
+  | "diff.prevDifference"
+  | "diff.nextDifference"
+  | "diff.jumpToSource"
+  | "diff.showSettings";
 
 export type ShortcutGroup =
   | "General"
@@ -457,6 +461,38 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Trigger code completion",
     group: "Editor",
     defaultBindings: [{ ctrl: true, key: " " }],
+  },
+  // The diff viewer's own keys, as IDEA binds them: F7 / Shift+F7 step through
+  // the changes, F4 jumps to the source file. IDEA opens the viewer settings
+  // with Shift+Cmd+D; Cmd+Shift+D is already "split pane down" here, so the
+  // pane-scoped variant is Shift+Alt+D.
+  {
+    id: "diff.prevDifference",
+    labelKey: "settings.shortcuts.items.diff.prevDifference",
+    label: "Previous difference",
+    group: "Editor",
+    defaultBindings: [{ shift: true, key: "F7" }],
+  },
+  {
+    id: "diff.nextDifference",
+    labelKey: "settings.shortcuts.items.diff.nextDifference",
+    label: "Next difference",
+    group: "Editor",
+    defaultBindings: [{ key: "F7" }],
+  },
+  {
+    id: "diff.jumpToSource",
+    labelKey: "settings.shortcuts.items.diff.jumpToSource",
+    label: "Jump to source",
+    group: "Editor",
+    defaultBindings: [{ key: "F4" }],
+  },
+  {
+    id: "diff.showSettings",
+    labelKey: "settings.shortcuts.items.diff.showSettings",
+    label: "Diff viewer settings",
+    group: "Editor",
+    defaultBindings: [{ alt: true, shift: true, key: "d" }],
   },
 ];
 

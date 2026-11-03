@@ -11,6 +11,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useShortcutLabel } from "@/modules/shortcuts";
 import {
   HIGHLIGHT_OPTIONS,
   IGNORE_OPTIONS,
@@ -54,27 +56,34 @@ type Props = {
   differenceCount: number;
   /** Hidden for the fallback (binary / huge) views, which have no block count. */
   hideCounter?: boolean;
+  /** Bumped to open the settings menu from a keyboard shortcut. */
+  settingsRequest?: number;
 };
 
 /** A toolbar icon button that reflects a pressed (active) state. */
 function ToolButton({
   icon,
   label,
+  shortcut,
   onClick,
   pressed,
   disabled,
 }: {
   icon: typeof ArrowUp01Icon;
   label: string;
+  /** Rendered after the label in the tooltip, as IDEA does. */
+  shortcut?: string;
   onClick: () => void;
   pressed?: boolean;
   disabled?: boolean;
 }) {
+  const title = shortcut ? `${label} (${shortcut})` : label;
   return (
     <button
       type="button"
-      title={label}
+      title={title}
       aria-label={label}
+      aria-keyshortcuts={shortcut}
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
@@ -91,7 +100,7 @@ function ToolButton({
 }
 
 function Separator() {
-  return <span className="mx-1 h-3.5 w-px shrink-0 bg-border" />;
+  return <span className="terax-diff-sep mx-1 h-3.5 w-px shrink-0 bg-border" />;
 }
 
 /**
@@ -109,9 +118,22 @@ export function DiffToolbar({
   onJumpToSource,
   differenceCount,
   hideCounter,
+  settingsRequest = 0,
 }: Props) {
   const { t } = useTranslation();
   const split = options.mode === "split";
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const prevShortcut = useShortcutLabel("diff.prevDifference");
+  const nextShortcut = useShortcutLabel("diff.nextDifference");
+  const sourceShortcut = useShortcutLabel("diff.jumpToSource");
+  const settingsShortcut = useShortcutLabel("diff.showSettings");
+
+  // ⇧⌥D opens the gear menu from the pane's keydown handler. (IDEA uses ⇧⌘D,
+  // already taken here by "split pane down".) The counter is the imperative
+  // channel, so no ref plumbing is needed.
+  useEffect(() => {
+    if (settingsRequest > 0) setSettingsOpen(true);
+  }, [settingsRequest]);
 
   return (
     <div
@@ -122,12 +144,14 @@ export function DiffToolbar({
       <ToolButton
         icon={ArrowUp01Icon}
         label={t("editor.diffPreviousDifference")}
+        shortcut={prevShortcut}
         onClick={onPrevious}
         disabled={differenceCount === 0}
       />
       <ToolButton
         icon={ArrowDown01Icon}
         label={t("editor.diffNextDifference")}
+        shortcut={nextShortcut}
         onClick={onNext}
         disabled={differenceCount === 0}
       />
@@ -135,6 +159,7 @@ export function DiffToolbar({
         <ToolButton
           icon={ArrowUpRight01Icon}
           label={t("editor.diffJumpToSource")}
+          shortcut={sourceShortcut}
           onClick={onJumpToSource}
         />
       ) : null}
@@ -232,11 +257,16 @@ export function DiffToolbar({
         <span className="ml-auto" />
       )}
 
-      <DropdownMenu>
+      <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            title={t("editor.diffSettings")}
+            title={
+              settingsShortcut
+                ? `${t("editor.diffSettings")} (${settingsShortcut})`
+                : t("editor.diffSettings")
+            }
+            aria-keyshortcuts={settingsShortcut}
             aria-label={t("editor.diffSettings")}
             aria-haspopup="menu"
             className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

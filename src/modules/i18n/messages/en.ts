@@ -628,6 +628,12 @@ export const en: Record<string, string> = {
   "settings.shortcuts.items.editor.save": "Save file",
   "settings.shortcuts.items.editor.aiComplete": "Trigger AI completion",
   "settings.shortcuts.items.editor.codeComplete": "Trigger code completion",
+  "settings.shortcuts.items.diff.prevDifference":
+    "Previous difference (diff viewer)",
+  "settings.shortcuts.items.diff.nextDifference":
+    "Next difference (diff viewer)",
+  "settings.shortcuts.items.diff.jumpToSource": "Jump to source (diff viewer)",
+  "settings.shortcuts.items.diff.showSettings": "Diff viewer settings",
   "settings.shortcuts.groups.AI": "AI",
   "settings.shortcuts.groups.Editor": "Editor",
   "settings.shortcuts.groups.General": "General",
